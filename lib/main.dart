@@ -162,7 +162,7 @@ class _MainScreenState extends State<MainScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 15),
+          const SizedBox(height: 25),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -195,7 +195,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildBottomNav() {
     return Positioned(
-      bottom: 30, left: 20, right: 20,
+      bottom: 55, left: 20, right: 20,
       child: Container(
         height: 74,
         decoration: BoxDecoration(color: const Color(0xFF151515), borderRadius: BorderRadius.circular(37), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 25)]),
@@ -452,7 +452,9 @@ class _PostViewState extends State<PostView> {
               ),
               // Sharp Foreground Images: TRUE Center Reveal + STABLE VERTICAL CENTER
               Positioned.fill(
-                child: Center(
+                child: Transform.translate(
+                  offset: const Offset(0, -25),
+                  child: Center(
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
@@ -528,18 +530,19 @@ class _PostViewState extends State<PostView> {
                   ),
                 ),
               ),
+            ),
               IgnorePointer(child: Container(color: Colors.black.withOpacity(0.15))),
               // Background Labels A/B with Small Crown on Winner
               Positioned(
-                top: sh * 0.28, left: 15, 
+                top: sh * 0.28 - 20, left: 15, 
                 child: _bgLabel('A', _votedSide == 1 ? Colors.cyanAccent.withOpacity(0.5) : Colors.white.withOpacity(0.45), isWinner: isExpired && (widget.post.percentA.compareTo(widget.post.percentB) > 0))
               ),
               Positioned(
-                top: sh * 0.28, right: 15, 
+                top: sh * 0.28 - 20, right: 15, 
                 child: _bgLabel('B', _votedSide == 2 ? Colors.redAccent.withOpacity(0.5) : Colors.white.withOpacity(0.45), isWinner: isExpired && (widget.post.percentB.compareTo(widget.post.percentA) > 0))
               ),
               Positioned(
-                top: 180, left: 0, right: 0,
+                top: 160, left: 0, right: 0,
                 child: Column(
                   children: [
                     Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const SizedBox(width: 40), Expanded(child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Text(widget.post.title, style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -1.5, shadows: [Shadow(color: Colors.black.withOpacity(0.6), blurRadius: 10, offset: const Offset(0, 2))]), maxLines: 1)))), const Icon(Icons.more_vert, color: Colors.white70, size: 28)])),
@@ -572,10 +575,10 @@ class _PostViewState extends State<PostView> {
                   ],
                 ),
               ),
-              AnimatedPositioned(duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), curve: Curves.easeOutCubic, bottom: 265, left: (currentWidthA / 2) - (descWidth / 2), child: _descBox(widget.post.descriptionA)),
-              AnimatedPositioned(duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), curve: Curves.easeOutCubic, bottom: 265, left: currentWidthA + ((sw - currentWidthA) / 2) - (descWidth / 2), child: _descBox(widget.post.descriptionB)),
+              AnimatedPositioned(duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), curve: Curves.easeOutCubic, bottom: 290, left: (currentWidthA / 2) - (descWidth / 2), child: _descBox(widget.post.descriptionA)),
+              AnimatedPositioned(duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), curve: Curves.easeOutCubic, bottom: 290, left: currentWidthA + ((sw - currentWidthA) / 2) - (descWidth / 2), child: _descBox(widget.post.descriptionB)),
               Positioned(
-                bottom: 115, left: 18, right: 130,
+                bottom: 140, left: 18, right: 130,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -615,13 +618,14 @@ class _PostViewState extends State<PostView> {
                     const SizedBox(height: 22),
                     Row(
                       children: [
+                        const SizedBox(width: 15),
                         _statIcon(
                           widget.post.isLiked ? Icons.favorite : Icons.favorite_border, 
                           widget.post.likesCount.toString(),
                           color: widget.post.isLiked ? Colors.redAccent : Colors.white,
                           onTap: widget.onLike,
                         ),
-                        const SizedBox(width: 35),
+                        const SizedBox(width: 20),
                         _statIcon(Icons.chat_bubble_outline, widget.post.commentsCount.toString(), onTap: () {
                           if (_votedSide == 0) {
                             showDialog(
@@ -709,14 +713,14 @@ class _PostViewState extends State<PostView> {
                             );
                           }
                         }),
-                        const SizedBox(width: 35),
+                        const SizedBox(width: 20),
                         _statIcon(
                           widget.post.isBookmarked ? Icons.bookmark : Icons.bookmark_border, 
                           '',
                           color: widget.post.isBookmarked ? Colors.amberAccent : Colors.white,
                           onTap: widget.onBookmark,
                         ),
-                        const SizedBox(width: 35),
+                        const SizedBox(width: 20),
                         _statIcon(Icons.share, '', onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('공유 링크가 복사되었습니다!'), duration: Duration(seconds: 1)));
                         }),
@@ -848,7 +852,7 @@ class _PostViewState extends State<PostView> {
     bool hasVoted = _votedSide != 0;
     
     return Positioned(
-      bottom: 102, // Lowered to be closer to nav bar
+      bottom: 127, // Raised to avoid system bar interference
       right: 35,   // Aligns donut center with profile icon's left edge
       child: SizedBox(
         width: 120, 
