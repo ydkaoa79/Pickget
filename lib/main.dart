@@ -2244,7 +2244,7 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 }
 
-class ChannelScreen extends StatelessWidget {
+class ChannelScreen extends StatefulWidget {
   final String uploaderId;
   final List<PostData> allPosts;
   final PostData initialPost;
@@ -2257,91 +2257,381 @@ class ChannelScreen extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    // Filter posts by this uploader
-    final channelPosts = allPosts.where((p) => p.uploaderId == uploaderId).toList();
-    
-    // Ensure the initialPost is at the top or handled correctly
-    if (!channelPosts.contains(initialPost)) {
-      channelPosts.insert(0, initialPost);
-    } else {
-      // Move initialPost to front if needed, or keep order
-      channelPosts.remove(initialPost);
-      channelPosts.insert(0, initialPost);
-    }
+  State<ChannelScreen> createState() => _ChannelScreenState();
+}
 
+class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  late List<PostData> _channelPosts;
+  bool _isBioExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_handleTabSelection);
+    _channelPosts = widget.allPosts.where((p) => p.uploaderId == widget.uploaderId).toList();
+    if (!_channelPosts.any((p) => p.id == widget.initialPost.id)) {
+      _channelPosts.insert(0, widget.initialPost);
+    }
+  }
+
+  void _handleTabSelection() {
+    if (_tabController.indexIsChanging || true) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _showMoreMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1C1C1C),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 12),
+          _buildMenuTile(Icons.share, '공유하기', () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('채널 링크가 복사되었습니다.'), duration: Duration(seconds: 1))
+            );
+          }),
+          _buildMenuTile(Icons.block, '이 채널 추천 안 함', () => Navigator.pop(context)),
+          _buildMenuTile(Icons.visibility_off, '관심 없음', () => Navigator.pop(context)),
+          _buildMenuTile(Icons.report_problem_outlined, '신고하기', () => Navigator.pop(context), isDestructive: true),
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuTile(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
+    return ListTile(
+      leading: Icon(icon, color: isDestructive ? Colors.redAccent : Colors.white),
+      title: Text(title, style: TextStyle(color: isDestructive ? Colors.redAccent : Colors.white, fontSize: 15)),
+      onTap: onTap,
+    );
+  }
+
+  int _parseTotalVotes(PostData post) {
+    int parseV(String s) {
+      s = s.toLowerCase().replaceAll(',', '').trim();
+      if (s.isEmpty) return 0;
+      if (s.endsWith('k')) {
+        return ((double.tryParse(s.substring(0, s.length - 1)) ?? 0) * 1000).toInt();
+      }
+      return int.tryParse(s) ?? 0;
+    }
+    return parseV(post.voteCountA) + parseV(post.voteCountB);
+  }
+
+  String _formatVotes(int count) {
+    if (count >= 1000000) {
+      return "${(count / 1000000).toStringAsFixed(1)}m";
+    } else if (count >= 1000) {
+      return "${(count / 1000).toStringAsFixed(1)}k";
+    }
+    return "$count";
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          PageView.builder(
-            scrollDirection: Axis.vertical,
-            itemCount: channelPosts.length,
-            itemBuilder: (context, index) {
-              final post = channelPosts[index];
-              return Stack(
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            backgroundColor: Colors.black,
+            expandedHeight: 0,
+            floating: true,
+            pinned: true,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+              onPressed: () => Navigator.pop(context),
+            ),
+            actions: [
+              IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: _showMoreMenu),
+            ],
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  PostView(
-                    post: post,
-                    onLike: () {},
-                    onFollow: () {},
-                    onBookmark: () {},
-                    onNotInterested: () {},
-                    onDontRecommendChannel: () {},
-                    onReport: (reason) {},
-                    onVote: (side) {},
-                  ),
-                  // Overlay Profile Header
-                  if (index == 0) Positioned(
-                    top: 0, left: 0, right: 0,
-                    child: Container(
-                      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 10, bottom: 20),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.black87, Colors.transparent],
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 42,
+                        backgroundImage: widget.initialPost.uploaderImage.startsWith('http')
+                          ? NetworkImage(widget.initialPost.uploaderImage)
+                          : AssetImage(widget.initialPost.uploaderImage) as ImageProvider,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.uploaderId,
+                              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "@${widget.uploaderId.toLowerCase().replaceAll(' ', '_')}",
+                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "팔로워 5.88만명 · 콘텐츠 ${_channelPosts.length}개",
+                              style: const TextStyle(color: Colors.white38, fontSize: 13),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Column(
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Bio with Expand Arrow
+                  GestureDetector(
+                    onTap: () => setState(() => _isBioExpanded = !_isBioExpanded),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '세상의 모든 선택지를 픽겟하다. 하고 싶은 거 다 해요 ✨ 매일 새로운 투표로 여러분의 선택을 기다립니다!',
+                            style: const TextStyle(color: Colors.white70, fontSize: 14),
+                            maxLines: _isBioExpanded ? 10 : 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Icon(
+                          _isBioExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                          color: Colors.white38,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Buttons (Follow & Sympathy Rate Detail)
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: const Text('팔로우', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF272727),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.check_rounded, color: Colors.cyanAccent, size: 16),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    '공감률 74%',
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                '32 / 42',
+                                style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _SliverAppBarDelegate(
+              PreferredSize(
+                preferredSize: const Size.fromHeight(50),
+                child: Container(
+                  color: Colors.black,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          CircleAvatar(
-                            radius: 35,
-                            backgroundImage: post.uploaderImage.startsWith('http')
-                              ? NetworkImage(post.uploaderImage)
-                              : AssetImage(post.uploaderImage) as ImageProvider,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            post.uploaderId,
-                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            '세상의 모든 선택지를 픽겟하다. #데일리룩 #맛집탐방',
-                            style: TextStyle(color: Colors.white70, fontSize: 13),
-                          ),
+                          _profileTab('최신순', 0),
+                          const SizedBox(width: 30),
+                          _profileTab('픽순', 1),
+                          const SizedBox(width: 30),
+                          _profileTab('시간순', 2),
                         ],
                       ),
-                    ),
+                    ],
                   ),
-                  // Back button
-                  Positioned(
-                    top: MediaQuery.of(context).padding.top + 10,
-                    left: 16,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 22),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                ],
-              );
-            },
+                ),
+              ),
+            ),
+          ),
+        ],
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildPostGrid(),
+            _buildPostGrid(),
+            _buildPostGrid(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _profileTab(String label, int index) {
+    final isSelected = _tabController.index == index;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() { _tabController.animateTo(index); }); 
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(color: Colors.transparent, fontSize: 15, fontWeight: FontWeight.w900),
+              ),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white38,
+                  fontSize: 15,
+                  fontWeight: isSelected ? FontWeight.w900 : FontWeight.w500,
+                ),
+                child: Text(label),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: isSelected ? 1.0 : 0.0,
+            child: Container(
+              width: 14,
+              height: 3,
+              decoration: BoxDecoration(
+                color: Colors.cyanAccent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildPostGrid() {
+    return GridView.builder(
+      padding: const EdgeInsets.only(top: 2),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 0.65,
+        crossAxisSpacing: 1,
+        mainAxisSpacing: 1,
+      ),
+      itemCount: _channelPosts.length,
+      itemBuilder: (context, index) {
+        final post = _channelPosts[index];
+        final totalVotes = _parseTotalVotes(post);
+        return GestureDetector(
+          onTap: () {
+             Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ChannelScreen(
+                uploaderId: widget.uploaderId,
+                allPosts: widget.allPosts,
+                initialPost: post,
+              )),
+            );
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(post.imageA, fit: BoxFit.cover),
+              Positioned(
+                bottom: 8,
+                left: 8,
+                child: Text(
+                  _formatVotes(totalVotes),
+                  style: const TextStyle(
+                    color: Colors.white, 
+                    fontSize: 11, 
+                    fontWeight: FontWeight.bold,
+                    shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final PreferredSizeWidget _widget;
+  _SliverAppBarDelegate(this._widget);
+
+  @override
+  double get minExtent => _widget.preferredSize.height;
+  @override
+  double get maxExtent => _widget.preferredSize.height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return _widget;
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => true;
 }
 
 class DonutPainter extends CustomPainter {
@@ -3281,11 +3571,12 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final List<String> _recentSearches = ['스타벅스', 'CU', '커피', '편의점', '에어팟'];
   List<PostData> _searchResults = [];
   bool _isSearching = false;
+  late TabController _tabController;
   
   // 디테일 뷰 모드를 위한 상태 변수
   bool _isDetailView = false;
@@ -3307,11 +3598,14 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() => setState(() {}));
     _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     // PageController는 초기화된 경우에만 해제
@@ -3345,100 +3639,155 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
         backgroundColor: Colors.black,
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-            onPressed: () {
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () {
+            if (_isDetailView) {
+              setState(() => _isDetailView = false);
+            } else if (_isSearching) {
+              // 검색 결과 목록에서 뒤로가기를 누르면 검색 대시보드로 복구
+              setState(() {
+                _isSearching = false;
+                _searchController.clear();
+                _wasInDetailView = false; // 검색을 새로 시작했으므로 이전 기억 초기화
+              });
+            } else if (_wasInDetailView && !_isSearching) {
+              // 대시보드 상태에서 '뒤로가기'를 누르면 이전 피드로 복구
+              setState(() {
+                _searchController.text = _lastSearchQuery;
+                _isSearching = true;
+                _isDetailView = true;
+                _wasInDetailView = false;
+                _detailPageController = PageController(initialPage: _detailPageIndex);
+              });
+            } else {
+              Navigator.pop(context);
+            }
+          },
+        ),
+        title: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1C1C),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: TextField(
+            controller: _searchController,
+            autofocus: true,
+            onTap: () {
               if (_isDetailView) {
-                setState(() => _isDetailView = false);
-              } else if (_isSearching) {
-                // 검색 결과 목록에서 뒤로가기를 누르면 검색 대시보드로 복구
                 setState(() {
+                  _lastSearchQuery = _searchController.text;
+                  _wasInDetailView = true;
+                  _isDetailView = false;
                   _isSearching = false;
                   _searchController.clear();
-                  _wasInDetailView = false; // 검색을 새로 시작했으므로 이전 기억 초기화
                 });
-              } else if (_wasInDetailView && !_isSearching) {
-                // 대시보드 상태에서 '뒤로가기'를 누르면 이전 피드로 복구
-                setState(() {
-                  _searchController.text = _lastSearchQuery;
-                  _isSearching = true;
-                  _isDetailView = true;
-                  _wasInDetailView = false;
-                  _detailPageController = PageController(initialPage: _detailPageIndex);
-                });
-              } else {
-                Navigator.pop(context);
               }
             },
-          ),
-          title: Container(
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1C1C1C),
-              borderRadius: BorderRadius.circular(20),
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: '궁금한 투표를 검색해보세요',
+              hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
+              prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
+              suffixIcon: _searchController.text.isNotEmpty 
+                ? IconButton(
+                    icon: const Icon(Icons.cancel, color: Colors.white24, size: 18),
+                    onPressed: () => _searchController.clear(),
+                  )
+                : null,
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
-            child: TextField(
-              controller: _searchController,
-              autofocus: true,
-              onTap: () {
-                if (_isDetailView) {
-                  setState(() {
-                    _lastSearchQuery = _searchController.text;
-                    _wasInDetailView = true;
-                    _isDetailView = false;
-                    _isSearching = false;
-                    _searchController.clear();
-                  });
-                }
-              },
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              decoration: InputDecoration(
-                hintText: '궁금한 투표를 검색해보세요',
-                hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
-                prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
-                suffixIcon: _searchController.text.isNotEmpty 
-                  ? IconButton(
-                      icon: const Icon(Icons.cancel, color: Colors.white24, size: 18),
-                      onPressed: () => _searchController.clear(),
-                    )
-                  : null,
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+          ),
+        ),
+        bottom: (_isSearching && !_isDetailView)
+          ? PreferredSize(
+              preferredSize: const Size.fromHeight(60),
+              child: Container(
+                color: Colors.black,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _searchTab('상위', 0),
+                        const SizedBox(width: 30),
+                        _searchTab('투표', 1),
+                        const SizedBox(width: 30),
+                        _searchTab('사용자', 2),
+                        const SizedBox(width: 30),
+                        _searchTab('태그', 3),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                ),
+              ),
+            )
+          : null,
+      ),
+      body: _isSearching 
+        ? (_isDetailView ? _buildImmersiveDetailFeed() : _buildSearchResults()) 
+        : _buildSearchDashboard(),
+    );
+  }
+
+  Widget _searchTab(String label, int index) {
+    // ... (rest of _searchTab is identical)
+    final isSelected = _tabController.index == index;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() { _tabController.animateTo(index); }); 
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(color: Colors.transparent, fontSize: 15, fontWeight: FontWeight.w900),
+              ),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white38,
+                  fontSize: 15,
+                  fontWeight: isSelected ? FontWeight.w900 : FontWeight.w500,
+                ),
+                child: Text(label),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: isSelected ? 1.0 : 0.0,
+            child: Container(
+              width: 14,
+              height: 3,
+              decoration: BoxDecoration(
+                color: Colors.cyanAccent,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
-          bottom: (_isSearching && !_isDetailView)
-            ? const TabBar(
-                isScrollable: true,
-                indicatorColor: Colors.cyanAccent,
-                indicatorWeight: 3,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white38,
-                labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                tabs: [
-                  Tab(text: '상위'),
-                  Tab(text: '투표'),
-                  Tab(text: '사용자'),
-                  Tab(text: '태그'),
-                ],
-              )
-            : null,
-        ),
-        body: _isSearching 
-          ? (_isDetailView ? _buildImmersiveDetailFeed() : _buildSearchResults()) 
-          : _buildSearchDashboard(),
+        ],
       ),
     );
   }
 
   Widget _buildImmersiveDetailFeed() {
+    // ... (rest of _buildImmersiveDetailFeed remains same)
     return PageView.builder(
       scrollDirection: Axis.vertical,
       controller: _detailPageController,
@@ -3521,6 +3870,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     return TabBarView(
+      controller: _tabController,
       children: [
         _buildVoteGrid(), // 상위
         _buildVoteGrid(), // 투표
@@ -3532,7 +3882,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildVoteGrid() {
     return GridView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         childAspectRatio: 0.65, // 세로로 긴 쇼츠 형태
