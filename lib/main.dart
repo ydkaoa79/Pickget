@@ -114,12 +114,12 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _posts = [
-      PostData(id: '1', title: '오늘의 데이트 룩, 뭐가 더 심쿵해?', uploaderId: '@style_guru', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '서울 강남구 • 2시간 전', imageA: 'assets/images/post1_a.jpg', imageB: 'assets/images/post1_b.jpg', descriptionA: '트렌디한 오버사이즈 핏과 미니멀한 블랙 코디의 정석', descriptionB: '화려한 패턴과 유니크한 액세서리로 완성된 힙스터 룩', likesCount: 1200, commentsCount: 342, voteCountA: '1.2k', voteCountB: '800', percentA: '60%', percentB: '40%', isFollowing: true, fullDescription: '오늘은 홍대에서 데이트하기 좋은 룩 두 가지를 준비해봤어요! 여러분의 선택은 무엇인가요?'),
-      PostData(id: '2', title: '출근룩 이거 어떰?', uploaderId: '@office_worker', uploaderImage: 'assets/profiles/profile_32.jpg', timeLocation: '판교 • 5시간 전', imageA: 'assets/images/post2_a.jpg', imageB: 'assets/images/post2_b.jpg', descriptionA: '깔끔한 셔츠와 슬랙스 조합, 신뢰감을 주는 비즈니스 캐주얼', descriptionB: '편안한 니트와 베이지 면바지, 다정하고 부드러운 오피스 룩', likesCount: 850, commentsCount: 120, voteCountA: '450', voteCountB: '400', percentA: '53%', percentB: '47%', fullDescription: '월요병을 이겨낼 수 있는 상큼한 출근룩 제안입니다. 투표 부탁드려요!'),
-      PostData(id: '3', title: '휴양지 패션 추천좀!', uploaderId: '@traveler_j', uploaderImage: 'assets/profiles/profile_44.jpg', timeLocation: '제주도 • 1일 전', imageA: 'assets/images/post3_a.jpg', imageB: 'assets/images/post3_b.jpg', descriptionA: '시원한 리넨 셔츠와 반바지, 휴양지의 여유가 느껴지는 스타일', descriptionB: '에스닉한 무드와 로브로 인생샷을 부르는 화려한 바캉스 룩', likesCount: 2500, commentsCount: 890, voteCountA: '1.8k', voteCountB: '700', percentA: '72%', percentB: '28%', isFollowing: true, fullDescription: '다음 주에 발리로 떠나는데 어떤 옷이 더 잘 어울릴까요? 현지 분위기에 맞춰서 골라주세요.'),
-      PostData(id: '4', title: '운동복 뭐가 나을까?', uploaderId: '@gym_rat', uploaderImage: 'assets/profiles/profile_12.jpg', timeLocation: '부산 • 3시간 전', imageA: 'assets/images/post4_a.jpg', imageB: 'assets/images/post4_b.jpg', descriptionA: '기능성에 집중한 컴프레션 웨어, 운동 효율을 높여주는 복장', descriptionB: '트렌디한 디자인의 조거 팬츠와 후드, 짐웨어로도 일상복으로도 만점', likesCount: 500, commentsCount: 40, voteCountA: '300', voteCountB: '200', percentA: '60%', percentB: '40%', fullDescription: '오운완! 오늘 새로 산 운동복인데 둘 중에 뭐가 더 핏이 좋아 보이나요?'),
-      PostData(id: '5', title: '오늘 저녁 뭐 먹지?', uploaderId: '@foodie_kim', uploaderImage: 'assets/profiles/profile_60.jpg', timeLocation: '홍대 • 10분 전', imageA: 'assets/images/post5_a.jpg', imageB: 'assets/images/post5_b.jpg', descriptionA: '매콤한 감칠맛이 일품인 전통 한식 메뉴, 한국인의 소울 푸드', descriptionB: '치즈가 듬뿍 들어간 정통 이탈리안 파스타, 특별한 날에 어울리는 맛', likesCount: 3000, commentsCount: 1200, voteCountA: '2k', voteCountB: '1k', percentA: '67%', percentB: '33%', isFollowing: true, fullDescription: '결정장애 왔어요... 한식 vs 양식! 여러분의 픽으로 오늘 저녁 메뉴를 정하겠습니다.'),
-      PostData(id: '6', title: '지난주 베스트 코디', uploaderId: '@style_guru', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '서울 • 1주일 전', imageA: 'assets/images/post1_a.jpg', imageB: 'assets/images/post1_b.jpg', descriptionA: 'A', descriptionB: 'B', likesCount: 5000, commentsCount: 1500, voteCountA: '3k', voteCountB: '2k', percentA: '60%', percentB: '40%', isExpired: true),
+      PostData(id: '1', title: '오늘의 데이트 룩, 뭐가 더 심쿵해?', uploaderId: '@style_guru', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '서울 강남구 • 2시간 전', imageA: 'assets/images/post1_a.jpg', imageB: 'assets/images/post1_b.jpg', descriptionA: '트렌디한 오버사이즈 핏과 미니멀한 블랙 코디의 정석', descriptionB: '화려한 패턴과 유니크한 액세서리로 완성된 힙스터 룩', likesCount: 1200, commentsCount: 342, voteCountA: '1.2k', voteCountB: '800', percentA: '60%', percentB: '40%', isFollowing: true, fullDescription: '오늘은 홍대에서 데이트하기 좋은 룩 두 가지를 준비해봤어요! 여러분의 선택은 무엇인가요?', tags: ['데이트', '코디', '홍대']),
+      PostData(id: '2', title: '출근룩 이거 어떰?', uploaderId: '@office_worker', uploaderImage: 'assets/profiles/profile_32.jpg', timeLocation: '판교 • 5시간 전', imageA: 'assets/images/post2_a.jpg', imageB: 'assets/images/post2_b.jpg', descriptionA: '깔끔한 셔츠와 슬랙스 조합, 신뢰감을 주는 비즈니스 캐주얼', descriptionB: '편안한 니트와 베이지 면바지, 다정하고 부드러운 오피스 룩', likesCount: 850, commentsCount: 120, voteCountA: '450', voteCountB: '400', percentA: '53%', percentB: '47%', fullDescription: '월요병을 이겨낼 수 있는 상큼한 출근룩 제안입니다. 투표 부탁드려요!', tags: ['출근룩', '오피스', '비즈니스']),
+      PostData(id: '3', title: '휴양지 패션 추천좀!', uploaderId: '@traveler_j', uploaderImage: 'assets/profiles/profile_44.jpg', timeLocation: '제주도 • 1일 전', imageA: 'assets/images/post3_a.jpg', imageB: 'assets/images/post3_b.jpg', descriptionA: '시원한 리넨 셔츠와 반바지, 휴양지의 여유가 느껴지는 스타일', descriptionB: '에스닉한 무드와 로브로 인생샷을 부르는 화려한 바캉스 룩', likesCount: 2500, commentsCount: 890, voteCountA: '1.8k', voteCountB: '700', percentA: '72%', percentB: '28%', isFollowing: true, fullDescription: '다음 주에 발리로 떠나는데 어떤 옷이 더 잘 어울릴까요? 현지 분위기에 맞춰서 골라주세요.', isExpired: true, tags: ['휴양지', '여행', '발리']),
+      PostData(id: '4', title: '운동복 뭐가 나을까?', uploaderId: '@gym_rat', uploaderImage: 'assets/profiles/profile_12.jpg', timeLocation: '부산 • 3시간 전', imageA: 'assets/images/post4_a.jpg', imageB: 'assets/images/post4_b.jpg', descriptionA: '기능성에 집중한 컴프레션 웨어, 운동 효율을 높여주는 복장', descriptionB: '트렌디한 디자인의 조거 팬츠와 후드, 짐웨어로도 일상복으로도 만점', likesCount: 500, commentsCount: 40, voteCountA: '300', voteCountB: '200', percentA: '60%', percentB: '40%', fullDescription: '오운완! 오늘 새로 산 운동복인데 둘 중에 뭐가 더 핏이 좋아 보이나요?', isExpired: true, tags: ['운동', '헬스', '짐웨어']),
+      PostData(id: '5', title: '오늘 저녁 뭐 먹지?', uploaderId: '@foodie_kim', uploaderImage: 'assets/profiles/profile_60.jpg', timeLocation: '홍대 • 10분 전', imageA: 'assets/images/post5_a.jpg', imageB: 'assets/images/post5_b.jpg', descriptionA: '매콤한 감칠맛이 일품인 전통 한식 메뉴, 한국인의 소울 푸드', descriptionB: '치즈가 듬뿍 들어간 정통 이탈리안 파스타, 특별한 날에 어울리는 맛', likesCount: 3000, commentsCount: 1200, voteCountA: '2k', voteCountB: '1k', percentA: '67%', percentB: '33%', isFollowing: true, fullDescription: '결정장애 왔어요... 한식 vs 양식! 여러분의 픽으로 오늘 저녁 메뉴를 정하겠습니다.', tags: ['맛집', '저녁', '메뉴추천']),
+      PostData(id: '6', title: '지난주 베스트 코디', uploaderId: '@style_guru', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '서울 • 1주일 전', imageA: 'assets/images/post1_a.jpg', imageB: 'assets/images/post1_b.jpg', descriptionA: 'A', descriptionB: 'B', likesCount: 5000, commentsCount: 1500, voteCountA: '3k', voteCountB: '2k', percentA: '60%', percentB: '40%', isExpired: true, tags: ['베스트', '코디', '결산']),
     ];
     _refreshRecommended();
   }
@@ -297,7 +297,16 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     ),
                     const SizedBox(width: 18),
-                    const Icon(Icons.search, color: Colors.white, size: 32),
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => SearchScreen(allPosts: _posts)),
+                        );
+                      },
+                      child: const Icon(Icons.search, color: Colors.white, size: 32),
+                    ),
                   ],
                 ),
               ],
@@ -324,11 +333,53 @@ class _MainScreenState extends State<MainScreen> {
   Widget _topTab(String label, int index) {
     final isSelected = _selectedTopTabIndex == index;
     return GestureDetector(
-      onTap: () { setState(() { _selectedTopTabIndex = index; }); },
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() { _selectedTopTabIndex = index; }); 
+      },
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.white54, fontSize: 16, fontWeight: isSelected ? FontWeight.w900 : FontWeight.w500)),
-          if (isSelected) Container(width: 20, height: 4, decoration: BoxDecoration(color: Colors.cyanAccent, borderRadius: BorderRadius.circular(2))),
+          // 글자 두께 변화에 따른 흔들림 방지를 위해 Stack 활용
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              // 보이지 않는 가장 두꺼운 글자를 배경에 깔아 너비 확보
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.transparent,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              // 실제 보이는 글자
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white54,
+                  fontSize: 16,
+                  fontWeight: isSelected ? FontWeight.w900 : FontWeight.w500,
+                  fontFamily: 'Pretendard',
+                ),
+                child: Text(label),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // 아래 포인트 바도 흔들림 없도록 투명도만 조절
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: isSelected ? 1.0 : 0.0,
+            child: Container(
+              width: 16,
+              height: 3,
+              decoration: BoxDecoration(
+                color: Colors.cyanAccent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -665,15 +716,12 @@ class _PostViewState extends State<PostView> {
       
       // 2. Update statistics reactively
       int parseV(String s) {
-        try {
-          s = s.toLowerCase().replaceAll(',', '').trim();
-          if (s.endsWith('k')) {
-            return (double.parse(s.substring(0, s.length - 1)) * 1000).toInt();
-          }
-          return int.parse(s);
-        } catch (e) {
-          return 0;
+        s = s.toLowerCase().replaceAll(',', '').trim();
+        if (s.isEmpty) return 0;
+        if (s.endsWith('k')) {
+          return (double.tryParse(s.substring(0, s.length - 1)) ?? 0 * 1000).toInt();
         }
+        return int.tryParse(s) ?? 0;
       }
       int countA = parseV(widget.post.voteCountA);
       int countB = parseV(widget.post.voteCountB);
@@ -904,12 +952,12 @@ class _PostViewState extends State<PostView> {
               Positioned(
                 top: sh * 0.28 - 20, left: 15, 
                 child: _bgLabel('A', _votedSide == 1 ? Colors.cyanAccent.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.45), 
-                  isWinner: isExpired && (double.parse(widget.post.percentA.replaceAll('%', '')) > double.parse(widget.post.percentB.replaceAll('%', ''))))
+                  isWinner: isExpired && ((double.tryParse(widget.post.percentA.replaceAll('%', '')) ?? 0) > (double.tryParse(widget.post.percentB.replaceAll('%', '')) ?? 0)))
               ),
               Positioned(
                 top: sh * 0.28 - 20, right: 15, 
                 child: _bgLabel('B', _votedSide == 2 ? Colors.redAccent.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.45), 
-                  isWinner: isExpired && (double.parse(widget.post.percentB.replaceAll('%', '')) > double.parse(widget.post.percentA.replaceAll('%', ''))))
+                  isWinner: isExpired && ((double.tryParse(widget.post.percentB.replaceAll('%', '')) ?? 0) > (double.tryParse(widget.post.percentA.replaceAll('%', '')) ?? 0)))
               ),
               Positioned(
                 top: 160, left: 0, right: 0,
@@ -3171,7 +3219,7 @@ class _MyCouponsScreenState extends State<MyCouponsScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context); // 팝업 닫기
+                  Navigator.pop(context);
                   _showConfirmUsedDialog(context, index);
                 },
                 style: ElevatedButton.styleFrom(
@@ -3225,6 +3273,529 @@ class _MyCouponsScreenState extends State<MyCouponsScreen> {
   }
 }
 
+class SearchScreen extends StatefulWidget {
+  final List<PostData> allPosts;
+  const SearchScreen({super.key, required this.allPosts});
+
+  @override
+  State<SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<SearchScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  final List<String> _recentSearches = ['스타벅스', 'CU', '커피', '편의점', '에어팟'];
+  List<PostData> _searchResults = [];
+  bool _isSearching = false;
+  
+  // 디테일 뷰 모드를 위한 상태 변수
+  bool _isDetailView = false;
+  int _detailPageIndex = 0;
+  late PageController _detailPageController;
+  
+  // 이전 상태를 기억하기 위한 변수
+  String _lastSearchQuery = '';
+  bool _wasInDetailView = false;
+
+  final List<Map<String, dynamic>> _trendingKeywords = [
+    {'rank': 1, 'keyword': '데이트 룩', 'change': 'up'},
+    {'rank': 2, 'keyword': '오늘 점심', 'change': 'new'},
+    {'rank': 3, 'keyword': '운동복 추천', 'change': 'down'},
+    {'rank': 4, 'keyword': '선물 고르기', 'change': 'same'},
+    {'rank': 5, 'keyword': '가습기 비교', 'change': 'up'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    // PageController는 초기화된 경우에만 해제
+    if (_isDetailView) {
+      _detailPageController.dispose();
+    }
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    String query = _searchController.text.toLowerCase();
+    if (query.isEmpty) {
+      setState(() {
+        _isSearching = false;
+        _searchResults = [];
+      });
+    } else {
+      setState(() {
+        _isSearching = true;
+        _searchResults = widget.allPosts.where((post) {
+          final q = query.toLowerCase();
+          final titleMatch = post.title.toLowerCase().contains(q);
+          final uploaderMatch = post.uploaderId.toLowerCase().contains(q);
+          final tagMatch = post.tags?.any((tag) => tag.toLowerCase().contains(q)) ?? false;
+          return titleMatch || uploaderMatch || tagMatch;
+        }).toList();
+      });
+    }
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+            onPressed: () {
+              if (_isDetailView) {
+                setState(() => _isDetailView = false);
+              } else if (_isSearching) {
+                // 검색 결과 목록에서 뒤로가기를 누르면 검색 대시보드로 복구
+                setState(() {
+                  _isSearching = false;
+                  _searchController.clear();
+                  _wasInDetailView = false; // 검색을 새로 시작했으므로 이전 기억 초기화
+                });
+              } else if (_wasInDetailView && !_isSearching) {
+                // 대시보드 상태에서 '뒤로가기'를 누르면 이전 피드로 복구
+                setState(() {
+                  _searchController.text = _lastSearchQuery;
+                  _isSearching = true;
+                  _isDetailView = true;
+                  _wasInDetailView = false;
+                  _detailPageController = PageController(initialPage: _detailPageIndex);
+                });
+              } else {
+                Navigator.pop(context);
+              }
+            },
+          ),
+          title: Container(
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1C1C1C),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: TextField(
+              controller: _searchController,
+              autofocus: true,
+              onTap: () {
+                if (_isDetailView) {
+                  setState(() {
+                    _lastSearchQuery = _searchController.text;
+                    _wasInDetailView = true;
+                    _isDetailView = false;
+                    _isSearching = false;
+                    _searchController.clear();
+                  });
+                }
+              },
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: '궁금한 투표를 검색해보세요',
+                hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
+                prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
+                suffixIcon: _searchController.text.isNotEmpty 
+                  ? IconButton(
+                      icon: const Icon(Icons.cancel, color: Colors.white24, size: 18),
+                      onPressed: () => _searchController.clear(),
+                    )
+                  : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+            ),
+          ),
+          bottom: (_isSearching && !_isDetailView)
+            ? const TabBar(
+                isScrollable: true,
+                indicatorColor: Colors.cyanAccent,
+                indicatorWeight: 3,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white38,
+                labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                tabs: [
+                  Tab(text: '상위'),
+                  Tab(text: '투표'),
+                  Tab(text: '사용자'),
+                  Tab(text: '태그'),
+                ],
+              )
+            : null,
+        ),
+        body: _isSearching 
+          ? (_isDetailView ? _buildImmersiveDetailFeed() : _buildSearchResults()) 
+          : _buildSearchDashboard(),
+      ),
+    );
+  }
+
+  Widget _buildImmersiveDetailFeed() {
+    return PageView.builder(
+      scrollDirection: Axis.vertical,
+      controller: _detailPageController,
+      itemCount: _searchResults.length,
+      onPageChanged: (index) {
+        setState(() => _detailPageIndex = index);
+      },
+      itemBuilder: (context, index) {
+        final post = _searchResults[index];
+        return PostView(
+          key: ValueKey('search_${post.id}'),
+          post: post,
+          onLike: () {
+            setState(() {
+              post.isLiked = !post.isLiked;
+              if (post.isLiked) {
+                post.likesCount++;
+              } else {
+                post.likesCount--;
+              }
+            });
+            HapticFeedback.lightImpact();
+          },
+          onFollow: () {
+            setState(() {
+              for (var p in widget.allPosts) {
+                if (p.uploaderId == post.uploaderId) {
+                  p.isFollowing = !post.isFollowing;
+                }
+              }
+            });
+            HapticFeedback.mediumImpact();
+          },
+          onBookmark: () {
+            setState(() {
+              post.isBookmarked = !post.isBookmarked;
+            });
+            HapticFeedback.selectionClick();
+          },
+          onNotInterested: () {
+            setState(() {
+              _searchResults.removeAt(index);
+              if (_searchResults.isEmpty) _isDetailView = false;
+            });
+          },
+          onDontRecommendChannel: () {
+            setState(() {
+              String uid = post.uploaderId;
+              _searchResults.removeWhere((p) => p.uploaderId == uid);
+              if (_searchResults.isEmpty) _isDetailView = false;
+            });
+          },
+          onReport: (reason) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('신고가 접수되었습니다: $reason'), duration: const Duration(seconds: 1))
+            );
+          },
+          onVote: (side) {
+            setState(() {
+              post.userVotedSide = side;
+            });
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_searchResults.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, color: Colors.white24, size: 60),
+            SizedBox(height: 16),
+            Text('일치하는 투표가 없습니다', style: TextStyle(color: Colors.white38, fontSize: 15)),
+          ],
+        ),
+      );
+    }
+
+    return TabBarView(
+      children: [
+        _buildVoteGrid(), // 상위
+        _buildVoteGrid(), // 투표
+        const Center(child: Text('검색된 사용자가 없습니다', style: TextStyle(color: Colors.white38))), // 사용자
+        const Center(child: Text('검색된 태그가 없습니다', style: TextStyle(color: Colors.white38))), // 태그
+      ],
+    );
+  }
+
+  Widget _buildVoteGrid() {
+    return GridView.builder(
+      padding: const EdgeInsets.all(12),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.65, // 세로로 긴 쇼츠 형태
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+      ),
+      itemCount: _searchResults.length,
+      itemBuilder: (context, index) {
+        final post = _searchResults[index];
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _detailPageIndex = index;
+              _isDetailView = true;
+              _detailPageController = PageController(initialPage: index);
+            });
+            HapticFeedback.lightImpact();
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1C1C1C),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(post.imageA, fit: BoxFit.cover),
+                      // 하단 그라데이션 오버레이
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: 80,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [
+                                Colors.black.withValues(alpha: 0.8),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // 투표수 또는 종료 배지 표시
+                      Positioned(
+                        bottom: 10,
+                        right: 10,
+                        child: post.isExpired 
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withValues(alpha: 0.9),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.emoji_events, color: Colors.black, size: 12),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    (double.tryParse(post.percentA.replaceAll('%', '')) ?? 0) >= (double.tryParse(post.percentB.replaceAll('%', '')) ?? 0) ? 'A 픽' : 'B 픽',
+                                    style: const TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.w900),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Row(
+                              children: [
+                                const Icon(Icons.how_to_vote, color: Colors.cyanAccent, size: 14),
+                                const SizedBox(width: 4),
+                                Text(
+                                  post.voteCountA.contains('k') || post.voteCountB.contains('k') 
+                                    ? '${post.voteCountA} / ${post.voteCountB}' // k가 포함된 경우 각각 표시하거나 별도 계산 필요
+                                    : '${(int.tryParse(post.voteCountA.replaceAll(',', '')) ?? 0) + (int.tryParse(post.voteCountB.replaceAll(',', '')) ?? 0)}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                                  ),
+                                ),
+                              ],
+                            ),
+                      ),
+                      // 종료된 경우 살짝 어둡게 처리하는 오버레이
+                      if (post.isExpired)
+                        Positioned.fill(
+                          child: Container(
+                            color: Colors.black.withValues(alpha: 0.2),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        post.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 10,
+                            backgroundColor: Colors.white10,
+                            backgroundImage: AssetImage(post.imageA), // 유저 프로필 대체
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              post.uploaderId,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white38, fontSize: 11),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchDashboard() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('최근 검색어', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                TextButton(
+                  onPressed: () => setState(() => _recentSearches.clear()),
+                  child: const Text('모두 삭제', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 40,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              scrollDirection: Axis.horizontal,
+              itemCount: _recentSearches.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                return ActionChip(
+                  label: Text(_recentSearches[index]),
+                  onPressed: () => _searchController.text = _recentSearches[index],
+                  backgroundColor: const Color(0xFF1C1C1C),
+                  labelStyle: const TextStyle(color: Colors.white70, fontSize: 13),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 40),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Text('지금 인기 있는 투표 키워드', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 20),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _trendingKeywords.length,
+            itemBuilder: (context, index) {
+              final item = _trendingKeywords[index];
+              return ListTile(
+                onTap: () => _searchController.text = item['keyword'],
+                leading: Text(
+                  item['rank'].toString(),
+                  style: TextStyle(color: item['rank'] <= 3 ? Colors.cyanAccent : Colors.white38, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                title: Text(item['keyword'], style: const TextStyle(color: Colors.white, fontSize: 14)),
+                trailing: _buildTrendingIcon(item['change']),
+              );
+            },
+          ),
+          const SizedBox(height: 40),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: Text('추천 카테고리', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 2.5,
+              children: [
+                _buildCategoryChip('👗 패션/뷰티', Colors.purpleAccent),
+                _buildCategoryChip('🍔 오늘 뭐먹지?', Colors.orangeAccent),
+                _buildCategoryChip('💻 IT/디지털', Colors.blueAccent),
+                _buildCategoryChip('🎮 게임/취미', Colors.cyanAccent),
+              ],
+            ),
+          ),
+          const SizedBox(height: 60),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrendingIcon(String change) {
+    switch (change) {
+      case 'up': return const Icon(Icons.arrow_drop_up, color: Colors.redAccent, size: 24);
+      case 'down': return const Icon(Icons.arrow_drop_down, color: Colors.blueAccent, size: 24);
+      case 'new': return const Text('NEW', style: TextStyle(color: Colors.cyanAccent, fontSize: 10, fontWeight: FontWeight.bold));
+      default: return const Text('-', style: TextStyle(color: Colors.white24));
+    }
+  }
+
+  Widget _buildCategoryChip(String label, Color color) {
+    return GestureDetector(
+      onTap: () {
+        // 이모지 제외한 텍스트만 추출 (예: '👗 패션/뷰티' -> '패션/뷰티')
+        final query = label.split(' ').last;
+        _searchController.text = query;
+        HapticFeedback.lightImpact();
+      },
+      child: Container(
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.2))),
+        alignment: Alignment.center,
+        child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+      ),
+    );
+  }
+}
+
 class CategoryProductScreen extends StatelessWidget {
   final String categoryName;
   const CategoryProductScreen({super.key, required this.categoryName});
@@ -3249,3 +3820,4 @@ class CategoryProductScreen extends StatelessWidget {
     );
   }
 }
+
