@@ -320,10 +320,10 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildBottomNav() {
     return Positioned(
-      bottom: 55, left: 20, right: 20,
+      bottom: 40, left: 20, right: 20,
       child: Container(
-        height: 74,
-        decoration: BoxDecoration(color: const Color(0xFF151515), borderRadius: BorderRadius.circular(37), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 25)]),
+        height: 50,
+        decoration: BoxDecoration(color: const Color(0xFF151515), borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 25)]),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -340,14 +340,14 @@ class _MainScreenState extends State<MainScreen> {
                   _pageController.animateToPage(0, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
                 }
               },
-              child: const Icon(Icons.home_filled, color: Colors.white, size: 32),
+              child: const Icon(Icons.home_filled, color: Colors.white, size: 22),
             ),
             GestureDetector(
               onTap: () {
                 HapticFeedback.mediumImpact();
                 _showRankingSheet(context);
               },
-              child: const Icon(Icons.emoji_events_outlined, color: Colors.white, size: 30),
+              child: const Icon(Icons.emoji_events_outlined, color: Colors.white, size: 20),
             ),
             GestureDetector(
               onTap: () {
@@ -358,9 +358,9 @@ class _MainScreenState extends State<MainScreen> {
                 );
               },
               child: Container(
-                width: 54, height: 54, 
+                width: 36, height: 36, 
                 decoration: const BoxDecoration(color: Color(0xFF1E1E1E), shape: BoxShape.circle), 
-                child: const Icon(Icons.add, color: Colors.cyanAccent, size: 38)
+                child: const Icon(Icons.add, color: Colors.cyanAccent, size: 26)
               ),
             ),
             GestureDetector(
@@ -368,9 +368,9 @@ class _MainScreenState extends State<MainScreen> {
                 HapticFeedback.mediumImpact();
                 _showNotificationSheet(context);
               },
-              child: const Icon(Icons.notifications_none, color: Colors.white, size: 30),
+              child: const Icon(Icons.notifications_none, color: Colors.white, size: 20),
             ),
-            const CircleAvatar(radius: 18, backgroundImage: AssetImage('assets/profiles/profile_5.jpg')),
+            const CircleAvatar(radius: 12, backgroundImage: AssetImage('assets/profiles/profile_5.jpg')),
           ],
         ),
       ),
@@ -648,8 +648,19 @@ class _PostViewState extends State<PostView> {
       _votedSide = side;
       
       // 2. Update statistics reactively
-      int countA = int.parse(widget.post.voteCountA.replaceAll(',', ''));
-      int countB = int.parse(widget.post.voteCountB.replaceAll(',', ''));
+      int parseV(String s) {
+        try {
+          s = s.toLowerCase().replaceAll(',', '').trim();
+          if (s.endsWith('k')) {
+            return (double.parse(s.substring(0, s.length - 1)) * 1000).toInt();
+          }
+          return int.parse(s);
+        } catch (e) {
+          return 0;
+        }
+      }
+      int countA = parseV(widget.post.voteCountA);
+      int countB = parseV(widget.post.voteCountB);
       
       if (side == 1) countA++; else countB++;
       
@@ -662,13 +673,7 @@ class _PostViewState extends State<PostView> {
       widget.post.percentA = "${perA.toStringAsFixed(0)}%";
       widget.post.percentB = "${perB.toStringAsFixed(0)}%";
       
-      // 3. Target Goal Check (Mocked for demo: if target is 1, it expires immediately)
-      // In a real app, this would be checked against a 'targetVotes' field in PostData.
-      if (total >= 1) { // Assuming user set 1 for testing
-        widget.post.isExpired = true;
-        _remainingSeconds = 0;
-        _countdownTimer?.cancel();
-      }
+      // 3. Target Goal Check (Removed buggy test logic)
     });
 
     widget.onVote(side);
@@ -1086,17 +1091,31 @@ class _PostViewState extends State<PostView> {
                 curve: Curves.easeOutCubic, 
                 bottom: 290, 
                 left: (currentWidthA / 2) - (descWidth / 2), 
-                child: _descBox(widget.post.descriptionA, _isDescAExpanded, () => setState(() => _isDescAExpanded = !_isDescAExpanded)),
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 300),
+                  opacity: _expandedSide == 1 ? 1.0 : 0.0,
+                  child: IgnorePointer(
+                    ignoring: _expandedSide != 1,
+                    child: _descBox(widget.post.descriptionA, _isDescAExpanded, () => setState(() => _isDescAExpanded = !_isDescAExpanded)),
+                  ),
+                ),
               ),
               AnimatedPositioned(
                 duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
                 curve: Curves.easeOutCubic, 
                 bottom: 290, 
                 left: currentWidthA + ((sw - currentWidthA) / 2) - (descWidth / 2), 
-                child: _descBox(widget.post.descriptionB, _isDescBExpanded, () => setState(() => _isDescBExpanded = !_isDescBExpanded)),
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 300),
+                  opacity: _expandedSide == 2 ? 1.0 : 0.0,
+                  child: IgnorePointer(
+                    ignoring: _expandedSide != 2,
+                    child: _descBox(widget.post.descriptionB, _isDescBExpanded, () => setState(() => _isDescBExpanded = !_isDescBExpanded)),
+                  ),
+                ),
               ),
               Positioned(
-                bottom: 140, left: 18, right: 130,
+                bottom: 100, left: 18, right: 130,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -1141,7 +1160,7 @@ class _PostViewState extends State<PostView> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         const SizedBox(width: 15),
@@ -1233,6 +1252,7 @@ class _PostViewState extends State<PostView> {
                                               GestureDetector(
                                                 onTap: () {
                                                   if (commentController.text.trim().isNotEmpty) {
+                                                    FocusScope.of(context).unfocus(); // Close keyboard
                                                     setSheetState(() {
                                                       widget.post.comments.add(CommentData(
                                                         user: '나 (본인)',
@@ -1464,7 +1484,7 @@ class _PostViewState extends State<PostView> {
     bool hasVoted = _votedSide != 0 || isExpired;
     
     return Positioned(
-      bottom: 127, // Raised to avoid system bar interference
+      bottom: 87, // Reduced along with bottom nav height
       right: 35,   // Aligns donut center with profile icon's left edge
       child: SizedBox(
         width: 120, 
