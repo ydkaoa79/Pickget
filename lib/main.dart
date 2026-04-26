@@ -69,7 +69,7 @@ class PostData {
     this.isExpired = false,
     this.userVotedSide = 0,
     List<CommentData>? comments,
-  }) : this.comments = comments ?? [
+  }) : comments = comments ?? [
     CommentData(user: '멋진 여행자', text: '와! 저는 A가 훨씬 세련되어 보여요. 스타일이 딱 제 취향!', side: 1, image: 'assets/profiles/profile_15.jpg'),
     CommentData(user: '패션매니아', text: '에이, 그래도 겨울엔 레드 포인트가 있는 B가 진리죠!', side: 2, image: 'assets/profiles/profile_20.jpg'),
     CommentData(user: '깔끔쟁이', text: 'A의 사이언 컬러가 사진의 전체적인 무드랑 너무 잘 어울리네요.', side: 1, image: 'assets/profiles/profile_35.jpg'),
@@ -105,7 +105,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   late List<PostData> _posts;
   List<PostData> _recommendedPosts = [];
-  Set<String> _forcedVisibleIds = {}; // To show expired posts clicked from ranking
+  final Set<String> _forcedVisibleIds = {}; // To show expired posts clicked from ranking
   final PageController _pageController = PageController();
   int _selectedTopTabIndex = 0;
 
@@ -187,8 +187,11 @@ class _MainScreenState extends State<MainScreen> {
                 onLike: () { 
                   setState(() { 
                     post.isLiked = !post.isLiked; 
-                    if (post.isLiked) post.likesCount++;
-                    else post.likesCount--;
+                    if (post.isLiked) {
+                      post.likesCount++;
+                    } else {
+                      post.likesCount--;
+                    }
                     HapticFeedback.lightImpact();
                   }); 
                 },
@@ -323,7 +326,7 @@ class _MainScreenState extends State<MainScreen> {
       bottom: 40, left: 20, right: 20,
       child: Container(
         height: 50,
-        decoration: BoxDecoration(color: const Color(0xFF151515), borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.6), blurRadius: 25)]),
+        decoration: BoxDecoration(color: const Color(0xFF151515), borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 25)]),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
@@ -422,7 +425,7 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
             child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(width: 16),
@@ -550,7 +553,7 @@ class _MainScreenState extends State<MainScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '${(post.likesCount + post.commentsCount).toString()}', // Simple mock for votes/engagement
+                  (post.likesCount + post.commentsCount).toString(), // Simple mock for votes/engagement
                   style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900),
                 ),
                 const Text(
@@ -662,7 +665,11 @@ class _PostViewState extends State<PostView> {
       int countA = parseV(widget.post.voteCountA);
       int countB = parseV(widget.post.voteCountB);
       
-      if (side == 1) countA++; else countB++;
+      if (side == 1) {
+        countA++;
+      } else {
+        countB++;
+      }
       
       int total = countA + countB;
       double perA = (countA / total) * 100;
@@ -777,7 +784,7 @@ class _PostViewState extends State<PostView> {
                               : Image.asset(widget.post.imageA, fit: BoxFit.cover),
                           ),
                         ),
-                        Positioned.fill(child: Container(color: Colors.black.withOpacity(0.4))),
+                        Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.4))),
                       ],
                     ),
                   ),
@@ -796,7 +803,7 @@ class _PostViewState extends State<PostView> {
                               : Image.asset(widget.post.imageB, fit: BoxFit.cover),
                           ),
                         ),
-                        Positioned.fill(child: Container(color: Colors.black.withOpacity(0.4))),
+                        Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.4))),
                       ],
                     ),
                   ),
@@ -864,7 +871,7 @@ class _PostViewState extends State<PostView> {
                         child: IgnorePointer(
                           child: Container(
                             width: 48, height: 48, 
-                            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.18)), 
+                            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.18)), 
                             child: ClipOval(
                               child: BackdropFilter(
                                 filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12), 
@@ -879,16 +886,16 @@ class _PostViewState extends State<PostView> {
                 ),
               ),
             ),
-              IgnorePointer(child: Container(color: Colors.black.withOpacity(0.15))),
+              IgnorePointer(child: Container(color: Colors.black.withValues(alpha: 0.15))),
               // Background Labels A/B with Small Crown on Winner
               Positioned(
                 top: sh * 0.28 - 20, left: 15, 
-                child: _bgLabel('A', _votedSide == 1 ? Colors.cyanAccent.withOpacity(0.5) : Colors.white.withOpacity(0.45), 
+                child: _bgLabel('A', _votedSide == 1 ? Colors.cyanAccent.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.45), 
                   isWinner: isExpired && (double.parse(widget.post.percentA.replaceAll('%', '')) > double.parse(widget.post.percentB.replaceAll('%', ''))))
               ),
               Positioned(
                 top: sh * 0.28 - 20, right: 15, 
-                child: _bgLabel('B', _votedSide == 2 ? Colors.redAccent.withOpacity(0.5) : Colors.white.withOpacity(0.45), 
+                child: _bgLabel('B', _votedSide == 2 ? Colors.redAccent.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.45), 
                   isWinner: isExpired && (double.parse(widget.post.percentB.replaceAll('%', '')) > double.parse(widget.post.percentA.replaceAll('%', ''))))
               ),
               Positioned(
@@ -912,7 +919,7 @@ class _PostViewState extends State<PostView> {
                                     fontSize: 26, 
                                     fontWeight: FontWeight.w900, 
                                     letterSpacing: -1.5, 
-                                    shadows: [Shadow(color: Colors.black.withOpacity(0.6), blurRadius: 10, offset: const Offset(0, 2))]
+                                    shadows: [Shadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 10, offset: const Offset(0, 2))]
                                   ), 
                                   maxLines: 1
                                 )
@@ -977,7 +984,7 @@ class _PostViewState extends State<PostView> {
                                                   Container(
                                                     padding: const EdgeInsets.all(20),
                                                     decoration: BoxDecoration(
-                                                      color: Colors.white.withOpacity(0.05),
+                                                      color: Colors.white.withValues(alpha: 0.05),
                                                       borderRadius: BorderRadius.circular(20),
                                                       border: Border.all(color: Colors.white10),
                                                     ),
@@ -1058,7 +1065,7 @@ class _PostViewState extends State<PostView> {
                       )
                     ),
                     const SizedBox(height: 12),
-                    Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7), decoration: BoxDecoration(color: Colors.black.withOpacity(0.3), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withOpacity(0.1), width: 1)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.access_time, color: isExpired ? Colors.white38 : Colors.cyanAccent, size: 18), const SizedBox(width: 6), Text(isExpired ? '투표종료' : _formatTimer(_remainingSeconds), style: TextStyle(color: isExpired ? Colors.white38 : Colors.white, fontWeight: FontWeight.w900, fontSize: 12))]))),
+                    Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.access_time, color: isExpired ? Colors.white38 : Colors.cyanAccent, size: 18), const SizedBox(width: 6), Text(isExpired ? '투표종료' : _formatTimer(_remainingSeconds), style: TextStyle(color: isExpired ? Colors.white38 : Colors.white, fontWeight: FontWeight.w900, fontSize: 12))]))),
                     // Voting Guide Text
                     if (_isDragging && _votedSide == 0 && !isExpired)
                       Padding(
@@ -1234,7 +1241,7 @@ class _PostViewState extends State<PostView> {
                                                 child: Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 16),
                                                   decoration: BoxDecoration(
-                                                    color: Colors.white.withOpacity(0.05),
+                                                    color: Colors.white.withValues(alpha: 0.05),
                                                     borderRadius: BorderRadius.circular(25),
                                                   ),
                                                   child: TextField(
@@ -1313,7 +1320,7 @@ class _PostViewState extends State<PostView> {
                               color: Colors.cyanAccent, 
                               fontSize: 36, 
                               fontWeight: FontWeight.w900,
-                              shadows: [Shadow(color: Colors.cyanAccent.withOpacity(0.5), blurRadius: 15)],
+                              shadows: [Shadow(color: Colors.cyanAccent.withValues(alpha: 0.5), blurRadius: 15)],
                             ),
                           ),
                         ),
@@ -1335,9 +1342,9 @@ class _PostViewState extends State<PostView> {
       height: 28, // Fixed height
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: isFollowing ? Colors.cyanAccent.withOpacity(0.1) : Colors.white.withOpacity(0.15),
+        color: isFollowing ? Colors.cyanAccent.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isFollowing ? Colors.cyanAccent.withOpacity(0.4) : Colors.transparent, width: 1),
+        border: Border.all(color: isFollowing ? Colors.cyanAccent.withValues(alpha: 0.4) : Colors.transparent, width: 1),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center, // Center icons and text
@@ -1388,7 +1395,7 @@ class _PostViewState extends State<PostView> {
             fontFamily: 'Pretendard', 
             fontWeight: FontWeight.w900, 
             letterSpacing: -4, 
-            shadows: [Shadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))]
+            shadows: [Shadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, 4))]
           ), 
           child: Text(text)
         ),
@@ -1424,9 +1431,9 @@ class _PostViewState extends State<PostView> {
             width: 175, 
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), 
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.2), 
+              color: Colors.black.withValues(alpha: 0.2), 
               borderRadius: BorderRadius.circular(15), 
-              border: Border.all(color: Colors.white.withOpacity(0.15))
+              border: Border.all(color: Colors.white.withValues(alpha: 0.15))
             ), 
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1509,7 +1516,7 @@ class _PostViewState extends State<PostView> {
                       fontWeight: FontWeight.w900, 
                       fontSize: hasVoted ? 13 : 10,
                       height: 1.1,
-                      shadows: [Shadow(color: Colors.black.withOpacity(0.5), blurRadius: 4, offset: const Offset(0, 1))],
+                      shadows: [Shadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 4, offset: const Offset(0, 1))],
                     ),
                   ),
                 ),
@@ -1556,7 +1563,7 @@ class _PostViewState extends State<PostView> {
         fontSize: size,
         fontWeight: weight,
         letterSpacing: -0.5,
-        shadows: [Shadow(color: Colors.black.withOpacity(0.8), blurRadius: 6, offset: const Offset(0, 1))],
+        shadows: [Shadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 6, offset: const Offset(0, 1))],
       ),
     );
   }
@@ -1577,7 +1584,7 @@ class _PostViewState extends State<PostView> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: showBorder ? teamColor : Colors.transparent, width: 2),
-              boxShadow: showBorder ? [BoxShadow(color: teamColor.withOpacity(0.3), blurRadius: 4, spreadRadius: 1)] : [],
+              boxShadow: showBorder ? [BoxShadow(color: teamColor.withValues(alpha: 0.3), blurRadius: 4, spreadRadius: 1)] : [],
             ),
             child: CircleAvatar(
               radius: 18, 
@@ -1748,7 +1755,7 @@ class _UploadScreenState extends State<UploadScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('"${_titleController.text}" 투표가 내 채널에 등록되었습니다!'),
-                  backgroundColor: Colors.cyanAccent.withOpacity(0.9),
+                  backgroundColor: Colors.cyanAccent.withValues(alpha: 0.9),
                 ),
               );
             },
@@ -1845,7 +1852,7 @@ class _UploadScreenState extends State<UploadScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _sectionHeader('투표 기간 설정', trailing: '${_selectedHours}시간 ${_selectedMinutes}분'),
+                  _sectionHeader('투표 기간 설정', trailing: '$_selectedHours시간 $_selectedMinutes분'),
                   const SizedBox(height: 16),
                   _durationSlider('시간', _selectedHours.toDouble(), 72, (val) {
                     setState(() {
@@ -1869,7 +1876,7 @@ class _UploadScreenState extends State<UploadScreen> {
                       Switch(
                         value: _useTargetGoal, 
                         onChanged: (val) => setState(() => _useTargetGoal = val),
-                        activeColor: Colors.cyanAccent,
+                        activeThumbColor: Colors.cyanAccent,
                       ),
                     ],
                   ),
@@ -1885,7 +1892,7 @@ class _UploadScreenState extends State<UploadScreen> {
                         suffixText: '표',
                         suffixStyle: const TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Colors.black.withOpacity(0.2),
+                        fillColor: Colors.black.withValues(alpha: 0.2),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                       ),
                     ),
@@ -1910,7 +1917,7 @@ class _UploadScreenState extends State<UploadScreen> {
                       hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
                       prefixIcon: const Icon(Icons.tag, color: Colors.cyanAccent, size: 18),
                       filled: true,
-                      fillColor: Colors.black.withOpacity(0.2),
+                      fillColor: Colors.black.withValues(alpha: 0.2),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                     ),
                   ),
@@ -1967,9 +1974,9 @@ class _UploadScreenState extends State<UploadScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: child,
     );
@@ -2030,9 +2037,9 @@ class _UploadScreenState extends State<UploadScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2072,7 +2079,7 @@ class _UploadScreenState extends State<UploadScreen> {
         child: Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: Colors.white10, width: 1),
           ),
@@ -2086,7 +2093,11 @@ class _UploadScreenState extends State<UploadScreen> {
                     top: 8, right: 8,
                     child: GestureDetector(
                       onTap: () => setState(() {
-                        if (isA) _imagePathA = null; else _imagePathB = null;
+                        if (isA) {
+                          _imagePathA = null;
+                        } else {
+                          _imagePathB = null;
+                        }
                       }),
                       child: Container(
                         padding: const EdgeInsets.all(4),
@@ -2103,7 +2114,7 @@ class _UploadScreenState extends State<UploadScreen> {
                   Text(
                     label,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.03),
+                      color: Colors.white.withValues(alpha: 0.03),
                       fontSize: 120,
                       fontWeight: FontWeight.w900,
                     ),
@@ -2167,7 +2178,7 @@ class _UploadScreenState extends State<UploadScreen> {
       title: Text(title, style: TextStyle(color: isCancel ? Colors.redAccent : Colors.white, fontWeight: FontWeight.w600)),
       onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      tileColor: Colors.white.withOpacity(0.03),
+      tileColor: Colors.white.withValues(alpha: 0.03),
     );
   }
 }
@@ -2278,10 +2289,10 @@ class DonutPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2); final radius = size.width / 2 - 4; final strokeWidth = 7.0;
-    final paintBg = Paint()..color = Colors.white.withOpacity(0.1)..style = PaintingStyle.stroke..strokeWidth = strokeWidth;
+    final paintBg = Paint()..color = Colors.white.withValues(alpha: 0.1)..style = PaintingStyle.stroke..strokeWidth = strokeWidth;
     canvas.drawCircle(center, radius, paintBg);
     if (isPreVote) {
-      final paintWhite = Paint()..color = Colors.white.withOpacity(0.8)..style = PaintingStyle.stroke..strokeWidth = strokeWidth..strokeCap = StrokeCap.round;
+      final paintWhite = Paint()..color = Colors.white.withValues(alpha: 0.8)..style = PaintingStyle.stroke..strokeWidth = strokeWidth..strokeCap = StrokeCap.round;
       canvas.drawCircle(center, radius, paintWhite);
     } else {
       final paintA = Paint()..color = Colors.cyanAccent..style = PaintingStyle.stroke..strokeWidth = strokeWidth..strokeCap = StrokeCap.round;
