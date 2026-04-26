@@ -107,6 +107,7 @@ class _MainScreenState extends State<MainScreen> {
   List<PostData> _recommendedPosts = [];
   final Set<String> _forcedVisibleIds = {}; // To show expired posts clicked from ranking
   final PageController _pageController = PageController();
+  int _userPoints = 1250;
   int _selectedTopTabIndex = 0;
 
   @override
@@ -273,14 +274,26 @@ class _MainScreenState extends State<MainScreen> {
                 Image.asset('assets/logo.png', height: 30, fit: BoxFit.contain),
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(22)),
-                      child: const Row(
-                        children: [
-                          Text('P ', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.w900, fontSize: 14)),
-                          Text('12,323', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
-                        ],
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => PointScreen(currentPoints: _userPoints)),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(22)),
+                        child: Row(
+                          children: [
+                            const Text('P ', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.w900, fontSize: 14)),
+                            Text(
+                              _userPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 18),
@@ -2306,4 +2319,933 @@ class DonutPainter extends CustomPainter {
   }
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+// --- 포인트 관련 클래스 추가 ---
+
+class PointHistoryItem {
+  final String title;
+  final int amount;
+  final String date;
+  final bool isEarned;
+
+  PointHistoryItem({
+    required this.title,
+    required this.amount,
+    required this.date,
+    required this.isEarned,
+  });
+}
+
+class PointScreen extends StatefulWidget {
+  final int currentPoints;
+  const PointScreen({super.key, required this.currentPoints});
+
+  @override
+  State<PointScreen> createState() => _PointScreenState();
+}
+
+class _PointScreenState extends State<PointScreen> {
+  late int _userPoints;
+  final List<PointHistoryItem> _history = [
+    PointHistoryItem(title: '친구 초대 보상', amount: 500, date: '2026.04.27', isEarned: true),
+    PointHistoryItem(title: '출석 체크 보상', amount: 100, date: '2026.04.27', isEarned: true),
+    PointHistoryItem(title: '게시물 좋아요 보상', amount: 50, date: '2026.04.26', isEarned: true),
+    PointHistoryItem(title: '현금 인출 신청', amount: 10000, date: '2026.04.25', isEarned: false),
+    PointHistoryItem(title: '상품권 교환', amount: 5000, date: '2026.04.24', isEarned: false),
+    PointHistoryItem(title: '투표 참여 보상', amount: 10, date: '2026.04.23', isEarned: true),
+    PointHistoryItem(title: '이벤트 당첨 보너스', amount: 2000, date: '2026.04.20', isEarned: true),
+    PointHistoryItem(title: '친구 초대 보상', amount: 500, date: '2026.04.18', isEarned: true),
+    PointHistoryItem(title: '베스트 코디 선정', amount: 1000, date: '2026.04.15', isEarned: true),
+    PointHistoryItem(title: '광고 시청 보상', amount: 50, date: '2026.04.10', isEarned: true),
+    PointHistoryItem(title: '출석 체크 보상', amount: 100, date: '2026.04.05', isEarned: true),
+    PointHistoryItem(title: '상품권 교환', amount: 3000, date: '2026.04.01', isEarned: false),
+    PointHistoryItem(title: '게시물 좋아요 보상', amount: 50, date: '2026.03.25', isEarned: true),
+    PointHistoryItem(title: '친구 초대 보상', amount: 500, date: '2026.03.20', isEarned: true),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _userPoints = widget.currentPoints;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('나의 포인트', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2C2C2C), Color(0xFF1C1C1C)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text('나의 보유 포인트', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          const Text('P', style: TextStyle(color: Colors.cyanAccent, fontSize: 28, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 10),
+                          Text(
+                            _userPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"),
+                            style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                          ),
+                        ],
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const StoreScreen()),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.cyanAccent,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('포인트 사용', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                            SizedBox(width: 4),
+                            Icon(Icons.chevron_right, size: 16),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Divider(color: Colors.white.withValues(alpha: 0.05)),
+                  const SizedBox(height: 12),
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('30일 이내 소멸 예정', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                      Text('150 P', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('포인트 내역', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                Text('최근 3개월', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '* 앱에서는 최근 3개월 내역만 표시되며, 전체 내역은 고객센터를 통해 확인하실 수 있습니다. (관련 법령에 의거 5년간 보관)',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10, height: 1.5),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _history.length,
+              separatorBuilder: (context, index) => Divider(color: Colors.white.withValues(alpha: 0.05), height: 1),
+              itemBuilder: (context, index) {
+                final item = _history[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: (item.isEarned ? Colors.cyanAccent : Colors.orangeAccent).withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          item.isEarned ? Icons.add : Icons.remove,
+                          color: item.isEarned ? Colors.cyanAccent : Colors.orangeAccent,
+                          size: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(item.title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 4),
+                            Text(item.date, style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        "${item.isEarned ? '+' : '-'}${item.amount} P",
+                        style: TextStyle(
+                          color: item.isEarned ? Colors.cyanAccent : Colors.white70,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPointAction({required IconData icon, required String label, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPointPolicyDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1C),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('포인트 유효기간 및 자동 소멸 정책 안내', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '안녕하세요. 서비스를 이용해 주시는 회원님께 감사의 말씀을 드립니다.\n\n' 
+                '회원님의 소중한 포인트 관리 및 원활한 서비스 제공을 위해 포인트 유효기간 정책을 아래와 같이 안내드립니다.\n\n' 
+                '• 유효기간: 각 포인트 적립일로부터 1년 (365일)\n\n' 
+                '• 소멸 방식: 유효기간이 경과한 포인트는 해당 일자 자정에 자동으로 소멸됩니다.\n\n' 
+                '• 사용 원칙: 먼저 적립된 포인트가 먼저 사용되는 \'선입선출\' 방식으로 차감됩니다.\n\n' 
+                '• 사전 안내: 포인트 소멸 30일 전과 7일 전에 앱 알림을 통해 소멸 예정 포인트를 미리 안내해 드립니다.\n\n' 
+                '소멸된 포인트는 복구가 불가능하오니, 유효기간 내에 현금전환이나 상품 구매 등으로 알뜰하게 사용하시길 바랍니다.',
+                style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.6),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('확인', style: TextStyle(color: Colors.cyanAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class StoreScreen extends StatefulWidget {
+  const StoreScreen({super.key});
+
+  @override
+  State<StoreScreen> createState() => _StoreScreenState();
+}
+
+class _StoreScreenState extends State<StoreScreen> {
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _accountController = TextEditingController();
+  final TextEditingController _bankController = TextEditingController();
+  String _selectedCategory = '커피';
+  
+  bool _isWithdrawalPending = false;
+  int _pendingAmount = 0;
+
+  final Map<String, List<Map<String, String>>> _categoryProducts = {
+    '커피': [
+      {'title': '[스타벅스] 아메리카노 T', 'price': '4,500 P', 'brand': '스타벅스'},
+      {'title': '[투썸플레이스] 카페라떼 R', 'price': '5,000 P', 'brand': '투썸플레이스'},
+      {'title': '[메가커피] 아메리카노(HOT)', 'price': '1,500 P', 'brand': '메가커피'},
+    ],
+    '편의점': [
+      {'title': '[GS25] 모바일 상품권 5,000원', 'price': '5,000 P', 'brand': 'GS25'},
+      {'title': '[CU] 모바일 상품권 3,000원', 'price': '3,000 P', 'brand': 'CU'},
+      {'title': '[7-Eleven] 바나나우유', 'price': '1,700 P', 'brand': '7-Eleven'},
+    ],
+    '상품권': [
+      {'title': '문화상품권 5,000원권', 'price': '5,000 P', 'brand': '컬쳐랜드'},
+      {'title': '구글 기프트카드 1만원', 'price': '10,000 P', 'brand': 'Google'},
+    ],
+    '외식': [
+      {'title': '[아웃백] 5만원권', 'price': '50,000 P', 'brand': '아웃백'},
+      {'title': '[VIPS] 평일 런치 1인', 'price': '32,000 P', 'brand': 'VIPS'},
+    ],
+  };
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _accountController.dispose();
+    _bankController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('포인트 스토어', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 상단 섹션: 묵직한 덩어리감을 위한 배경 처리
+            Container(
+              width: double.infinity,
+              color: const Color(0xFF0F0F0F), // 미세하게 밝은 배경으로 섹션 구분
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+              child: Column(
+                children: [
+                  // 인출 신청 카드
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1C1C1C),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _isWithdrawalPending ? Colors.cyanAccent.withValues(alpha: 0.5) : Colors.cyanAccent.withValues(alpha: 0.1)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(_isWithdrawalPending ? Icons.sync : Icons.stars, color: Colors.cyanAccent, size: 24),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _isWithdrawalPending ? '인출 신청 진행 중' : '현금 인출하기', 
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _isWithdrawalPending ? '신청금액: ${_pendingAmount}P (승인 대기)' : '보유 포인트를 현금으로 전환', 
+                                style: TextStyle(color: _isWithdrawalPending ? Colors.cyanAccent : Colors.white38, fontSize: 12)
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: _isWithdrawalPending ? null : _showWithdrawalDialog,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isWithdrawalPending ? Colors.grey[800] : Colors.cyanAccent,
+                            foregroundColor: _isWithdrawalPending ? Colors.white24 : Colors.black,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            minimumSize: const Size(0, 36),
+                          ),
+                          child: Text(
+                            _isWithdrawalPending ? '처리중' : '인출신청', 
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // 내 쿠폰함 카드
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1C1C1C),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    ),
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => const MyCouponsScreen()));
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Row(
+                          children: [
+                            Icon(Icons.confirmation_num_outlined, color: Colors.amberAccent, size: 24),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('내 쿠폰함', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                  SizedBox(height: 4),
+                                  Text('보유 중인 상품권 확인', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 14),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // 하단 섹션: 가볍고 탁 트인 덩어리감
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('카테고리', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 24),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 24,
+                    crossAxisSpacing: 10,
+                    children: [
+                      _buildCategoryItem(Icons.coffee, '커피'),
+                      _buildCategoryItem(Icons.fastfood, '편의점'),
+                      _buildCategoryItem(Icons.card_giftcard, '상품권'),
+                      _buildCategoryItem(Icons.restaurant, '외식'),
+                      _buildCategoryItem(Icons.shopping_bag, '백화점'),
+                      _buildCategoryItem(Icons.movie, '영화'),
+                      _buildCategoryItem(Icons.cake, '베이커리'),
+                      _buildCategoryItem(Icons.more_horiz, '기타'),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('$_selectedCategory 상품', style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+                      const Text('전체보기', style: TextStyle(color: Colors.white24, fontSize: 12)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildProductList(),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryItem(IconData icon, String label) {
+    final bool isSelected = _selectedCategory == label;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedCategory = label;
+        });
+      },
+      child: Column(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isSelected ? Colors.cyanAccent.withValues(alpha: 0.1) : const Color(0xFF1C1C1C),
+              borderRadius: BorderRadius.circular(15),
+              border: isSelected ? Border.all(color: Colors.cyanAccent, width: 1.5) : null,
+            ),
+            child: Icon(icon, color: isSelected ? Colors.cyanAccent : Colors.white, size: 24),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.cyanAccent : Colors.white70,
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductList() {
+    final products = _categoryProducts[_selectedCategory] ?? _categoryProducts['커피']!;
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: products.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final product = products[index];
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1C1C),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.shopping_bag_outlined, color: Colors.white38, size: 20),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(product['title']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 4),
+                    Text(product['brand']!, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                  ],
+                ),
+              ),
+              Text(product['price']!, style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showWithdrawalDialog() {
+    _amountController.clear();
+    _accountController.clear();
+    _bankController.clear();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          bool isFormValid = _amountController.text.isNotEmpty && 
+                            _accountController.text.isNotEmpty && 
+                            _bankController.text.isNotEmpty;
+
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1C1C1C),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('현금 인출 신청', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                SizedBox(height: 6),
+                Text('1일 1회 최대 30,000P', style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.w500)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildStoreTextField(
+                    '인출할 포인트 (5,000 P 단위)', 
+                    controller: _amountController,
+                    onChanged: (val) => setDialogState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildStoreTextField(
+                    '입금받으실 계좌번호', 
+                    controller: _accountController,
+                    onChanged: (val) => setDialogState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildStoreTextField(
+                    '은행명 및 예금주', 
+                    controller: _bankController,
+                    onChanged: (val) => setDialogState(() {}),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.redAccent, size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '계좌번호 및 예금주 잘못 기입 시 입금이 불가능하며, 이에 따른 책임은 본인에게 있습니다.',
+                            style: TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text("취소", style: TextStyle(color: Colors.white38))),
+              ElevatedButton(
+                onPressed: isFormValid ? () {
+                  int? amount = int.tryParse(_amountController.text.replaceAll(',', ''));
+                  if (amount == null || amount <= 0 || amount % 5000 != 0) {
+                    _showErrorPopup('인출 신청은 5,000P 단위로만 가능합니다.');
+                  } else if (amount > 30000) {
+                    _showErrorPopup('1회 최대 인출 가능 금액은 30,000P입니다.');
+                  } else {
+                    Navigator.pop(context);
+                    setState(() {
+                      _isWithdrawalPending = true;
+                      _pendingAmount = amount;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${amount}P 인출 신청이 완료되었습니다.'), duration: const Duration(seconds: 2)),
+                    );
+                  }
+                } : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isFormValid ? Colors.cyanAccent : Colors.grey[800],
+                  foregroundColor: isFormValid ? Colors.black : Colors.white24,
+                ),
+                child: const Text('신청하기', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
+  void _showErrorPopup(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1C),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('안내', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text(message, style: const TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('확인', style: TextStyle(color: Colors.cyanAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStoreTextField(String label, {TextEditingController? controller, Function(String)? onChanged}) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      style: const TextStyle(color: Colors.white),
+      keyboardType: label.contains('포인트') ? TextInputType.number : TextInputType.text,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.cyanAccent)),
+      ),
+    );
+  }
+}
+
+class MyCouponsScreen extends StatefulWidget {
+  const MyCouponsScreen({super.key});
+
+  @override
+  State<MyCouponsScreen> createState() => _MyCouponsScreenState();
+}
+
+class _MyCouponsScreenState extends State<MyCouponsScreen> {
+  final List<Map<String, dynamic>> _coupons = [
+    {'title': '[GS25] 모바일 상품권 5,000원', 'date': '2026.12.31까지', 'brand': 'GS25', 'isUsed': false, 'type': 'barcode'},
+    {'title': '[CU] 모바일 상품권 3,000원', 'date': '2026.11.15까지', 'brand': 'CU', 'isUsed': false, 'type': 'qr'},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('내 쿠폰함', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+      ),
+      body: ListView.separated(
+        padding: const EdgeInsets.all(20),
+        itemCount: _coupons.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 16),
+        itemBuilder: (context, index) {
+          final coupon = _coupons[index];
+          final bool isUsed = coupon['isUsed'];
+
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1C1C1C),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            ),
+            child: Row(
+              children: [
+                Opacity(
+                  opacity: isUsed ? 0.3 : 1.0,
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      coupon['type'] == 'barcode' ? Icons.barcode_reader : Icons.qr_code_2,
+                      color: Colors.cyanAccent,
+                      size: 28,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(coupon['title']!,
+                          style: TextStyle(
+                            color: isUsed ? Colors.white38 : Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            decoration: isUsed ? TextDecoration.lineThrough : null,
+                          )),
+                      const SizedBox(height: 6),
+                      Text('유효기간: ${coupon['date']}',
+                          style: TextStyle(color: Colors.white.withValues(alpha: isUsed ? 0.2 : 0.4), fontSize: 12)),
+                    ],
+                  ),
+                ),
+                if (isUsed)
+                  const Text('사용완료', style: TextStyle(color: Colors.white24, fontSize: 12, fontWeight: FontWeight.bold))
+                else
+                  ElevatedButton(
+                    onPressed: () => _showBarcodeDialog(context, index, coupon['title']!),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.cyanAccent,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text('사용하기', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showBarcodeDialog(BuildContext context, int index, String title) {
+    final coupon = _coupons[index];
+    final String type = coupon['type'] ?? 'barcode';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Text(title, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16), textAlign: TextAlign.center),
+            const SizedBox(height: 30),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.black12),
+              ),
+              child: type == 'barcode' 
+                ? Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(20, (index) => Container(
+                          width: index % 3 == 0 ? 4 : 2,
+                          height: 80,
+                          margin: const EdgeInsets.symmetric(horizontal: 1),
+                          color: Colors.black,
+                        )),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text('1234 - 5678 - 9012', style: TextStyle(color: Colors.black, letterSpacing: 2, fontSize: 14, fontWeight: FontWeight.bold)),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      const Icon(Icons.qr_code_2, size: 100, color: Colors.black),
+                      const SizedBox(height: 10),
+                      const Text('QR-9876-5432-10', style: TextStyle(color: Colors.black, letterSpacing: 1, fontSize: 13, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              type == 'barcode' ? '매장 점원에게 바코드를 보여주세요.' : '매장 스캐너에 QR코드를 스캔해주세요.',
+              style: const TextStyle(color: Colors.black54, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Divider(color: Colors.black.withValues(alpha: 0.1)),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context); // 팝업 닫기
+                  _showConfirmUsedDialog(context, index);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey[200],
+                  foregroundColor: Colors.black87,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('사용 완료 처리하기', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Center(
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('닫기', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showConfirmUsedDialog(BuildContext context, int index) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1C),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('사용 완료 처리', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text('정말로 사용 완료 처리하시겠습니까?\n한 번 완료하면 되돌릴 수 없습니다.', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소', style: TextStyle(color: Colors.white38))),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _coupons[index]['isUsed'] = true;
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('사용 완료 처리되었습니다.'), duration: Duration(seconds: 2)),
+              );
+            },
+            child: const Text('확인', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CategoryProductScreen extends StatelessWidget {
+  final String categoryName;
+  const CategoryProductScreen({super.key, required this.categoryName});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(categoryName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Text('$categoryName 상품 목록이 곧 업데이트됩니다!', style: const TextStyle(color: Colors.white54)),
+      ),
+    );
+  }
 }
