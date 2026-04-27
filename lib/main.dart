@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'dart:async';
@@ -7,6 +7,17 @@ String gProfileImage = 'assets/profiles/profile_11.jpg';
 String gNameText = '나의 픽겟';
 String gIdText = '@나의_픽겟';
 String gBioText = '세상의 모든 선택지를 픽겟하다. 하고 싶은 거 다 해요 ✨ 매일 새로운 투표로 여러분의 선택을 기다립니다!';
+
+String formatCount(int count) {
+  if (count >= 1000000) {
+    double m = count / 1000000;
+    return m == m.toInt().toDouble() ? "${m.toInt()}M" : "${m.toStringAsFixed(1)}M";
+  } else if (count >= 1000) {
+    double k = count / 1000;
+    return k == k.toInt().toDouble() ? "${k.toInt()}k" : "${k.toStringAsFixed(1)}k";
+  }
+  return count.toString();
+}
 
 void main() {
   runApp(const PickGetApp());
@@ -94,6 +105,16 @@ class PickGetApp extends StatelessWidget {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: Colors.black,
         fontFamily: 'Pretendard',
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.cyanAccent,
+          brightness: Brightness.dark,
+          primary: Colors.cyanAccent,
+        ),
+        textSelectionTheme: const TextSelectionThemeData(
+          cursorColor: Colors.cyanAccent,
+          selectionColor: Colors.cyanAccent,
+          selectionHandleColor: Colors.cyanAccent,
+        ),
       ),
       home: const MainScreen(),
     );
@@ -119,12 +140,12 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _posts = [
-      PostData(id: '1', title: '오늘의 데이트 룩, 뭐가 더 심쿵해?', uploaderId: '@style_guru', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '서울 강남구 • 2시간 전', imageA: 'assets/images/post1_a.jpg', imageB: 'assets/images/post1_b.jpg', descriptionA: '트렌디한 오버사이즈 핏과 미니멀한 블랙 코디의 정석', descriptionB: '화려한 패턴과 유니크한 액세서리로 완성된 힙스터 룩', likesCount: 1200, commentsCount: 342, voteCountA: '1.2k', voteCountB: '800', percentA: '60%', percentB: '40%', isFollowing: true, fullDescription: '오늘은 홍대에서 데이트하기 좋은 룩 두 가지를 준비해봤어요! 여러분의 선택은 무엇인가요?', tags: ['데이트', '코디', '홍대']),
-      PostData(id: '2', title: '출근룩 이거 어떰?', uploaderId: '@office_worker', uploaderImage: 'assets/profiles/profile_32.jpg', timeLocation: '판교 • 5시간 전', imageA: 'assets/images/post2_a.jpg', imageB: 'assets/images/post2_b.jpg', descriptionA: '깔끔한 셔츠와 슬랙스 조합, 신뢰감을 주는 비즈니스 캐주얼', descriptionB: '편안한 니트와 베이지 면바지, 다정하고 부드러운 오피스 룩', likesCount: 850, commentsCount: 120, voteCountA: '450', voteCountB: '400', percentA: '53%', percentB: '47%', fullDescription: '월요병을 이겨낼 수 있는 상큼한 출근룩 제안입니다. 투표 부탁드려요!', tags: ['출근룩', '오피스', '비즈니스']),
-      PostData(id: '3', title: '휴양지 패션 추천좀!', uploaderId: '@traveler_j', uploaderImage: 'assets/profiles/profile_44.jpg', timeLocation: '제주도 • 1일 전', imageA: 'assets/images/post3_a.jpg', imageB: 'assets/images/post3_b.jpg', descriptionA: '시원한 리넨 셔츠와 반바지, 휴양지의 여유가 느껴지는 스타일', descriptionB: '에스닉한 무드와 로브로 인생샷을 부르는 화려한 바캉스 룩', likesCount: 2500, commentsCount: 890, voteCountA: '1.8k', voteCountB: '700', percentA: '72%', percentB: '28%', isFollowing: true, fullDescription: '다음 주에 발리로 떠나는데 어떤 옷이 더 잘 어울릴까요? 현지 분위기에 맞춰서 골라주세요.', isExpired: true, tags: ['휴양지', '여행', '발리']),
-      PostData(id: '4', title: '운동복 뭐가 나을까?', uploaderId: '@gym_rat', uploaderImage: 'assets/profiles/profile_12.jpg', timeLocation: '부산 • 3시간 전', imageA: 'assets/images/post4_a.jpg', imageB: 'assets/images/post4_b.jpg', descriptionA: '기능성에 집중한 컴프레션 웨어, 운동 효율을 높여주는 복장', descriptionB: '트렌디한 디자인의 조거 팬츠와 후드, 짐웨어로도 일상복으로도 만점', likesCount: 500, commentsCount: 40, voteCountA: '300', voteCountB: '200', percentA: '60%', percentB: '40%', fullDescription: '오운완! 오늘 새로 산 운동복인데 둘 중에 뭐가 더 핏이 좋아 보이나요?', isExpired: true, tags: ['운동', '헬스', '짐웨어']),
-      PostData(id: '5', title: '오늘 저녁 뭐 먹지?', uploaderId: '@foodie_kim', uploaderImage: 'assets/profiles/profile_60.jpg', timeLocation: '홍대 • 10분 전', imageA: 'assets/images/post5_a.jpg', imageB: 'assets/images/post5_b.jpg', descriptionA: '매콤한 감칠맛이 일품인 전통 한식 메뉴, 한국인의 소울 푸드', descriptionB: '치즈가 듬뿍 들어간 정통 이탈리안 파스타, 특별한 날에 어울리는 맛', likesCount: 3000, commentsCount: 1200, voteCountA: '2k', voteCountB: '1k', percentA: '67%', percentB: '33%', isFollowing: true, fullDescription: '결정장애 왔어요... 한식 vs 양식! 여러분의 픽으로 오늘 저녁 메뉴를 정하겠습니다.', tags: ['맛집', '저녁', '메뉴추천']),
-      PostData(id: '6', title: '지난주 베스트 코디', uploaderId: '@style_guru', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '서울 • 1주일 전', imageA: 'assets/images/post1_a.jpg', imageB: 'assets/images/post1_b.jpg', descriptionA: 'A', descriptionB: 'B', likesCount: 5000, commentsCount: 1500, voteCountA: '3k', voteCountB: '2k', percentA: '60%', percentB: '40%', isExpired: true, tags: ['베스트', '코디', '결산']),
+      PostData(id: '1', title: '오늘의 데이트 룩, 뭐가 더 심쿵해?', uploaderId: '@style_guru', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '서울 강남구 ? 2시간 전', imageA: 'assets/images/post1_a.jpg', imageB: 'assets/images/post1_b.jpg', descriptionA: '트렌디한 오버사이즈 핏과 미니멀한 블랙 코디의 정석', descriptionB: '화려한 패턴과 유니크한 액세서리로 완성된 힙스터 룩', likesCount: 1200, commentsCount: 342, voteCountA: '1.2k', voteCountB: '800', percentA: '60%', percentB: '40%', isFollowing: true, fullDescription: '오늘은 홍대에서 데이트하기 좋은 룩 두 가지를 준비해봤어요! 여러분의 선택은 무엇인가요?', tags: ['데이트', '코디', '홍대']),
+      PostData(id: '2', title: '출근룩 이거 어떰?', uploaderId: '@office_worker', uploaderImage: 'assets/profiles/profile_32.jpg', timeLocation: '판교 ? 5시간 전', imageA: 'assets/images/post2_a.jpg', imageB: 'assets/images/post2_b.jpg', descriptionA: '깔끔한 셔츠와 슬랙스 조합, 신뢰감을 주는 비즈니스 캐주얼', descriptionB: '편안한 니트와 베이지 면바지, 다정하고 부드러운 오피스 룩', likesCount: 850, commentsCount: 120, voteCountA: '450', voteCountB: '400', percentA: '53%', percentB: '47%', fullDescription: '월요병을 이겨낼 수 있는 상큼한 출근룩 제안입니다. 투표 부탁드려요!', tags: ['출근룩', '오피스', '비즈니스']),
+      PostData(id: '3', title: '휴양지 패션 추천좀!', uploaderId: '@traveler_j', uploaderImage: 'assets/profiles/profile_44.jpg', timeLocation: '제주도 ? 1일 전', imageA: 'assets/images/post3_a.jpg', imageB: 'assets/images/post3_b.jpg', descriptionA: '시원한 리넨 셔츠와 반바지, 휴양지의 여유가 느껴지는 스타일', descriptionB: '에스닉한 무드와 로브로 인생샷을 부르는 화려한 바캉스 룩', likesCount: 2500, commentsCount: 890, voteCountA: '1.8k', voteCountB: '700', percentA: '72%', percentB: '28%', isFollowing: true, fullDescription: '다음 주에 발리로 떠나는데 어떤 옷이 더 잘 어울릴까요? 현지 분위기에 맞춰서 골라주세요.', isExpired: true, tags: ['휴양지', '여행', '발리']),
+      PostData(id: '4', title: '운동복 뭐가 나을까?', uploaderId: '@gym_rat', uploaderImage: 'assets/profiles/profile_12.jpg', timeLocation: '부산 ? 3시간 전', imageA: 'assets/images/post4_a.jpg', imageB: 'assets/images/post4_b.jpg', descriptionA: '기능성에 집중한 컴프레션 웨어, 운동 효율을 높여주는 복장', descriptionB: '트렌디한 디자인의 조거 팬츠와 후드, 짐웨어로도 일상복으로도 만점', likesCount: 500, commentsCount: 40, voteCountA: '300', voteCountB: '200', percentA: '60%', percentB: '40%', fullDescription: '오운완! 오늘 새로 산 운동복인데 둘 중에 뭐가 더 핏이 좋아 보이나요?', isExpired: true, tags: ['운동', '헬스', '짐웨어']),
+      PostData(id: '5', title: '오늘 저녁 뭐 먹지?', uploaderId: '@foodie_kim', uploaderImage: 'assets/profiles/profile_60.jpg', timeLocation: '홍대 ? 10분 전', imageA: 'assets/images/post5_a.jpg', imageB: 'assets/images/post5_b.jpg', descriptionA: '매콤한 감칠맛이 일품인 전통 한식 메뉴, 한국인의 소울 푸드', descriptionB: '치즈가 듬뿍 들어간 정통 이탈리안 파스타, 특별한 날에 어울리는 맛', likesCount: 3000, commentsCount: 1200, voteCountA: '2k', voteCountB: '1k', percentA: '67%', percentB: '33%', isFollowing: true, fullDescription: '결정장애 왔어요... 한식 vs 양식! 여러분의 픽으로 오늘 저녁 메뉴를 정하겠습니다.', tags: ['맛집', '저녁', '메뉴추천']),
+      PostData(id: '6', title: '지난주 베스트 코디', uploaderId: '@style_guru', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '서울 ? 1주일 전', imageA: 'assets/images/post1_a.jpg', imageB: 'assets/images/post1_b.jpg', descriptionA: 'A', descriptionB: 'B', likesCount: 5000, commentsCount: 1500, voteCountA: '3k', voteCountB: '2k', percentA: '60%', percentB: '40%', isExpired: true, tags: ['베스트', '코디', '결산']),
     ];
     _refreshRecommended();
   }
@@ -623,7 +644,7 @@ class _MainScreenState extends State<MainScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  (post.likesCount + post.commentsCount).toString(), // Simple mock for votes/engagement
+                  formatCount(post.likesCount + post.commentsCount), // Simple mock for votes/engagement
                   style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900),
                 ),
                 const Text(
@@ -1240,12 +1261,12 @@ class _PostViewState extends State<PostView> {
                         const SizedBox(width: 15),
                         _statIcon(
                           widget.post.isLiked ? Icons.favorite : Icons.favorite_border, 
-                          widget.post.likesCount.toString(),
+                          formatCount(widget.post.likesCount),
                           color: widget.post.isLiked ? Colors.redAccent : Colors.white,
                           onTap: widget.onLike,
                         ),
                         const SizedBox(width: 20),
-                        _statIcon(Icons.chat_bubble_outline, widget.post.commentsCount.toString(), onTap: () {
+                        _statIcon(Icons.chat_bubble_outline, formatCount(widget.post.commentsCount), onTap: () {
                           if (_votedSide == 0 && !isExpired) {
                             showDialog(
                               context: context,
@@ -1405,26 +1426,30 @@ class _PostViewState extends State<PostView> {
 
   Widget _followBtn(bool isFollowing) {
     return Container(
-      width: 72, // Fixed width to prevent layout shift
-      height: 28, // Fixed height
+      width: 72, 
+      height: 28, 
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: isFollowing ? Colors.cyanAccent.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.15),
+        color: isFollowing ? const Color(0xFF272727) : Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: isFollowing ? Colors.cyanAccent.withValues(alpha: 0.4) : Colors.transparent, width: 1),
+        border: Border.all(color: isFollowing ? Colors.white10 : Colors.transparent, width: 1),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center, // Center icons and text
+        mainAxisAlignment: MainAxisAlignment.center, 
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(isFollowing ? Icons.check : Icons.add, color: isFollowing ? Colors.cyanAccent : Colors.white, size: 12),
+          Icon(
+            isFollowing ? Icons.check : Icons.add, 
+            color: isFollowing ? Colors.white70 : Colors.white, 
+            size: 12
+          ),
           const SizedBox(width: 4),
           Transform.translate(
-            offset: const Offset(0, -2), // Shift text up by 2px
+            offset: const Offset(0, -2), 
             child: Text(
               isFollowing ? '팔로잉' : '팔로우', 
               style: TextStyle(
-                color: isFollowing ? Colors.cyanAccent : Colors.white, 
+                color: isFollowing ? Colors.white70 : Colors.white, 
                 fontSize: 10, 
                 fontWeight: FontWeight.bold,
               ),
@@ -2012,10 +2037,10 @@ class _UploadScreenState extends State<UploadScreen> {
                 children: [
                   const Text('픽겟 업로드 가이드라인', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  _guideText('• 직접 촬영하거나 사용 권한이 있는 이미지만 업로드해 주세요.'),
-                  _guideText('• 욕설, 혐오 표현, 부적절한 비하 내용 포함 시 삭제될 수 있습니다.'),
-                  _guideText('• 성인 컨텐츠 및 AI 생성물은 반드시 해당 항목을 체크해야 합니다.'),
-                  _guideText('• 허위 정보로 혼란을 야기하는 투표는 서비스 이용이 제한됩니다.'),
+                  _guideText('? 직접 촬영하거나 사용 권한이 있는 이미지만 업로드해 주세요.'),
+                  _guideText('? 욕설, 혐오 표현, 부적절한 비하 내용 포함 시 삭제될 수 있습니다.'),
+                  _guideText('? 성인 컨텐츠 및 AI 생성물은 반드시 해당 항목을 체크해야 합니다.'),
+                  _guideText('? 허위 정보로 혼란을 야기하는 투표는 서비스 이용이 제한됩니다.'),
                 ],
               ),
             ),
@@ -2268,6 +2293,7 @@ class ChannelScreen extends StatefulWidget {
 
 class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProviderStateMixin {
   String _dName = ''; String _dId = ''; String _dImg = 'assets/profiles/profile_11.jpg'; String _dBio = '';
+  bool _isFollowing = false;
   late TabController _tabController;
   late List<PostData> _channelPosts;
   bool _isBioExpanded = false;
@@ -2276,7 +2302,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
   void initState() {
     super.initState();
     if (widget.uploaderId == '나의 픽겟') { _dName = gNameText; _dId = gIdText; _dImg = gProfileImage; _dBio = gBioText; }
-    else { _dName = widget.uploaderId; _dId = "@${widget.uploaderId.toLowerCase().replaceAll(' ', '_')}"; _dImg = widget.initialPost.uploaderImage; _dBio = '안녕하세요! ${widget.uploaderId}의 픽겟 공간입니다. ✨'; }
+    else { _dName = widget.uploaderId; _dId = "@${widget.uploaderId.toLowerCase().replaceAll(' ', '_')}"; _dImg = widget.initialPost.uploaderImage; _dBio = '안녕하세요! ${widget.uploaderId}의 픽겟 공간입니다. ✨'; _isFollowing = widget.initialPost.isFollowing; }
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabSelection);
     _channelPosts = widget.allPosts.where((p) => p.uploaderId == widget.uploaderId).toList();
@@ -2344,12 +2370,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
   }
 
   String _formatVotes(int count) {
-    if (count >= 1000000) {
-      return "${(count / 1000000).toStringAsFixed(1)}m";
-    } else if (count >= 1000) {
-      return "${(count / 1000).toStringAsFixed(1)}k";
-    }
-    return "$count";
+    return formatCount(count);
   }
 
   @override
@@ -2367,8 +2388,9 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
               icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
               onPressed: () => Navigator.pop(context),
             ),
-            actions: [ if (widget.uploaderId == '나의 픽겟') IconButton(icon: const Icon(Icons.edit_note, color: Colors.cyanAccent), onPressed: () { Navigator.push(context, MaterialPageRoute(builder: (context) => EditProfileScreen(currentName: gNameText, currentId: gIdText, currentBio: gBioText, currentImage: gProfileImage))).then((res) { if (res != null) setState(() { gNameText = res['name']; gIdText = res['id']; gBioText = res['bio']; gProfileImage = res['image']; _dName = gNameText; _dId = gIdText; _dBio = gBioText; _dImg = gProfileImage; }); }); }),
-              IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: _showMoreMenu),
+            actions: [
+              if (widget.uploaderId != '나의 픽겟')
+                IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: _showMoreMenu),
             ],
           ),
           SliverToBoxAdapter(
@@ -2392,9 +2414,45 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              _dName,
-                              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+                            Row(
+                              children: [
+                                Text(
+                                  _dName,
+                                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+                                ),
+                                if (widget.uploaderId == '나의 픽겟') ...[
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => EditProfileScreen(
+                                            currentName: gNameText,
+                                            currentId: gIdText,
+                                            currentBio: gBioText,
+                                            currentImage: gProfileImage,
+                                          ),
+                                        ),
+                                      ).then((res) {
+                                        if (res != null) {
+                                          setState(() {
+                                            gNameText = res['name'];
+                                            gIdText = res['id'];
+                                            gBioText = res['bio'];
+                                            gProfileImage = res['image'];
+                                            _dName = gNameText;
+                                            _dId = gIdText;
+                                            _dBio = gBioText;
+                                            _dImg = gProfileImage;
+                                          });
+                                        }
+                                      });
+                                    },
+                                    child: const Icon(Icons.edit_note, color: Colors.cyanAccent, size: 24),
+                                  ),
+                                ],
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -2403,7 +2461,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              "팔로워 5.88만명 · 콘텐츠 ${_channelPosts.length}개",
+                              "팔로워 58.8k · 콘텐츠 ${formatCount(_channelPosts.length)}",
                               style: const TextStyle(color: Colors.white38, fontSize: 13),
                             ),
                           ],
@@ -2441,15 +2499,46 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                       Expanded(
                         flex: 3,
                         child: ElevatedButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            if (widget.uploaderId != '나의 픽겟') {
+                              setState(() {
+                                _isFollowing = !_isFollowing;
+                                // 동일 업로더의 모든 포스트 팔로우 상태 동기화
+                                for (var p in widget.allPosts) {
+                                  if (p.uploaderId == widget.uploaderId) {
+                                    p.isFollowing = _isFollowing;
+                                  }
+                                }
+                              });
+                              HapticFeedback.mediumImpact();
+                            }
+                          },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
+                            backgroundColor: (widget.uploaderId != '나의 픽겟' && _isFollowing) 
+                              ? const Color(0xFF272727) 
+                              : Colors.white,
+                            foregroundColor: (widget.uploaderId != '나의 픽겟' && _isFollowing) 
+                              ? Colors.white70 
+                              : Colors.black,
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
-                          child: const Text('팔로우', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (widget.uploaderId != '나의 픽겟' && _isFollowing) ...[
+                                const Icon(Icons.check, size: 18),
+                                const SizedBox(width: 6),
+                              ],
+                              Text(
+                                widget.uploaderId == '나의 픽겟' 
+                                  ? '활동분석' 
+                                  : (_isFollowing ? '팔로잉' : '팔로우'),
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -2917,10 +3006,10 @@ class _PointScreenState extends State<PointScreen> {
               Text(
                 '안녕하세요. 서비스를 이용해 주시는 회원님께 감사의 말씀을 드립니다.\n\n' 
                 '회원님의 소중한 포인트 관리 및 원활한 서비스 제공을 위해 포인트 유효기간 정책을 아래와 같이 안내드립니다.\n\n' 
-                '• 유효기간: 각 포인트 적립일로부터 1년 (365일)\n\n' 
-                '• 소멸 방식: 유효기간이 경과한 포인트는 해당 일자 자정에 자동으로 소멸됩니다.\n\n' 
-                '• 사용 원칙: 먼저 적립된 포인트가 먼저 사용되는 \'선입선출\' 방식으로 차감됩니다.\n\n' 
-                '• 사전 안내: 포인트 소멸 30일 전과 7일 전에 앱 알림을 통해 소멸 예정 포인트를 미리 안내해 드립니다.\n\n' 
+                '? 유효기간: 각 포인트 적립일로부터 1년 (365일)\n\n' 
+                '? 소멸 방식: 유효기간이 경과한 포인트는 해당 일자 자정에 자동으로 소멸됩니다.\n\n' 
+                '? 사용 원칙: 먼저 적립된 포인트가 먼저 사용되는 \'선입선출\' 방식으로 차감됩니다.\n\n' 
+                '? 사전 안내: 포인트 소멸 30일 전과 7일 전에 앱 알림을 통해 소멸 예정 포인트를 미리 안내해 드립니다.\n\n' 
                 '소멸된 포인트는 복구가 불가능하오니, 유효기간 내에 현금전환이나 상품 구매 등으로 알뜰하게 사용하시길 바랍니다.',
                 style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.6),
               ),
@@ -3683,7 +3772,11 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
           ),
           child: TextField(
             controller: _searchController,
-            autofocus: true,
+            autofocus: false,
+            textInputAction: TextInputAction.search,
+            onSubmitted: (value) {
+              FocusScope.of(context).unfocus();
+            },
             onTap: () {
               if (_isDetailView) {
                 setState(() {
@@ -4064,7 +4157,10 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
               itemBuilder: (context, index) {
                 return ActionChip(
                   label: Text(_recentSearches[index]),
-                  onPressed: () => _searchController.text = _recentSearches[index],
+                  onPressed: () {
+                    _searchController.text = _recentSearches[index];
+                    FocusScope.of(context).unfocus();
+                  },
                   backgroundColor: const Color(0xFF1C1C1C),
                   labelStyle: const TextStyle(color: Colors.white70, fontSize: 13),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -4086,7 +4182,10 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
             itemBuilder: (context, index) {
               final item = _trendingKeywords[index];
               return ListTile(
-                onTap: () => _searchController.text = item['keyword'],
+                onTap: () {
+                  _searchController.text = item['keyword'];
+                  FocusScope.of(context).unfocus();
+                },
                 leading: Text(
                   item['rank'].toString(),
                   style: TextStyle(color: item['rank'] <= 3 ? Colors.cyanAccent : Colors.white38, fontWeight: FontWeight.bold, fontSize: 16),
@@ -4112,10 +4211,10 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
               crossAxisSpacing: 12,
               childAspectRatio: 2.5,
               children: [
-                _buildCategoryChip('👗 패션/뷰티', Colors.purpleAccent),
-                _buildCategoryChip('🍔 오늘 뭐먹지?', Colors.orangeAccent),
-                _buildCategoryChip('💻 IT/디지털', Colors.blueAccent),
-                _buildCategoryChip('🎮 게임/취미', Colors.cyanAccent),
+                _buildCategoryChip('?? 패션/뷰티', Colors.purpleAccent),
+                _buildCategoryChip('?? 오늘 뭐먹지?', Colors.orangeAccent),
+                _buildCategoryChip('?? IT/디지털', Colors.blueAccent),
+                _buildCategoryChip('?? 게임/취미', Colors.cyanAccent),
               ],
             ),
           ),
@@ -4137,9 +4236,10 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   Widget _buildCategoryChip(String label, Color color) {
     return GestureDetector(
       onTap: () {
-        // 이모지 제외한 텍스트만 추출 (예: '👗 패션/뷰티' -> '패션/뷰티')
+        // 이모지 제외한 텍스트만 추출 (예: '?? 패션/뷰티' -> '패션/뷰티')
         final query = label.split(' ').last;
         _searchController.text = query;
+        FocusScope.of(context).unfocus();
         HapticFeedback.lightImpact();
       },
       child: Container(
@@ -4175,7 +4275,8 @@ class CategoryProductScreen extends StatelessWidget {
     );
   }
 }
-class PostDetailScreen extends StatelessWidget {
+
+class PostDetailScreen extends StatelessWidget {
   final PostData post;
   const PostDetailScreen({super.key, required this.post});
   @override Widget build(BuildContext context) {
