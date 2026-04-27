@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/post_data.dart';
 import '../widgets/post_view.dart';
+import 'channel_screen.dart';
 
 class ChannelFeedScreen extends StatefulWidget {
   final int initialIndex;
@@ -96,6 +97,18 @@ class _ChannelFeedScreenState extends State<ChannelFeedScreen> {
                     post.userVotedSide = side;
                   });
                 },
+                onProfileTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChannelScreen(
+                        uploaderId: post.uploaderId,
+                        allPosts: widget.allPosts,
+                        initialPost: post,
+                      ),
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -113,6 +126,25 @@ class _ChannelFeedScreenState extends State<ChannelFeedScreen> {
                 child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
               ),
               onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          // 상단 홈 버튼 (플로팅 - 한 번에 메인으로)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 10,
+            right: 10,
+            child: IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.home_rounded, color: Colors.white, size: 22),
+              ),
+              onPressed: () {
+                // 첫 화면(메인)이 나올 때까지 모든 화면을 닫음
+                Navigator.popUntil(context, (route) => route.isFirst);
+              },
             ),
           ),
         ],

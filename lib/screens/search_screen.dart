@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/post_data.dart';
+import 'channel_screen.dart';
 import 'channel_feed_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -321,93 +322,140 @@ class _SearchScreenState extends State<SearchScreen> {
             itemCount: displayList.length,
             itemBuilder: (context, index) {
               final post = displayList[index];
-              return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ChannelFeedScreen(
-                        initialIndex: index,
-                        channelPosts: displayList,
-                        allPosts: widget.allPosts,
+              return Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Stack(
+                    children: [
+                      // 1. 영상 피드로 이동 (썸네일 + 그라데이션 영역)
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ChannelFeedScreen(
+                                initialIndex: index,
+                                channelPosts: displayList,
+                                allPosts: widget.allPosts,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: Image.asset(post.imageA, fit: BoxFit.cover),
+                            ),
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.black.withValues(alpha: 0.3),
+                                      Colors.black.withValues(alpha: 0.8),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: Image.asset(post.imageA, fit: BoxFit.cover),
-                        ),
-                        Positioned.fill(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withValues(alpha: 0.3),
-                                  Colors.black.withValues(alpha: 0.8),
-                                ],
-                              ),
+                      // 2. 상태 배지 (단순 표시)
+                      Positioned(
+                        top: 10, left: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: post.isExpired ? Colors.black54 : Colors.cyanAccent.withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            post.isExpired ? '선택종료' : '선택중',
+                            style: TextStyle(
+                              color: post.isExpired ? Colors.white70 : Colors.black,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
                         ),
-                        Positioned(
-                          top: 10, left: 10,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: post.isExpired ? Colors.black54 : Colors.cyanAccent.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              post.isExpired ? '선택종료' : '선택중',
-                              style: TextStyle(
-                                color: post.isExpired ? Colors.white70 : Colors.black,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 12, left: 12, right: 12,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
+                      ),
+                      // 3. 하단 정보 (제목 클릭 시에도 피드 이동)
+                      Positioned(
+                        bottom: 12, left: 12, right: 12,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ChannelFeedScreen(
+                                      initialIndex: index,
+                                      channelPosts: displayList,
+                                      allPosts: widget.allPosts,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Text(
                                 post.title, 
                                 style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, height: 1.3),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Text(
-                                    '${(post.likesCount / 100).toStringAsFixed(1)}k views', 
-                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 9),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Text(
+                                  '${(post.likesCount / 100).toStringAsFixed(1)}k views', 
+                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 9),
+                                ),
+                                const Spacer(),
+                                // 4. 아이디 클릭 시에만 유저 채널 이동 (독립적 클릭 영역)
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ChannelScreen(
+                                          uploaderId: post.uploaderId,
+                                          allPosts: widget.allPosts,
+                                          initialPost: post,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.cyanAccent.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      post.uploaderId, 
+                                      style: const TextStyle(
+                                        color: Colors.cyanAccent, 
+                                        fontSize: 10, 
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
-                                  const Spacer(),
-                                  Text(
-                                    post.uploaderId, 
-                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 10, fontWeight: FontWeight.w500),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               );
