@@ -65,109 +65,127 @@ class _StoreScreenState extends State<StoreScreen> {
       builder: (context) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
           decoration: const BoxDecoration(
             color: Color(0xFF1C1C1C),
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('현금 인출 신청', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('최소 10,000P부터 인출 가능합니다.', style: TextStyle(color: Colors.white38, fontSize: 13)),
-              const SizedBox(height: 24),
-              _inputField('인출 포인트', _amountController, '예: 10000 (5,000P 단위)', TextInputType.number),
-              const SizedBox(height: 16),
-              _inputField('은행명', _bankController, '예: 카카오뱅크', TextInputType.text),
-              const SizedBox(height: 16),
-              _inputField('예금주 성함', _holderController, '계좌 소유주 실명', TextInputType.text),
-              const SizedBox(height: 16),
-              _inputField('계좌번호', _accountController, '하이픈(-) 없이 입력', TextInputType.number),
-              const SizedBox(height: 24),
-              
-              // --- 현금 인출 신청 시 주의사항 ---
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.redAccent.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.redAccent.withValues(alpha: 0.1)),
-                ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
-                        SizedBox(width: 8),
-                        Text('인출 신청 전 주의사항', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    SizedBox(height: 12),
-                    Text('• 인출은 5,000P 단위로만 신청 가능합니다. (1회 최대 30,000P)', style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.5)),
-                    Text('• 반드시 본인 명의의 계좌로 신청해야 하며, 정보 불일치 시 승인이 거절됩니다.', style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.5)),
-                    Text('• 계좌정보 오기입으로 인한 오송금 책임은 본인에게 있습니다.', style: TextStyle(color: Colors.redAccent, fontSize: 12, height: 1.5, fontWeight: FontWeight.w500)),
-                    Text('• 승인 및 입금은 신청일로부터 영업일 기준 최대 3일이 소요됩니다.', style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.5)),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () {
-                    final int? amount = int.tryParse(_amountController.text);
-                    if (_amountController.text.isEmpty || _holderController.text.isEmpty || _accountController.text.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('모든 정보를 입력해주세요.'), backgroundColor: Colors.orangeAccent),
-                      );
-                      return;
-                    }
-                    
-                    if (amount == null || amount < 10000) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('최소 10,000P부터 인출 가능합니다.'), backgroundColor: Colors.orangeAccent),
-                      );
-                      return;
-                    }
-
-                    if (amount % 5000 != 0) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('인출 신청은 5,000P 단위로만 가능합니다.'), backgroundColor: Colors.orangeAccent),
-                      );
-                      return;
-                    }
-
-                    if (amount > widget.userPoints) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('보유하신 포인트가 부족합니다.'), backgroundColor: Colors.redAccent),
-                      );
-                      return;
-                    }
-
-                    setState(() {
-                      _isWithdrawalPending = true;
-                      _pendingAmount = amount;
-                    });
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('인출 신청이 완료되었습니다. 승인까지 최대 3일이 소요됩니다.'), backgroundColor: Colors.cyanAccent),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.cyanAccent,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: SingleChildScrollView( // 키보드 가림 방지를 위한 스크롤 추가
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('현금 인출 신청', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                const Text('최소 10,000P부터 인출 가능합니다.', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                const SizedBox(height: 24),
+                _inputField('인출 포인트', _amountController, '예: 10000 (5,000P 단위)', TextInputType.number),
+                const SizedBox(height: 16),
+                _inputField('은행명', _bankController, '예: 카카오뱅크', TextInputType.text),
+                const SizedBox(height: 16),
+                _inputField('예금주 성함', _holderController, '계좌 소유주 실명', TextInputType.text),
+                const SizedBox(height: 16),
+                _inputField('계좌번호', _accountController, '하이픈(-) 없이 입력', TextInputType.number),
+                const SizedBox(height: 24),
+                
+                // --- 현금 인출 신청 시 주의사항 ---
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.redAccent.withValues(alpha: 0.1)),
                   ),
-                  child: const Text('신청하기', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
+                          SizedBox(width: 8),
+                          Text('인출 신청 전 주의사항', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      Text('• 인출은 5,000P 단위로만 신청 가능합니다. (1회 최대 30,000P)', style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.5)),
+                      Text('• 반드시 본인 명의의 계좌로 신청해야 하며, 정보 불일치 시 승인이 거절됩니다.', style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.5)),
+                      Text('• 계좌정보 오기입으로 인한 오송금 책임은 본인에게 있습니다.', style: TextStyle(color: Colors.redAccent, fontSize: 12, height: 1.5, fontWeight: FontWeight.w500)),
+                      Text('• 승인 및 입금은 신청일로부터 영업일 기준 최대 3일이 소요됩니다.', style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.5)),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-            ],
+
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      final int? amount = int.tryParse(_amountController.text);
+                      if (_amountController.text.isEmpty || _holderController.text.isEmpty || _accountController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('모든 정보를 입력해주세요.'), backgroundColor: Colors.orangeAccent),
+                        );
+                        return;
+                      }
+                      
+                      if (amount == null || amount < 10000) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('최소 10,000P부터 인출 가능합니다.'), backgroundColor: Colors.orangeAccent),
+                        );
+                        return;
+                      }
+
+                      if (amount % 5000 != 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('인출 신청은 5,000P 단위로만 가능합니다.'), backgroundColor: Colors.orangeAccent),
+                        );
+                        return;
+                      }
+
+                      if (amount > widget.userPoints) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('보유하신 포인트가 부족합니다.'), backgroundColor: Colors.redAccent),
+                        );
+                        return;
+                      }
+
+                      setState(() {
+                        _isWithdrawalPending = true;
+                        _pendingAmount = amount;
+                      });
+                      
+                      Navigator.pop(context); // 시트 닫기
+
+                      // 신청 완료 팝업 띄우기
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          backgroundColor: const Color(0xFF1E1E1E),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          title: const Text('신청 완료', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          content: const Text('현금 인출 신청이 완료되었습니다.\n관리자 확인 후 최대 3일 이내에 입금됩니다.', style: TextStyle(color: Colors.white70)),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('확인', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.cyanAccent,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text('신청하기', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                ),
+                // 하단 시스템 바 여백 추가
+                SizedBox(height: 24 + MediaQuery.of(context).padding.bottom),
+              ],
+            ),
           ),
         ),
       ),
@@ -259,7 +277,7 @@ class _StoreScreenState extends State<StoreScreen> {
                             minimumSize: const Size(0, 36),
                           ),
                           child: Text(
-                            _isWithdrawalPending ? '처리중' : '인출신청', 
+                            _isWithdrawalPending ? '신청중' : '인출신청', 
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)
                           ),
                         ),

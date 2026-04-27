@@ -688,10 +688,14 @@ class _PostViewState extends State<PostView> {
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (context) => StatefulBuilder(
-          builder: (context, setSheetState) => SafeArea(
+          builder: (context, setSheetState) => Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
             child: Container(
               height: MediaQuery.of(context).size.height * 0.75, 
-              decoration: const BoxDecoration(color: Color(0xFF121212), borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+              decoration: const BoxDecoration(
+                color: Color(0xFF121212), 
+                borderRadius: BorderRadius.vertical(top: Radius.circular(25))
+              ),
               child: Column(
                 children: [
                   const SizedBox(height: 12),
@@ -721,11 +725,11 @@ class _PostViewState extends State<PostView> {
 
   Widget _commentInput(TextEditingController controller, StateSetter setSheetState) {
     return Container(
-      padding: EdgeInsets.only(
+      padding: const EdgeInsets.only(
         left: 16, 
         right: 16, 
         top: 12, 
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        bottom: 16,
       ),
       decoration: const BoxDecoration(
         color: Color(0xFF1E1E1E), 

@@ -156,6 +156,7 @@ class _SearchScreenState extends State<SearchScreen> {
               children: [
                 GestureDetector(
                   onTap: () {
+                    // 키워드 클릭 시 키보드 즉시 숨김
                     FocusScope.of(context).unfocus();
                     _searchController.text = item;
                     _performSearch(item);
@@ -237,6 +238,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _popularSearchTile(int rank, String term, String status, int change) {
     return InkWell(
       onTap: () {
+        // 인기 검색어 클릭 시 키보드 즉시 숨김
         FocusScope.of(context).unfocus();
         _searchController.text = term;
         _performSearch(term);
@@ -311,8 +313,11 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
         Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: GridView.builder(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               childAspectRatio: 0.55,
@@ -462,7 +467,8 @@ class _SearchScreenState extends State<SearchScreen> {
             },
           ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 }
