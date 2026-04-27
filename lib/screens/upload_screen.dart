@@ -19,6 +19,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
   bool _isAdultContent = false;
   bool _isAIContent = false;
+  bool _allowComments = true;
 
   int _selectedHours = 24;
   int _selectedMinutes = 0;
@@ -39,7 +40,7 @@ class _UploadScreenState extends State<UploadScreen> {
           icon: const Icon(Icons.close, color: Colors.white, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('새 선택지 만들기', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+        title: const Text('새 질문 하기', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
         centerTitle: true,
         actions: [
           TextButton(
@@ -96,7 +97,7 @@ class _UploadScreenState extends State<UploadScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('투표 제목', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Text('질문 제목', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
                   TextField(
                     controller: _titleController,
                     style: const TextStyle(color: Colors.white, fontSize: 16),
@@ -129,7 +130,7 @@ class _UploadScreenState extends State<UploadScreen> {
                     maxLines: 3,
                     style: const TextStyle(color: Colors.white, fontSize: 15),
                     decoration: const InputDecoration(
-                      hintText: '투표에 대해 더 자세히 알려주세요...',
+                      hintText: '질문에 대해 더 자세히 알려주세요...',
                       hintStyle: TextStyle(color: Colors.white24, fontSize: 15),
                       border: InputBorder.none,
                     ),
@@ -209,8 +210,9 @@ class _UploadScreenState extends State<UploadScreen> {
       ),
       child: Column(
         children: [
-          _settingItem(Icons.timer_outlined, '투표 기간', '${_selectedHours}시간 00분'),
-          _settingItem(Icons.ads_click_outlined, '목표 투표수', _useTargetGoal ? '${_targetVotesController.text}표' : '무제한'),
+          _settingItem(Icons.timer_outlined, '진행 기간', '${_selectedHours}시간 00분'),
+          _settingItem(Icons.ads_click_outlined, '목표 참여수', _useTargetGoal ? '${_targetVotesController.text}명' : '무제한'),
+          _settingItem(Icons.comment_outlined, '댓글 허용', _allowComments ? '예' : '아니오', isToggle: true, toggleValue: _allowComments, onChanged: (v) => setState(() => _allowComments = v)),
           _settingItem(Icons.psychology_outlined, 'AI 생성 콘텐츠', _isAIContent ? '예' : '아니오', isToggle: true, toggleValue: _isAIContent, onChanged: (v) => setState(() => _isAIContent = v)),
           _settingItem(Icons.explicit_outlined, '성인 콘텐츠', _isAdultContent ? '예' : '아니오', isToggle: true, toggleValue: _isAdultContent, onChanged: (v) => setState(() => _isAdultContent = v)),
         ],
