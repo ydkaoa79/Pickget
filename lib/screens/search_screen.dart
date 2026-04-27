@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/post_data.dart';
-import 'channel_screen.dart';
+import 'channel_feed_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   final List<PostData> allPosts;
@@ -314,7 +314,7 @@ class _SearchScreenState extends State<SearchScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              childAspectRatio: 0.7,
+              childAspectRatio: 0.55,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
             ),
@@ -326,67 +326,88 @@ class _SearchScreenState extends State<SearchScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ChannelScreen(
-                        uploaderId: post.uploaderId,
+                      builder: (context) => ChannelFeedScreen(
+                        initialIndex: index,
+                        channelPosts: displayList,
                         allPosts: widget.allPosts,
-                        initialPost: post,
                       ),
                     ),
                   );
                 },
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.03),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                            image: DecorationImage(image: AssetImage(post.imageA), fit: BoxFit.cover),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Image.asset(post.imageA, fit: BoxFit.cover),
+                        ),
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.3),
+                                  Colors.black.withValues(alpha: 0.8),
+                                ],
+                              ),
+                            ),
                           ),
-                          child: Stack(
+                        ),
+                        Positioned(
+                          top: 10, left: 10,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: post.isExpired ? Colors.black54 : Colors.cyanAccent.withValues(alpha: 0.8),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              post.isExpired ? '선택종료' : '선택중',
+                              style: TextStyle(
+                                color: post.isExpired ? Colors.white70 : Colors.black,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 12, left: 12, right: 12,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Positioned(
-                                right: 8, top: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.play_arrow, color: Colors.white, size: 10),
-                                      const SizedBox(width: 2),
-                                      Text('${(post.likesCount / 100).toStringAsFixed(1)}k', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                    ],
+                              Text(
+                                post.title, 
+                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, height: 1.3),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Text(
+                                    '${(post.likesCount / 100).toStringAsFixed(1)}k views', 
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 9),
                                   ),
-                                ),
+                                  const Spacer(),
+                                  Text(
+                                    post.uploaderId, 
+                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 10, fontWeight: FontWeight.w500),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(post.title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, height: 1.2), maxLines: 2, overflow: TextOverflow.ellipsis),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(Icons.person, color: Colors.white24, size: 12),
-                                const SizedBox(width: 4),
-                                Expanded(child: Text(post.uploaderId, style: const TextStyle(color: Colors.white38, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               );
