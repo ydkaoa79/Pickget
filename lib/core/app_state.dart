@@ -1,0 +1,29 @@
+import 'package:flutter/material.dart';
+
+// Global Profile State
+String gProfileImage = 'assets/profiles/profile_11.jpg';
+String gNameText = '나의 픽겟';
+String gIdText = '@나의_픽겟';
+String gBioText = '세상의 모든 선택지를 픽겟하다. 하고 싶은 거 다 해요 ✨ 매일 새로운 투표로 여러분의 선택을 기다립니다!';
+bool gIsLoggedIn = false;
+VoidCallback? gShowLoginPopup;
+
+// Utils
+String formatCount(int count) {
+  if (count >= 1000000) {
+    double m = count / 1000000;
+    return m == m.toInt().toDouble() ? "${m.toInt()}M" : "${m.toStringAsFixed(1)}M";
+  } else if (count >= 1000) {
+    double k = count / 1000;
+    return k == k.toInt().toDouble() ? "${k.toInt()}k" : "${k.toStringAsFixed(1)}k";
+  }
+  return count.toString();
+}
+
+String getEmpathyLevel(int percent) {
+  if (percent <= 20) return '매우 낮음';
+  if (percent <= 40) return '낮음';
+  if (percent <= 60) return '보통';
+  if (percent <= 80) return '높음';
+  return '매우 높음';
+}
