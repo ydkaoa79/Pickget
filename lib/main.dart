@@ -391,8 +391,9 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildBottomNav() {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Positioned(
-      bottom: 40, left: 20, right: 20,
+      bottom: 20 + bottomPadding, left: 20, right: 20,
       child: Container(
         height: 50,
         decoration: BoxDecoration(color: const Color(0xFF151515), borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 25)]),
@@ -1162,7 +1163,7 @@ class _PostViewState extends State<PostView> {
               AnimatedPositioned(
                 duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
                 curve: Curves.easeOutCubic, 
-                bottom: 290, 
+                bottom: 210 + MediaQuery.of(context).padding.bottom, 
                 left: (currentWidthA / 2) - (descWidth / 2), 
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 300),
@@ -1176,7 +1177,7 @@ class _PostViewState extends State<PostView> {
               AnimatedPositioned(
                 duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
                 curve: Curves.easeOutCubic, 
-                bottom: 290, 
+                bottom: 210 + MediaQuery.of(context).padding.bottom, 
                 left: currentWidthA + ((sw - currentWidthA) / 2) - (descWidth / 2), 
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 300),
@@ -1188,7 +1189,7 @@ class _PostViewState extends State<PostView> {
                 ),
               ),
               Positioned(
-                bottom: 100, left: 18, right: 130,
+                bottom: 80 + MediaQuery.of(context).padding.bottom, left: 18, right: 130,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -1557,7 +1558,7 @@ class _PostViewState extends State<PostView> {
     bool hasVoted = _votedSide != 0 || isExpired;
     
     return Positioned(
-      bottom: 87, // Reduced along with bottom nav height
+      bottom: 67 + MediaQuery.of(context).padding.bottom,
       right: 35,   // Aligns donut center with profile icon's left edge
       child: SizedBox(
         width: 120, 
