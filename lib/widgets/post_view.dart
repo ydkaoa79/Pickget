@@ -668,7 +668,8 @@ class _PostViewState extends State<PostView> {
   }
 
   void _showCommentsSheet(BuildContext context) {
-    if (_votedSide == 0 && !isExpired) {
+    // 본인 게시글('me')이 아니면서 투표도 안 한 경우만 팝업 표시
+    if (_votedSide == 0 && !isExpired && widget.post.uploaderId != 'me') {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -725,11 +726,11 @@ class _PostViewState extends State<PostView> {
 
   Widget _commentInput(TextEditingController controller, StateSetter setSheetState) {
     return Container(
-      padding: const EdgeInsets.only(
+      padding: EdgeInsets.only(
         left: 16, 
         right: 16, 
         top: 12, 
-        bottom: 16,
+        bottom: 16 + MediaQuery.of(context).padding.bottom,
       ),
       decoration: const BoxDecoration(
         color: Color(0xFF1E1E1E), 
@@ -748,6 +749,20 @@ class _PostViewState extends State<PostView> {
                 controller: controller,
                 autofocus: false,
                 style: const TextStyle(color: Colors.white, fontSize: 14),
+                onSubmitted: (val) {
+                  if (val.trim().isNotEmpty) {
+                    setSheetState(() {
+                      widget.post.comments.add(CommentData(
+                        user: '나 (본인)', 
+                        text: val, 
+                        side: _votedSide, 
+                        image: 'assets/profiles/profile_11.jpg',
+                      ));
+                      controller.clear();
+                    });
+                    FocusScope.of(context).unfocus(); // 엔터 시 키보드 닫기
+                  }
+                },
                 decoration: const InputDecoration(
                   hintText: '의견을 나눠보세요...', 
                   hintStyle: TextStyle(color: Colors.white38), 
