@@ -31,7 +31,7 @@ class _PointScreenState extends State<PointScreen> {
     PointHistoryItem(title: '게시물 좋아요 보상', amount: 50, date: '2026.04.26', isEarned: true),
     PointHistoryItem(title: '현금 인출 신청', amount: 10000, date: '2026.04.25', isEarned: false),
     PointHistoryItem(title: '상품권 교환', amount: 5000, date: '2026.04.24', isEarned: false),
-    PointHistoryItem(title: '투표 참여 보상', amount: 10, date: '2026.04.23', isEarned: true),
+    PointHistoryItem(title: '선택 참여 보상', amount: 10, date: '2026.04.23', isEarned: true),
     PointHistoryItem(title: '이벤트 당첨 보너스', amount: 2000, date: '2026.04.20', isEarned: true),
     PointHistoryItem(title: '친구 초대 보상', amount: 500, date: '2026.04.18', isEarned: true),
     PointHistoryItem(title: '베스트 코디 선정', amount: 1000, date: '2026.04.15', isEarned: true),

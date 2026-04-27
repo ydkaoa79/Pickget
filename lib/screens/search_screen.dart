@@ -65,7 +65,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         style: const TextStyle(color: Colors.white),
                         onChanged: _performSearch,
                         decoration: const InputDecoration(
-                          hintText: '투표 제목, 채널명, 태그 검색',
+                          hintText: '질문 제목, 채널명, 태그 검색',
                           hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
                           prefixIcon: Icon(Icons.search, color: Colors.white38),
                           border: InputBorder.none,
@@ -114,10 +114,10 @@ class _SearchScreenState extends State<SearchScreen> {
         const SizedBox(height: 40),
         const Text('추천 카테고리', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        _categoryTile(Icons.shopping_bag_outlined, '패션 & 스타일', '3,452개의 픽겟'),
-        _categoryTile(Icons.restaurant_outlined, '맛집 & 카페', '1,245개의 픽겟'),
-        _categoryTile(Icons.favorite_border, '연애 & 고민', '2,890개의 픽겟'),
-        _categoryTile(Icons.flight_takeoff, '여행 & 라이프', '980개의 픽겟'),
+        _categoryTile(Icons.shopping_bag_outlined, '패션 & 스타일', '3,452개의 질문'),
+        _categoryTile(Icons.restaurant_outlined, '맛집 & 카페', '1,245개의 질문'),
+        _categoryTile(Icons.favorite_border, '연애 & 고민', '2,890개의 질문'),
+        _categoryTile(Icons.flight_takeoff, '여행 & 라이프', '980개의 질문'),
       ],
     );
   }

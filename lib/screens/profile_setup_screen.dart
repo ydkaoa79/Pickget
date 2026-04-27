@@ -39,7 +39,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 """;
 
   final String _marketingText = """
-본 동의를 통해 PickGet에서 제공하는 투표 참여 보상 안내, 신규 리워드 상품 입고 알림, 이벤트 소식 등을 Push 알림 또는 이메일로 받아보실 수 있습니다.
+본 동의를 통해 PickGet에서 제공하는 선택 참여 보상 안내, 신규 리워드 상품 입고 알림, 이벤트 소식 등을 Push 알림 또는 이메일로 받아보실 수 있습니다.
 ※ 동의하지 않으셔도 서비스 이용이 가능하며, 설정에서 언제든 변경할 수 있습니다.
 """;
 

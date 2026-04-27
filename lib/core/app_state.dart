@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 String gProfileImage = 'assets/profiles/profile_11.jpg';
 String gNameText = '나의 픽겟';
 String gIdText = '@나의_픽겟';
-String gBioText = '세상의 모든 선택지를 픽겟하다. 하고 싶은 거 다 해요 ✨ 매일 새로운 투표로 여러분의 선택을 기다립니다!';
+String gBioText = '세상의 모든 선택지를 픽겟하다. 하고 싶은 거 다 해요 ✨ 매일 새로운 선택지로 여러분의 참여를 기다립니다!';
 bool gIsLoggedIn = false;
 VoidCallback? gShowLoginPopup;
 

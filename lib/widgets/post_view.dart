@@ -44,6 +44,7 @@ class _PostViewState extends State<PostView> {
   Timer? _countdownTimer;
   bool _isDescAExpanded = false;
   bool _isDescBExpanded = false;
+  bool _showAlreadySelectedToast = false;
 
   @override
   void initState() {
@@ -82,6 +83,14 @@ class _PostViewState extends State<PostView> {
     });
   }
 
+  void _showAlreadySelectedMessage() {
+    if (_showAlreadySelectedToast) return;
+    setState(() => _showAlreadySelectedToast = true);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _showAlreadySelectedToast = false);
+    });
+  }
+
   void _onVote(int side) {
     if (!gIsLoggedIn) {
       gShowLoginPopup?.call();
@@ -92,7 +101,7 @@ class _PostViewState extends State<PostView> {
     if (widget.post.uploaderId == '나의 픽겟') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('본인이 올린 투표에는 참여할 수 없습니다.'),
+          content: Text('본인이 올린 질문에는 참여할 수 없습니다.'),
           duration: Duration(seconds: 2),
         ),
       );
@@ -151,12 +160,18 @@ class _PostViewState extends State<PostView> {
       if (currentWidthA > sw * 0.65) {
         if (!isExpired && _votedSide == 0) {
           _onVote(1);
+        } else if (_votedSide != 0) {
+          _showAlreadySelectedMessage();
+          HapticFeedback.heavyImpact();
         } else {
           HapticFeedback.heavyImpact();
         }
       } else if (currentWidthA < sw * 0.35) {
         if (!isExpired && _votedSide == 0) {
           _onVote(2);
+        } else if (_votedSide != 0) {
+          _showAlreadySelectedMessage();
+          HapticFeedback.heavyImpact();
         } else {
           HapticFeedback.heavyImpact();
         }
@@ -424,7 +439,7 @@ class _PostViewState extends State<PostView> {
                       )
                     ),
                     const SizedBox(height: 12),
-                    Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.access_time, color: isExpired ? Colors.white38 : Colors.cyanAccent, size: 18), const SizedBox(width: 6), Text(isExpired ? '투표종료' : _formatTimer(_remainingSeconds), style: TextStyle(color: isExpired ? Colors.white38 : Colors.white, fontWeight: FontWeight.w900, fontSize: 12))]))),
+                    Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7), decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.access_time, color: isExpired ? Colors.white38 : Colors.cyanAccent, size: 18), const SizedBox(width: 6), Text(isExpired ? '선택종료' : _formatTimer(_remainingSeconds), style: TextStyle(color: isExpired ? Colors.white38 : Colors.white, fontWeight: FontWeight.w900, fontSize: 12))]))),
                     if (_isDragging && _votedSide == 0 && !isExpired)
                       Padding(
                         padding: const EdgeInsets.only(top: 12),
@@ -579,6 +594,24 @@ class _PostViewState extends State<PostView> {
                     },
                   ),
                 ),
+              if (_showAlreadySelectedToast)
+                Positioned(
+                  top: 260, 
+                  left: 0, right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        '이미 선택한 콘텐츠입니다',
+                        style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         );
@@ -641,7 +674,7 @@ class _PostViewState extends State<PostView> {
         builder: (context) => AlertDialog(
           backgroundColor: const Color(0xFF1E1E1E),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('투표 후 참여 가능', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+          title: const Text('선택 후 참여 가능', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
           content: const Text('댓글을 확인하고 의견을 나누려면\n먼저 어느 쪽이든 Pick 해주세요!', style: TextStyle(color: Colors.white70)),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('확인', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold))),

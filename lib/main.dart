@@ -78,7 +78,7 @@ class _MainScreenState extends State<MainScreen> {
       PostData(id: '4', title: '운동복 뭐가 나을까?', uploaderId: '@gym_rat', uploaderImage: 'assets/profiles/profile_12.jpg', timeLocation: '부산 ? 3시간 전', imageA: 'assets/images/post4_a.jpg', imageB: 'assets/images/post4_b.jpg', descriptionA: '기능성에 집중한 컴프레션 웨어, 운동 효율을 높여주는 복장', descriptionB: '트렌디한 디자인의 조거 팬츠와 후드, 짐웨어로도 일상복으로도 만점', likesCount: 500, commentsCount: 40, voteCountA: '300', voteCountB: '200', percentA: '60%', percentB: '40%', fullDescription: '오운완! 오늘 새로 산 운동복인데 둘 중에 뭐가 더 핏이 좋아 보이나요?', isExpired: true, tags: ['운동', '헬스', '짐웨어']),
       PostData(id: '5', title: '오늘 저녁 뭐 먹지?', uploaderId: '@foodie_kim', uploaderImage: 'assets/profiles/profile_60.jpg', timeLocation: '홍대 ? 10분 전', imageA: 'assets/images/post5_a.jpg', imageB: 'assets/images/post5_b.jpg', descriptionA: '매콤한 감칠맛이 일품인 전통 한식 메뉴, 한국인의 소울 푸드', descriptionB: '치즈가 듬뿍 들어간 정통 이탈리안 파스타, 특별한 날에 어울리는 맛', likesCount: 3000, commentsCount: 1200, voteCountA: '2k', voteCountB: '1k', percentA: '67%', percentB: '33%', isFollowing: true, fullDescription: '결정장애 왔어요... 한식 vs 양식! 여러분의 픽으로 오늘 저녁 메뉴를 정하겠습니다.', tags: ['맛집', '저녁', '메뉴추천']),
       PostData(id: '6', title: '지난주 베스트 코디', uploaderId: '@style_guru', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '서울 ? 1주일 전', imageA: 'assets/images/post1_a.jpg', imageB: 'assets/images/post1_b.jpg', descriptionA: 'A', descriptionB: 'B', likesCount: 5000, commentsCount: 1500, voteCountA: '3k', voteCountB: '2k', percentA: '60%', percentB: '40%', isExpired: true, tags: ['베스트', '코디', '결산']),
-      PostData(id: 'my_1', title: '내가 올린 첫 번째 투표! 어떤가요?', uploaderId: '나의 픽겟', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '방금 전', imageA: 'assets/images/post2_a.jpg', imageB: 'assets/images/post2_b.jpg', descriptionA: '깔끔한 화이트', descriptionB: '포근한 웜톤', likesCount: 45, commentsCount: 12, voteCountA: '28', voteCountB: '17', percentA: '62%', percentB: '38%', tags: ['내꺼', '첫투표']),
+      PostData(id: 'my_1', title: '내가 올린 첫 번째 선택! 어떤가요?', uploaderId: '나의 픽겟', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '방금 전', imageA: 'assets/images/post2_a.jpg', imageB: 'assets/images/post2_b.jpg', descriptionA: '깔끔한 화이트', descriptionB: '포근한 웜톤', likesCount: 45, commentsCount: 12, voteCountA: '28', voteCountB: '17', percentA: '62%', percentB: '38%', tags: ['내꺼', '첫선택']),
       PostData(id: 'my_2', title: '오늘 점심 메뉴 골라줘요!', uploaderId: '나의 픽겟', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '1시간 전', imageA: 'assets/images/post5_a.jpg', imageB: 'assets/images/post5_b.jpg', descriptionA: '매콤한 제육', descriptionB: '담백한 돈까스', likesCount: 120, commentsCount: 45, voteCountA: '65', voteCountB: '55', percentA: '54%', percentB: '46%', tags: ['점심', '메뉴']),
     ];
     _refreshRecommended();
@@ -142,7 +142,7 @@ class _MainScreenState extends State<MainScreen> {
       case 2: // 즐겨찾기: 내가 즐겨찾기한 컨텐츠만
         filtered = filtered.where((p) => p.isBookmarked).toList();
         break;
-      case 3: // Pick: 내가 투표한 진행중인 컨텐츠만
+      case 3: // Pick: 내가 선택한 진행중인 컨텐츠만
         filtered = filtered.where((p) => p.userVotedSide != 0).toList();
         break;
     }

@@ -39,7 +39,7 @@ class _UploadScreenState extends State<UploadScreen> {
           icon: const Icon(Icons.close, color: Colors.white, size: 28),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('새 투표 만들기', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+        title: const Text('새 선택지 만들기', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
         centerTitle: true,
         actions: [
           TextButton(
@@ -77,7 +77,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('"${_titleController.text}" 투표가 내 채널에 등록되었습니다!'),
+                  content: Text('"${_titleController.text}" 질문이 내 채널에 등록되었습니다!'),
                   backgroundColor: Colors.cyanAccent.withValues(alpha: 0.9),
                 ),
               );
