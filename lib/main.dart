@@ -7,6 +7,8 @@ String gProfileImage = 'assets/profiles/profile_11.jpg';
 String gNameText = '나의 픽겟';
 String gIdText = '@나의_픽겟';
 String gBioText = '세상의 모든 선택지를 픽겟하다. 하고 싶은 거 다 해요 ✨ 매일 새로운 투표로 여러분의 선택을 기다립니다!';
+bool gIsLoggedIn = false;
+VoidCallback? gShowLoginPopup;
 
 String formatCount(int count) {
   if (count >= 1000000) {
@@ -143,7 +145,7 @@ class _MainScreenState extends State<MainScreen> {
   List<PostData> _recommendedPosts = [];
   final Set<String> _forcedVisibleIds = {}; // To show expired posts clicked from ranking
   final PageController _pageController = PageController();
-  int _userPoints = 1250;
+  int _userPoints = 0;
   int _selectedTopTabIndex = 0;
 
   @override
@@ -160,6 +162,15 @@ class _MainScreenState extends State<MainScreen> {
       PostData(id: 'my_2', title: '오늘 점심 메뉴 골라줘요!', uploaderId: '나의 픽겟', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '1시간 전', imageA: 'assets/images/post5_a.jpg', imageB: 'assets/images/post5_b.jpg', descriptionA: '매콤한 제육', descriptionB: '담백한 돈까스', likesCount: 120, commentsCount: 45, voteCountA: '65', voteCountB: '55', percentA: '54%', percentB: '46%', tags: ['점심', '메뉴']),
     ];
     _refreshRecommended();
+    
+    gShowLoginPopup = _showLoginPopup;
+
+    // 5초 후 로그인 팝업 노출
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        _showLoginPopup();
+      }
+    });
   }
 
   void _refreshRecommended() {
@@ -205,7 +216,143 @@ class _MainScreenState extends State<MainScreen> {
         filtered = filtered.where((p) => p.userVotedSide != 0).toList();
         break;
     }
+    if (!gIsLoggedIn && _selectedTopTabIndex != 0) return [];
     return filtered;
+  }
+
+  void _showLoginPopup() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.8), // 뒷화면 어둡게
+      transitionDuration: const Duration(milliseconds: 400),
+      pageBuilder: (context, anim1, anim2) {
+        return Center(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.85,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.1)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.cyanAccent.withValues(alpha: 0.05),
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                )
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.auto_awesome, color: Colors.cyanAccent, size: 48),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'PickGet 시작하기',
+                    style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '로그인하고 당신의 취향을\n세상과 공유해보세요!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white60, fontSize: 15, height: 1.5),
+                  ),
+                  const SizedBox(height: 40),
+                  _buildSocialLoginButton(
+                    icon: Icons.chat_bubble,
+                    label: '카카오 로그인',
+                    color: const Color(0xFFFEE500),
+                    textColor: Colors.black.withValues(alpha: 0.85),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSocialLoginButton(
+                    icon: Icons.g_mobiledata,
+                    label: 'Google 계정으로 로그인',
+                    color: Colors.white,
+                    textColor: Colors.black87,
+                    hasBorder: true,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSocialLoginButton(
+                    icon: Icons.apple,
+                    label: 'Apple로 로그인',
+                    color: Colors.black,
+                    textColor: Colors.white,
+                  ),
+                  const SizedBox(height: 30),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      '나중에 할게요',
+                      style: TextStyle(color: Colors.white38, fontSize: 14, decoration: TextDecoration.underline),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+              CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSocialLoginButton({required IconData icon, required String label, required Color color, required Color textColor, bool hasBorder = false}) {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(6), // Guidelines often prefer smaller radius or specific ones
+        border: hasBorder ? Border.all(color: Colors.black12) : null,
+      ),
+      child: InkWell(
+        onTap: () {
+          // 로그인 로직 (Mock)
+          setState(() {
+            gIsLoggedIn = true;
+            _userPoints = 1250;
+          });
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$label 완료!', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)), 
+              backgroundColor: Colors.cyanAccent, 
+              duration: const Duration(seconds: 1)
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: textColor, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -214,7 +361,10 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          PageView.builder(
+          if (!gIsLoggedIn && _selectedTopTabIndex != 0)
+            _buildLoginRequiredView()
+          else
+            PageView.builder(
             controller: _pageController,
             scrollDirection: Axis.vertical,
             itemCount: filteredList.length,
@@ -224,6 +374,10 @@ class _MainScreenState extends State<MainScreen> {
                 key: ValueKey(post.id),
                 post: post,
                 onLike: () { 
+                  if (!gIsLoggedIn) {
+                    _showLoginPopup();
+                    return;
+                  }
                   setState(() { 
                     post.isLiked = !post.isLiked; 
                     if (post.isLiked) {
@@ -235,6 +389,10 @@ class _MainScreenState extends State<MainScreen> {
                   }); 
                 },
                 onFollow: () { 
+                  if (!gIsLoggedIn) {
+                    _showLoginPopup();
+                    return;
+                  }
                   setState(() { 
                     // 동일한 업로더의 모든 포스트 팔로우 상태 업데이트
                     for (var p in _posts) {
@@ -246,6 +404,10 @@ class _MainScreenState extends State<MainScreen> {
                   }); 
                 },
                 onBookmark: () { 
+                  if (!gIsLoggedIn) {
+                    _showLoginPopup();
+                    return;
+                  }
                   setState(() { 
                     post.isBookmarked = !post.isBookmarked; 
                     HapticFeedback.selectionClick();
@@ -274,11 +436,19 @@ class _MainScreenState extends State<MainScreen> {
                   );
                 },
                 onVote: (side) {
+                  if (!gIsLoggedIn) {
+                    _showLoginPopup();
+                    return;
+                  }
                   setState(() {
                     post.userVotedSide = side;
                   });
                 },
                 onProfileTap: () {
+                  if (!gIsLoggedIn) {
+                    _showLoginPopup();
+                    return;
+                  }
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -288,7 +458,9 @@ class _MainScreenState extends State<MainScreen> {
                         initialPost: post,
                       ),
                     ),
-                  );
+                  ).then((_) {
+                    if (mounted) setState(() {});
+                  });
                 },
               );
             },
@@ -296,6 +468,54 @@ class _MainScreenState extends State<MainScreen> {
           _buildTopBar(),
           _buildBottomNav(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLoginRequiredView() {
+    String tabName = ['', '팔로우한 채널', '즐겨찾기한 픽겟', '투표한 픽겟'][_selectedTopTabIndex];
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.lock_outline, color: Colors.cyanAccent, size: 60),
+            ),
+            const SizedBox(height: 32),
+            Text(
+              '로그인이 필요한 기능입니다',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '$tabName 확인을 위해\n로그인을 진행해주세요.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 15, height: 1.5),
+            ),
+            const SizedBox(height: 40),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: _showLoginPopup,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.cyanAccent,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: const Text('로그인하고 시작하기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -314,6 +534,10 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     GestureDetector(
                       onTap: () {
+                        if (!gIsLoggedIn) {
+                          _showLoginPopup();
+                          return;
+                        }
                         HapticFeedback.lightImpact();
                         Navigator.push(
                           context,
@@ -337,6 +561,10 @@ class _MainScreenState extends State<MainScreen> {
                     const SizedBox(width: 18),
                     GestureDetector(
                       onTap: () {
+                        if (!gIsLoggedIn) {
+                          _showLoginPopup();
+                          return;
+                        }
                         HapticFeedback.lightImpact();
                         Navigator.push(
                           context,
@@ -450,6 +678,10 @@ class _MainScreenState extends State<MainScreen> {
             ),
             GestureDetector(
               onTap: () {
+                if (!gIsLoggedIn) {
+                  _showLoginPopup();
+                  return;
+                }
                 HapticFeedback.mediumImpact();
                 _showRankingSheet(context);
               },
@@ -457,6 +689,10 @@ class _MainScreenState extends State<MainScreen> {
             ),
             GestureDetector(
               onTap: () {
+                if (!gIsLoggedIn) {
+                  _showLoginPopup();
+                  return;
+                }
                 HapticFeedback.heavyImpact();
                 Navigator.push(
                   context,
@@ -471,12 +707,32 @@ class _MainScreenState extends State<MainScreen> {
             ),
             GestureDetector(
               onTap: () {
+                if (!gIsLoggedIn) {
+                  _showLoginPopup();
+                  return;
+                }
                 HapticFeedback.mediumImpact();
                 _showNotificationSheet(context);
               },
               child: const Icon(Icons.notifications_none, color: Colors.white, size: 20),
             ),
-            GestureDetector(onTap: () { Navigator.push(context, MaterialPageRoute(builder: (context) => ChannelScreen(uploaderId: '나의 픽겟', allPosts: _posts, initialPost: _posts.first))); }, child: CircleAvatar(radius: 12, backgroundImage: gProfileImage.startsWith('http') ? NetworkImage(gProfileImage) : AssetImage(gProfileImage) as ImageProvider)),
+            GestureDetector(
+              onTap: () { 
+                if (!gIsLoggedIn) {
+                  _showLoginPopup();
+                  return;
+                }
+                Navigator.push(
+                  context, 
+                  MaterialPageRoute(builder: (context) => ChannelScreen(uploaderId: '나의 픽겟', allPosts: _posts, initialPost: _posts.first))
+                ).then((_) {
+                  if (mounted) setState(() {});
+                });
+              }, 
+              child: gIsLoggedIn 
+                ? CircleAvatar(radius: 12, backgroundImage: gProfileImage.startsWith('http') ? NetworkImage(gProfileImage) : AssetImage(gProfileImage) as ImageProvider)
+                : const Icon(Icons.account_circle_outlined, color: Colors.white54, size: 24),
+            ),
           ],
         ),
       ),
@@ -682,7 +938,19 @@ class PostView extends StatefulWidget {
   final Function(String reason) onReport;
   final Function(int side) onVote;
   final VoidCallback? onProfileTap;
-  const PostView({super.key, required this.post, required this.onLike, required this.onFollow, required this.onBookmark, required this.onNotInterested, required this.onDontRecommendChannel, required this.onReport, required this.onVote, this.onProfileTap});
+
+  const PostView({
+    super.key, 
+    required this.post, 
+    required this.onLike, 
+    required this.onFollow, 
+    required this.onBookmark, 
+    required this.onNotInterested, 
+    required this.onDontRecommendChannel, 
+    required this.onReport, 
+    required this.onVote, 
+    this.onProfileTap
+  });
   @override
   State<PostView> createState() => _PostViewState();
 }
@@ -737,10 +1005,14 @@ class _PostViewState extends State<PostView> {
   }
 
   void _onVote(int side) {
+    if (!gIsLoggedIn) {
+      gShowLoginPopup?.call();
+      return;
+    }
     if (_votedSide != 0) return;
     
     // 1. Prevent self-voting
-    if (widget.post.uploaderId == '마이픽겟') {
+    if (widget.post.uploaderId == '나의 픽겟') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('본인이 올린 투표에는 참여할 수 없습니다.'),
@@ -1826,7 +2098,7 @@ class _UploadScreenState extends State<UploadScreen> {
               // 1. Create Real Post Data
               final newPost = PostData(
                 id: 'post_${DateTime.now().millisecondsSinceEpoch}',
-                uploaderId: '마이픽겟',
+                uploaderId: '나의 픽겟',
                 uploaderImage: 'https://i.pravatar.cc/150?u=mypickget',
                 title: _titleController.text,
                 fullDescription: _descController.text,
@@ -2304,7 +2576,7 @@ class ChannelScreen extends StatefulWidget {
 }
 
 class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProviderStateMixin {
-  String _dName = ''; String _dId = ''; String _dImg = 'assets/profiles/profile_11.jpg'; String _dBio = '';
+  String _dName = ''; String _dImg = 'assets/profiles/profile_11.jpg'; String _dBio = '';
   bool _isFollowing = false;
   late TabController _tabController;
   late List<PostData> _channelPosts;
@@ -2317,8 +2589,8 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    if (widget.uploaderId == '나의 픽겟') { _dName = gNameText; _dId = gIdText; _dImg = gProfileImage; _dBio = gBioText; }
-    else { _dName = widget.uploaderId; _dId = "@${widget.uploaderId.toLowerCase().replaceAll(' ', '_')}"; _dImg = widget.initialPost.uploaderImage; _dBio = '안녕하세요! ${widget.uploaderId}의 픽겟 공간입니다. ✨'; _isFollowing = widget.initialPost.isFollowing; }
+    if (widget.uploaderId == '나의 픽겟') { _dName = gNameText; _dImg = gProfileImage; _dBio = gBioText; }
+    else { _dName = widget.uploaderId; _dImg = widget.initialPost.uploaderImage; _dBio = '안녕하세요! ${widget.uploaderId}의 픽겟 공간입니다. ✨'; _isFollowing = widget.initialPost.isFollowing; }
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabSelection);
     _loadPosts();
@@ -2398,6 +2670,11 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                 }
                 _confirmDelete();
               }, color: _selectedPostIds.isNotEmpty ? Colors.redAccent : Colors.redAccent.withValues(alpha: 0.3)),
+              const Divider(color: Colors.white10),
+              _menuItem(Icons.logout, '로그아웃', () {
+                Navigator.pop(context);
+                _showLogoutDialog();
+              }, color: Colors.redAccent),
               const SizedBox(height: 20),
             ],
           ),
@@ -2411,6 +2688,37 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
       leading: Icon(icon, color: color),
       title: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
       onTap: onTap,
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1C),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text('로그아웃 하시겠습니까?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text('로그아웃 후에도 게스트 모드로 둘러보실 수 있습니다.', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소', style: TextStyle(color: Colors.white38)),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                gIsLoggedIn = false;
+              });
+              Navigator.pop(context); // close dialog
+              Navigator.pop(context); // return to MainScreen
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('로그아웃 되었습니다.'), duration: Duration(seconds: 1)),
+              );
+            },
+            child: const Text('로그아웃', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2603,6 +2911,8 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
+              if (widget.uploaderId == '나의 픽겟')
+                IconButton(icon: const Icon(Icons.settings_outlined, color: Colors.white), onPressed: _showSettingsMenu),
               if (widget.uploaderId != '나의 픽겟')
                 IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: _showMoreMenu),
             ],
@@ -2656,7 +2966,6 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                                             gBioText = res['bio'];
                                             gProfileImage = res['image'];
                                             _dName = gNameText;
-                                            _dId = gIdText;
                                             _dBio = gBioText;
                                             _dImg = gProfileImage;
                                           });
@@ -3262,61 +3571,6 @@ class _PointScreenState extends State<PointScreen> {
     );
   }
 
-  Widget _buildPointAction({required IconData icon, required String label, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Text(label, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showPointPolicyDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1C),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('포인트 유효기간 및 자동 소멸 정책 안내', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        content: const SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '안녕하세요. 서비스를 이용해 주시는 회원님께 감사의 말씀을 드립니다.\n\n' 
-                '회원님의 소중한 포인트 관리 및 원활한 서비스 제공을 위해 포인트 유효기간 정책을 아래와 같이 안내드립니다.\n\n' 
-                '? 유효기간: 각 포인트 적립일로부터 1년 (365일)\n\n' 
-                '? 소멸 방식: 유효기간이 경과한 포인트는 해당 일자 자정에 자동으로 소멸됩니다.\n\n' 
-                '? 사용 원칙: 먼저 적립된 포인트가 먼저 사용되는 \'선입선출\' 방식으로 차감됩니다.\n\n' 
-                '? 사전 안내: 포인트 소멸 30일 전과 7일 전에 앱 알림을 통해 소멸 예정 포인트를 미리 안내해 드립니다.\n\n' 
-                '소멸된 포인트는 복구가 불가능하오니, 유효기간 내에 현금전환이나 상품 구매 등으로 알뜰하게 사용하시길 바랍니다.',
-                style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.6),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('확인', style: TextStyle(color: Colors.cyanAccent)),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class StoreScreen extends StatefulWidget {
