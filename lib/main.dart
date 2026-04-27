@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'dart:async';
+// Global Profile State
+String gProfileImage = 'assets/profiles/profile_11.jpg';
+String gNameText = '나의 픽겟';
+String gIdText = '@나의_픽겟';
+String gBioText = '세상의 모든 선택지를 픽겟하다. 하고 싶은 거 다 해요 ✨ 매일 새로운 투표로 여러분의 선택을 기다립니다!';
 
 void main() {
   runApp(const PickGetApp());
@@ -437,7 +442,7 @@ class _MainScreenState extends State<MainScreen> {
               },
               child: const Icon(Icons.notifications_none, color: Colors.white, size: 20),
             ),
-            const CircleAvatar(radius: 12, backgroundImage: AssetImage('assets/profiles/profile_5.jpg')),
+            GestureDetector(onTap: () { Navigator.push(context, MaterialPageRoute(builder: (context) => ChannelScreen(uploaderId: '나의 픽겟', allPosts: _posts, initialPost: _posts.first))); }, child: CircleAvatar(radius: 12, backgroundImage: gProfileImage.startsWith('http') ? NetworkImage(gProfileImage) : AssetImage(gProfileImage) as ImageProvider)),
           ],
         ),
       ),
@@ -2261,6 +2266,7 @@ class ChannelScreen extends StatefulWidget {
 }
 
 class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProviderStateMixin {
+  String _dName = ''; String _dId = ''; String _dImg = 'assets/profiles/profile_11.jpg'; String _dBio = '';
   late TabController _tabController;
   late List<PostData> _channelPosts;
   bool _isBioExpanded = false;
@@ -2268,6 +2274,8 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
+    if (widget.uploaderId == '나의 픽겟') { _dName = gNameText; _dId = gIdText; _dImg = gProfileImage; _dBio = gBioText; }
+    else { _dName = widget.uploaderId; _dId = "@${widget.uploaderId.toLowerCase().replaceAll(' ', '_')}"; _dImg = widget.initialPost.uploaderImage; _dBio = '안녕하세요! ${widget.uploaderId}의 픽겟 공간입니다. ✨'; }
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabSelection);
     _channelPosts = widget.allPosts.where((p) => p.uploaderId == widget.uploaderId).toList();
@@ -2358,7 +2366,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
               icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
               onPressed: () => Navigator.pop(context),
             ),
-            actions: [
+            actions: [ if (widget.uploaderId == '나의 픽겟') IconButton(icon: const Icon(Icons.edit_note, color: Colors.cyanAccent), onPressed: () { Navigator.push(context, MaterialPageRoute(builder: (context) => EditProfileScreen(currentName: gNameText, currentId: gIdText, currentBio: gBioText, currentImage: gProfileImage))).then((res) { if (res != null) setState(() { gNameText = res['name']; gIdText = res['id']; gBioText = res['bio']; gProfileImage = res['image']; _dName = gNameText; _dId = gIdText; _dBio = gBioText; _dImg = gProfileImage; }); }); }),
               IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: _showMoreMenu),
             ],
           ),
@@ -2374,9 +2382,9 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                     children: [
                       CircleAvatar(
                         radius: 42,
-                        backgroundImage: widget.initialPost.uploaderImage.startsWith('http')
-                          ? NetworkImage(widget.initialPost.uploaderImage)
-                          : AssetImage(widget.initialPost.uploaderImage) as ImageProvider,
+                        backgroundImage: _dImg.startsWith('http')
+                          ? NetworkImage(_dImg)
+                          : AssetImage(_dImg) as ImageProvider,
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -2384,12 +2392,12 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              widget.uploaderId,
+                              _dName,
                               style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              "@${widget.uploaderId.toLowerCase().replaceAll(' ', '_')}",
+                              "@${_dName.toLowerCase().replaceAll(' ', '_')}",
                               style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
                             ),
                             const SizedBox(height: 4),
@@ -2411,7 +2419,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                       children: [
                         Expanded(
                           child: Text(
-                            '세상의 모든 선택지를 픽겟하다. 하고 싶은 거 다 해요 ✨ 매일 새로운 투표로 여러분의 선택을 기다립니다!',
+                            _dBio,
                             style: const TextStyle(color: Colors.white70, fontSize: 14),
                             maxLines: _isBioExpanded ? 10 : 1,
                             overflow: TextOverflow.ellipsis,
@@ -2584,10 +2592,10 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
           onTap: () {
              Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => ChannelScreen(
-                uploaderId: widget.uploaderId,
-                allPosts: widget.allPosts,
-                initialPost: post,
+              MaterialPageRoute(builder: (context) => PostDetailScreen(
+                post: post,
+
+
               )),
             );
           },
@@ -4170,4 +4178,67 @@ class CategoryProductScreen extends StatelessWidget {
     );
   }
 }
-
+class PostDetailScreen extends StatelessWidget {
+  final PostData post;
+  const PostDetailScreen({super.key, required this.post});
+  @override Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(backgroundColor: Colors.black, elevation: 0, leading: IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.white), onPressed: () => Navigator.pop(context))),
+      body: SingleChildScrollView(child: Column(children: [
+        const SizedBox(height: 20),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Row(children: [
+          CircleAvatar(radius: 18, backgroundImage: AssetImage(post.uploaderImage)),
+          const SizedBox(width: 12),
+          Text(post.uploaderId, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        ])),
+        const SizedBox(height: 20),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Text(post.title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold))),
+        const SizedBox(height: 10),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Text(post.fullDescription, style: const TextStyle(color: Colors.white70, fontSize: 14))),
+        const SizedBox(height: 20),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 10), child: Row(children: [
+          Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(15), child: Image.asset(post.imageA, fit: BoxFit.cover))),
+          const SizedBox(width: 8),
+          Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(15), child: Image.asset(post.imageB, fit: BoxFit.cover))),
+        ])),
+        const SizedBox(height: 40),
+        const Text('투표에 참여해 보세요!', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 100),
+      ])),
+    );
+  }
+}
+class EditProfileScreen extends StatefulWidget {
+  final String currentName; final String currentId; final String currentBio; final String currentImage;
+  const EditProfileScreen({super.key, required this.currentName, required this.currentId, required this.currentBio, required this.currentImage});
+  @override State<EditProfileScreen> createState() => _EditProfileScreenState();
+}
+class _EditProfileScreenState extends State<EditProfileScreen> {
+  late TextEditingController _name; late TextEditingController _id; late TextEditingController _bio; late String _img;
+  @override void initState() { super.initState(); _name = TextEditingController(text: widget.currentName); _id = TextEditingController(text: widget.currentId); _bio = TextEditingController(text: widget.currentBio); _img = widget.currentImage; }
+  @override Widget build(BuildContext context) {
+    return Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: Colors.black, elevation: 0, title: const Text('프로필 편집', style: TextStyle(color: Colors.white))),
+      body: SingleChildScrollView(child: Column(children: [
+        const SizedBox(height: 30),
+        GestureDetector(onTap: () => setState(() { int n = int.tryParse(_img.replaceAll(RegExp(r'[^0-9]'), '')) ?? 11; _img = 'assets/profiles/profile_${(n % 11) + 1}.jpg'; }), 
+          child: Center(child: Stack(alignment: Alignment.center, children: [
+            Container(width: 100, height: 100, decoration: BoxDecoration(shape: BoxShape.circle, image: DecorationImage(image: AssetImage(_img), fit: BoxFit.cover, opacity: 0.6))),
+            const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 30),
+          ]))),
+        const SizedBox(height: 40),
+        _field('이름', _name), const SizedBox(height: 20), _field('아이디', _id), const SizedBox(height: 20), _field('자기소개', _bio, lines: 5),
+        const SizedBox(height: 60),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: SizedBox(width: double.infinity, child: ElevatedButton(
+          onPressed: () => Navigator.pop(context, {'name': _name.text, 'id': _id.text, 'bio': _bio.text, 'image': _img}),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+          child: const Text('저장하기'),
+        ))),
+      ])),
+    );
+  }
+  Widget _field(String l, TextEditingController c, {int lines = 1}) => Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(l, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+    TextField(controller: c, maxLines: lines, style: const TextStyle(color: Colors.white), decoration: InputDecoration(filled: true, fillColor: const Color(0xFF151515))),
+  ]));
+}
