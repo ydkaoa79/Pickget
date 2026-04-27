@@ -668,8 +668,8 @@ class _PostViewState extends State<PostView> {
   }
 
   void _showCommentsSheet(BuildContext context) {
-    // 본인 게시글('me')이 아니면서 투표도 안 한 경우만 팝업 표시
-    if (_votedSide == 0 && !isExpired && widget.post.uploaderId != 'me') {
+    // 본인 게시글('나의 픽겟' 또는 'me')이 아니면서 투표도 안 한 경우만 팝업 표시
+    if (_votedSide == 0 && !isExpired && widget.post.uploaderId != '나의 픽겟' && widget.post.uploaderId != 'me') {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -748,24 +748,29 @@ class _PostViewState extends State<PostView> {
               child: TextField(
                 controller: controller,
                 autofocus: false,
+                textInputAction: TextInputAction.send, // 키보드 액션 버튼을 '전송'으로 설정
                 style: const TextStyle(color: Colors.white, fontSize: 14),
                 onSubmitted: (val) {
-                  if (val.trim().isNotEmpty) {
+                  final text = val.trim();
+                  if (text.isNotEmpty) {
                     setSheetState(() {
                       widget.post.comments.add(CommentData(
                         user: '나 (본인)', 
-                        text: val, 
+                        text: text, 
                         side: _votedSide, 
                         image: 'assets/profiles/profile_11.jpg',
                       ));
                       controller.clear();
                     });
-                    FocusScope.of(context).unfocus(); // 엔터 시 키보드 닫기
+                    // 전송 후 즉시 키보드 닫기
+                    FocusScope.of(context).unfocus(); 
                   }
                 },
-                decoration: const InputDecoration(
-                  hintText: '의견을 나눠보세요...', 
-                  hintStyle: TextStyle(color: Colors.white38), 
+                decoration: InputDecoration(
+                  hintText: (widget.post.uploaderId == '나의 픽겟' || widget.post.uploaderId == 'me' || _votedSide != 0) 
+                      ? '의견을 나눠보세요...' 
+                      : '투표 후 참여 가능합니다.', 
+                  hintStyle: const TextStyle(color: Colors.white38), 
                   border: InputBorder.none,
                 ),
               ),
