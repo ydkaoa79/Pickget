@@ -1,20 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'dart:ui';
 import 'dart:async';
 
 // New Imports
 import 'models/post_data.dart';
-import 'models/comment_data.dart';
 import 'core/app_state.dart';
 import 'widgets/social_login_button.dart';
 import 'widgets/post_view.dart';
 import 'screens/upload_screen.dart';
 import 'screens/channel_screen.dart';
-import 'screens/activity_analysis_screen.dart';
-import 'screens/edit_profile_screen.dart';
-import 'screens/channel_feed_screen.dart';
 import 'screens/point_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/profile_setup_screen.dart';
@@ -59,7 +54,6 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
   Timer? _loginTimer;
   late List<PostData> _posts;
   List<PostData> _recommendedPosts = [];

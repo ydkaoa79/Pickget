@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 class StoreScreen extends StatefulWidget {
-  const StoreScreen({super.key});
+  final int userPoints;
+  const StoreScreen({super.key, required this.userPoints});
 
   @override
   State<StoreScreen> createState() => _StoreScreenState();
@@ -11,6 +12,7 @@ class _StoreScreenState extends State<StoreScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _accountController = TextEditingController();
   final TextEditingController _bankController = TextEditingController();
+  final TextEditingController _holderController = TextEditingController();
   String _selectedCategory = '커피';
   
   bool _isWithdrawalPending = false;
@@ -31,9 +33,18 @@ class _StoreScreenState extends State<StoreScreen> {
       {'title': '문화상품권 5,000원권', 'price': '5,000 P', 'brand': '컬쳐랜드'},
       {'title': '구글 기프트카드 1만원', 'price': '10,000 P', 'brand': 'Google'},
     ],
+    '문화': [
+      {'title': 'CGV 1인 영화관람권', 'price': '13,000 P', 'brand': 'CGV'},
+      {'title': '롯데시네마 영화예매권', 'price': '12,000 P', 'brand': '롯데시네마'},
+      {'title': '교보문고 기프트카드 1만원', 'price': '10,000 P', 'brand': '교보문고'},
+    ],
     '외식': [
       {'title': '[아웃백] 5만원권', 'price': '50,000 P', 'brand': '아웃백'},
       {'title': '[VIPS] 평일 런치 1인', 'price': '32,000 P', 'brand': 'VIPS'},
+    ],
+    '기타': [
+      {'title': '네이버페이 포인트 5,000원', 'price': '5,000 P', 'brand': '네이버'},
+      {'title': '카카오톡 이모티콘 구매권', 'price': '2,500 P', 'brand': '카카오'},
     ],
   };
 
@@ -42,6 +53,7 @@ class _StoreScreenState extends State<StoreScreen> {
     _amountController.dispose();
     _accountController.dispose();
     _bankController.dispose();
+    _holderController.dispose();
     super.dispose();
   }
 
@@ -66,27 +78,85 @@ class _StoreScreenState extends State<StoreScreen> {
               const SizedBox(height: 8),
               const Text('최소 10,000P부터 인출 가능합니다.', style: TextStyle(color: Colors.white38, fontSize: 13)),
               const SizedBox(height: 24),
-              _inputField('인출 포인트', _amountController, '예: 10000', TextInputType.number),
+              _inputField('인출 포인트', _amountController, '예: 10000 (5,000P 단위)', TextInputType.number),
               const SizedBox(height: 16),
               _inputField('은행명', _bankController, '예: 카카오뱅크', TextInputType.text),
               const SizedBox(height: 16),
+              _inputField('예금주 성함', _holderController, '계좌 소유주 실명', TextInputType.text),
+              const SizedBox(height: 16),
               _inputField('계좌번호', _accountController, '하이픈(-) 없이 입력', TextInputType.number),
+              const SizedBox(height: 24),
+              
+              // --- 현금 인출 신청 시 주의사항 ---
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.redAccent.withValues(alpha: 0.1)),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
+                        SizedBox(width: 8),
+                        Text('인출 신청 전 주의사항', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    Text('• 인출은 5,000P 단위로만 신청 가능합니다. (1회 최대 30,000P)', style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.5)),
+                    Text('• 반드시 본인 명의의 계좌로 신청해야 하며, 정보 불일치 시 승인이 거절됩니다.', style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.5)),
+                    Text('• 계좌정보 오기입으로 인한 오송금 책임은 본인에게 있습니다.', style: TextStyle(color: Colors.redAccent, fontSize: 12, height: 1.5, fontWeight: FontWeight.w500)),
+                    Text('• 승인 및 입금은 신청일로부터 영업일 기준 최대 3일이 소요됩니다.', style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.5)),
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
                   onPressed: () {
-                    if (_amountController.text.isNotEmpty) {
-                      setState(() {
-                        _isWithdrawalPending = true;
-                        _pendingAmount = int.tryParse(_amountController.text) ?? 0;
-                      });
-                      Navigator.pop(context);
+                    final int? amount = int.tryParse(_amountController.text);
+                    if (_amountController.text.isEmpty || _holderController.text.isEmpty || _accountController.text.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('인출 신청이 완료되었습니다. 승인까지 최대 3일이 소요됩니다.'), backgroundColor: Colors.cyanAccent),
+                        const SnackBar(content: Text('모든 정보를 입력해주세요.'), backgroundColor: Colors.orangeAccent),
                       );
+                      return;
                     }
+                    
+                    if (amount == null || amount < 10000) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('최소 10,000P부터 인출 가능합니다.'), backgroundColor: Colors.orangeAccent),
+                      );
+                      return;
+                    }
+
+                    if (amount % 5000 != 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('인출 신청은 5,000P 단위로만 가능합니다.'), backgroundColor: Colors.orangeAccent),
+                      );
+                      return;
+                    }
+
+                    if (amount > widget.userPoints) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('보유하신 포인트가 부족합니다.'), backgroundColor: Colors.redAccent),
+                      );
+                      return;
+                    }
+
+                    setState(() {
+                      _isWithdrawalPending = true;
+                      _pendingAmount = amount;
+                    });
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('인출 신청이 완료되었습니다. 승인까지 최대 3일이 소요됩니다.'), backgroundColor: Colors.cyanAccent),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.cyanAccent,
@@ -215,9 +285,10 @@ class _StoreScreenState extends State<StoreScreen> {
                       child: const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('내 쿠폰함', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                            Icon(Icons.confirmation_num_outlined, color: Colors.cyanAccent, size: 20),
+                            SizedBox(width: 12),
+                            Expanded(child: Text('내 쿠폰함', style: TextStyle(color: Colors.white70, fontSize: 14))),
                             Row(
                               children: [
                                 Text('2', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
@@ -233,13 +304,12 @@ class _StoreScreenState extends State<StoreScreen> {
               ),
             ),
             const SizedBox(height: 30),
-            Padding(
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: _categoryProducts.keys.map((cat) => _categoryTab(cat)).toList(),
-                ),
+              child: Row(
+                children: _categoryProducts.keys.map((cat) => _categoryTab(cat)).toList(),
               ),
             ),
             const SizedBox(height: 20),

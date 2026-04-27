@@ -25,6 +25,7 @@ class PointScreen extends StatefulWidget {
 
 class _PointScreenState extends State<PointScreen> {
   late int _userPoints;
+  final ScrollController _scrollController = ScrollController();
   final List<PointHistoryItem> _history = [
     PointHistoryItem(title: '친구 초대 보상', amount: 500, date: '2026.04.27', isEarned: true),
     PointHistoryItem(title: '출석 체크 보상', amount: 100, date: '2026.04.27', isEarned: true),
@@ -43,6 +44,20 @@ class _PointScreenState extends State<PointScreen> {
   ];
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToPolicy() {
+    _scrollController.animateTo(
+      _scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
   void initState() {
     super.initState();
     _userPoints = widget.currentPoints;
@@ -56,113 +71,151 @@ class _PointScreenState extends State<PointScreen> {
         backgroundColor: Colors.black,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('나의 포인트', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text('나의 포인트', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        controller: _scrollController,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // --- 상단 프리미엄 포인트 카드 ---
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF2C2C2C), Color(0xFF1C1C1C)],
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.cyanAccent.withValues(alpha: 0.15),
+                    const Color(0xFF1A1A1A),
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.2), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.cyanAccent.withValues(alpha: 0.05),
+                    blurRadius: 30,
+                    spreadRadius: 2,
+                  )
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text('나의 보유 포인트', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                  ),
-                  const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Text('현재 보유한 포인트', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.baseline,
                         textBaseline: TextBaseline.alphabetic,
                         children: [
-                          const Text('P', style: TextStyle(color: Colors.cyanAccent, fontSize: 28, fontWeight: FontWeight.bold)),
-                          const SizedBox(width: 10),
+                          const Text('P', style: TextStyle(color: Colors.cyanAccent, fontSize: 24, fontWeight: FontWeight.w900)),
+                          const SizedBox(width: 12),
                           Text(
                             _userPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"),
-                            style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                            style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: -1),
                           ),
                         ],
                       ),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const StoreScreen()),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.cyanAccent,
-                          foregroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('포인트 사용', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                            SizedBox(width: 4),
-                            Icon(Icons.chevron_right, size: 16),
-                          ],
+                      GestureDetector(
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => StoreScreen(userPoints: _userPoints))),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.cyanAccent,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [BoxShadow(color: Colors.cyanAccent.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 5))],
+                          ),
+                          child: const Row(
+                            children: [
+                              Text('사용하기', style: TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w900)),
+                              SizedBox(width: 4),
+                              Icon(Icons.arrow_forward_rounded, color: Colors.black, size: 16),
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  Divider(color: Colors.white.withValues(alpha: 0.05)),
-                  const SizedBox(height: 12),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('30일 이내 소멸 예정', style: TextStyle(color: Colors.white38, fontSize: 13)),
-                      Text('150 P', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
-                    ],
+                  const SizedBox(height: 28),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.timer_outlined, color: Colors.white38, size: 16),
+                            SizedBox(width: 8),
+                            Text('30일 이내 소멸 예정', style: TextStyle(color: Colors.white38, fontSize: 13, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                        Text('150 P', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onTap: _scrollToPolicy,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          '포인트 이용안내 및 소멸정책',
+                          style: TextStyle(color: Colors.cyanAccent.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                        Icon(Icons.chevron_right_rounded, color: Colors.cyanAccent.withValues(alpha: 0.7), size: 16),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 32),
+
+            const SizedBox(height: 40),
+
+            // --- 포인트 내역 헤더 ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('포인트 내역', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                Text('최근 3개월', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12)),
+                const Text('포인트 내역', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(border: Border.all(color: Colors.white12), borderRadius: BorderRadius.circular(8)),
+                  child: const Text('최근 3개월', style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
               ],
             ),
-            const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '* 앱에서는 최근 3개월 내역만 표시되며, 전체 내역은 고객센터를 통해 확인하실 수 있습니다. (관련 법령에 의거 5년간 보관)',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10, height: 1.5),
-              ),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
+
+            // --- 포인트 내역 리스트 ---
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -171,19 +224,19 @@ class _PointScreenState extends State<PointScreen> {
               itemBuilder: (context, index) {
                 final item = _history[index];
                 return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 18),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: (item.isEarned ? Colors.cyanAccent : Colors.orangeAccent).withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
+                          color: (item.isEarned ? Colors.cyanAccent : Colors.white).withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         child: Icon(
-                          item.isEarned ? Icons.add : Icons.remove,
-                          color: item.isEarned ? Colors.cyanAccent : Colors.orangeAccent,
-                          size: 16,
+                          item.isEarned ? Icons.add_rounded : Icons.remove_rounded,
+                          color: item.isEarned ? Colors.cyanAccent : Colors.white60,
+                          size: 18,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -191,18 +244,18 @@ class _PointScreenState extends State<PointScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(item.title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
+                            Text(item.title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
                             const SizedBox(height: 4),
-                            Text(item.date, style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 12)),
+                            Text(item.date, style: TextStyle(color: Colors.white24, fontSize: 12, fontWeight: FontWeight.w500)),
                           ],
                         ),
                       ),
                       Text(
                         "${item.isEarned ? '+' : '-'}${item.amount} P",
                         style: TextStyle(
-                          color: item.isEarned ? Colors.cyanAccent : Colors.white70,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                          color: item.isEarned ? Colors.cyanAccent : Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ],
@@ -210,8 +263,67 @@ class _PointScreenState extends State<PointScreen> {
                 );
               },
             ),
+
+            const SizedBox(height: 40),
+
+            // --- 중요: 과거 버전의 모든 경고문/정책 안내 섹션 ---
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, color: Colors.cyanAccent, size: 18),
+                      SizedBox(width: 10),
+                      Text('포인트 이용 안내 및 소멸 정책', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  _policyItem('유효기간', '각 포인트 적립일로부터 1년 (365일) 동안 유지됩니다.'),
+                  _policyItem('소멸 방식', '유효기간이 경과한 포인트는 해당 일자 자정에 자동 소멸됩니다.'),
+                  _policyItem('사용 원칙', '먼저 적립된 포인트가 먼저 사용되는 \'선입선출\' 방식입니다.'),
+                  _policyItem('사전 안내', '소멸 30일 전과 7일 전에 앱 알림으로 미리 안내해 드립니다.'),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '* 소멸된 포인트는 복구가 불가능하오니 기간 내에 상품 구매 등으로 사용하시길 바랍니다.\n* 최근 3개월 내역만 표시되며, 전체 내역은 고객센터를 통해 확인 가능합니다.',
+                    style: TextStyle(color: Colors.white24, fontSize: 11, height: 1.6, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 60),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _policyItem(String title, String content) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('• ', style: TextStyle(color: Colors.cyanAccent, fontSize: 13, fontWeight: FontWeight.bold)),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(color: Colors.white60, fontSize: 13, height: 1.4, fontFamily: 'Pretendard'),
+                children: [
+                  TextSpan(text: '$title: ', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  TextSpan(text: content),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

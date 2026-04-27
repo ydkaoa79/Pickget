@@ -900,7 +900,6 @@ class _PostViewState extends State<PostView> {
   }
 
   Widget _commentItem(String name, String text, int votedSide, String imageUrl, bool isPostExpired) {
-    Color teamColor = votedSide == 1 ? Colors.cyanAccent : Colors.redAccent;
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Row(
@@ -948,7 +947,10 @@ class _PostViewState extends State<PostView> {
                 const SizedBox(height: 25),
                 const Text('신고 사유 선택', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 20),
-                Column(children: reasons.map((reason) => RadioListTile<String>(title: Text(reason, style: const TextStyle(color: Colors.white70, fontSize: 15)), value: reason, groupValue: selectedReason, activeColor: Colors.redAccent, onChanged: (val) => setSheetState(() => selectedReason = val), contentPadding: EdgeInsets.zero)).toList()),
+                // ignore: deprecated_member_use
+                Column(children: reasons.map((reason) => RadioListTile<String>(title: Text(reason, style: const TextStyle(color: Colors.white70, fontSize: 15)), value: reason, groupValue: selectedReason, activeColor: Colors.redAccent, 
+                  // ignore: deprecated_member_use
+                  onChanged: (val) => setSheetState(() => selectedReason = val), contentPadding: EdgeInsets.zero)).toList()),
                 const SizedBox(height: 20),
                 SizedBox(width: double.infinity, height: 54, child: ElevatedButton(onPressed: selectedReason == null ? null : () { Navigator.pop(context); widget.onReport(selectedReason!); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), child: const Text('신고하기', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)))),
               ],

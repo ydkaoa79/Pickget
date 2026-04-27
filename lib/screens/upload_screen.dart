@@ -21,9 +21,8 @@ class _UploadScreenState extends State<UploadScreen> {
   bool _isAIContent = false;
   bool _allowComments = true;
 
-  int _selectedHours = 24;
-  int _selectedMinutes = 0;
-  bool _useTargetGoal = false;
+  final int _selectedHours = 24;
+  final bool _useTargetGoal = false;
   final TextEditingController _targetVotesController = TextEditingController(text: '100');
 
   String? _imagePathA;
@@ -210,7 +209,7 @@ class _UploadScreenState extends State<UploadScreen> {
       ),
       child: Column(
         children: [
-          _settingItem(Icons.timer_outlined, '진행 기간', '${_selectedHours}시간 00분'),
+          _settingItem(Icons.timer_outlined, '진행 기간', '$_selectedHours시간 00분'),
           _settingItem(Icons.ads_click_outlined, '목표 참여수', _useTargetGoal ? '${_targetVotesController.text}명' : '무제한'),
           _settingItem(Icons.comment_outlined, '댓글 허용', _allowComments ? '예' : '아니오', isToggle: true, toggleValue: _allowComments, onChanged: (v) => setState(() => _allowComments = v)),
           _settingItem(Icons.psychology_outlined, 'AI 생성 콘텐츠', _isAIContent ? '예' : '아니오', isToggle: true, toggleValue: _isAIContent, onChanged: (v) => setState(() => _isAIContent = v)),
@@ -227,7 +226,7 @@ class _UploadScreenState extends State<UploadScreen> {
       trailing: isToggle ? Switch(
         value: toggleValue, 
         onChanged: onChanged,
-        activeColor: Colors.cyanAccent,
+        activeThumbColor: Colors.cyanAccent,
       ) : Text(displayValue, style: const TextStyle(color: Colors.white38, fontSize: 14)),
     );
   }
