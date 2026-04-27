@@ -721,18 +721,34 @@ class _PostViewState extends State<PostView> {
 
   Widget _commentInput(TextEditingController controller, StateSetter setSheetState) {
     return Container(
-      padding: EdgeInsets.only(left: 16, right: 16, top: 12, bottom: MediaQuery.of(context).viewInsets.bottom + 12),
-      decoration: const BoxDecoration(color: Color(0xFF1E1E1E), border: Border(top: BorderSide(color: Colors.white10, width: 0.5))),
+      padding: EdgeInsets.only(
+        left: 16, 
+        right: 16, 
+        top: 12, 
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1E1E1E), 
+        border: Border(top: BorderSide(color: Colors.white10, width: 0.5)),
+      ),
       child: Row(
         children: [
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(25)),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05), 
+                borderRadius: BorderRadius.circular(25),
+              ),
               child: TextField(
                 controller: controller,
+                autofocus: false,
                 style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: const InputDecoration(hintText: '의견을 나눠보세요...', hintStyle: TextStyle(color: Colors.white38), border: InputBorder.none),
+                decoration: const InputDecoration(
+                  hintText: '의견을 나눠보세요...', 
+                  hintStyle: TextStyle(color: Colors.white38), 
+                  border: InputBorder.none,
+                ),
               ),
             ),
           ),
@@ -741,9 +757,15 @@ class _PostViewState extends State<PostView> {
             onTap: () {
               if (controller.text.trim().isNotEmpty) {
                 setSheetState(() {
-                  widget.post.comments.add(CommentData(user: '나 (본인)', text: controller.text, side: _votedSide, image: 'assets/profiles/profile_11.jpg'));
+                  widget.post.comments.add(CommentData(
+                    user: '나 (본인)', 
+                    text: controller.text, 
+                    side: _votedSide, 
+                    image: 'assets/profiles/profile_11.jpg',
+                  ));
                   controller.clear();
                 });
+                FocusScope.of(context).unfocus(); // 전송 후 키보드 닫기
               }
             },
             child: const Icon(Icons.send_rounded, color: Colors.cyanAccent),
@@ -884,7 +906,22 @@ class _PostViewState extends State<PostView> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(radius: 18, backgroundImage: imageUrl.startsWith('http') ? NetworkImage(imageUrl) : AssetImage(imageUrl) as ImageProvider),
+          Container(
+            padding: const EdgeInsets.all(2), // 테두리 두께
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: votedSide == 1 ? Colors.cyanAccent : (votedSide == 2 ? Colors.redAccent : Colors.transparent),
+                width: 2,
+              ),
+            ),
+            child: CircleAvatar(
+              radius: 18, 
+              backgroundImage: imageUrl.startsWith('http') 
+                ? NetworkImage(imageUrl) 
+                : AssetImage(imageUrl) as ImageProvider
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(name, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Text(text, style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.3))])),
         ],
