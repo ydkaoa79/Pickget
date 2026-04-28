@@ -27,6 +27,8 @@ class PostData {
   final String? shortDescA;
   final String? shortDescB;
   final List<String>? tags;
+  final int? durationMinutes;
+  final int? targetPickCount;
 
   PostData({
     required this.id,
@@ -41,6 +43,8 @@ class PostData {
     this.shortDescA,
     this.shortDescB,
     this.tags,
+    this.durationMinutes,
+    this.targetPickCount,
     required this.likesCount,
     required this.commentsCount,
     required this.voteCountA,

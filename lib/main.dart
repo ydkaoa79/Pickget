@@ -13,6 +13,7 @@ import 'screens/channel_screen.dart';
 import 'screens/point_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/profile_setup_screen.dart';
+import 'screens/channel_feed_screen.dart';
 
 void main() {
   runApp(const PickGetApp());
@@ -778,7 +779,16 @@ class _MainScreenState extends State<MainScreen> {
                     final post = topPosts[index];
                     return _rankingItem(index + 1, post, () {
                       Navigator.pop(context);
-                      _navigateToPost(post);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChannelFeedScreen(
+                            initialIndex: index,
+                            channelPosts: topPosts,
+                            allPosts: _posts,
+                          ),
+                        ),
+                      );
                     });
                   },
                 ),
@@ -790,29 +800,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _navigateToPost(PostData post) {
-    setState(() {
-      // Switch to Recommended tab
-      _selectedTopTabIndex = 0;
-      // Force this post to be visible even if it's expired
-      _forcedVisibleIds.add(post.id);
-      
-      // If it's not in the recommended list at all (e.g. was filtered out during shuffle), add it
-      if (!_recommendedPosts.any((p) => p.id == post.id)) {
-        _recommendedPosts.insert(0, post);
-      }
-    });
-    
-    // Give a small delay for state update and PageView rebuild
-    Future.microtask(() {
-      final filtered = _filteredPosts;
-      final index = filtered.indexWhere((p) => p.id == post.id);
-      if (index != -1 && _pageController.hasClients) {
-        _pageController.jumpToPage(index);
-        HapticFeedback.mediumImpact();
-      }
-    });
-  }
 
   Widget _rankingItem(int rank, PostData post, VoidCallback onTap) {
     return GestureDetector(

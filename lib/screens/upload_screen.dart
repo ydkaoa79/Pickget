@@ -14,19 +14,15 @@ class _UploadScreenState extends State<UploadScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descAController = TextEditingController();
   final TextEditingController _descBController = TextEditingController();
-  final TextEditingController _descController = TextEditingController();
+  final TextEditingController _descController = TextEditingController(); // 상세설명 그대로 유지
   final TextEditingController _tagsController = TextEditingController();
-
-  bool _isAdultContent = false;
-  bool _isAIContent = false;
-  bool _allowComments = true;
-
-  final int _selectedHours = 24;
-  final bool _useTargetGoal = false;
-  final TextEditingController _targetVotesController = TextEditingController(text: '100');
 
   String? _imagePathA;
   String? _imagePathB;
+  int _selectedHours = 24;
+  int _selectedMinutes = 0;
+  bool _useTargetPick = false;
+  final TextEditingController _targetPickController = TextEditingController(text: '100');
 
   @override
   Widget build(BuildContext context) {
@@ -43,191 +39,355 @@ class _UploadScreenState extends State<UploadScreen> {
         centerTitle: true,
         actions: [
           TextButton(
-            onPressed: () {
-              final newPost = PostData(
-                id: 'post_${DateTime.now().millisecondsSinceEpoch}',
-                uploaderId: gNameText,
-                uploaderImage: gProfileImage,
-                title: _titleController.text,
-                fullDescription: _descController.text,
-                timeLocation: '방금 전 · 서울',
-                imageA: _imagePathA ?? 'https://picsum.photos/seed/a/800/1000',
-                imageB: _imagePathB ?? 'https://picsum.photos/seed/b/800/1000',
-                descriptionA: '선택지 A',
-                descriptionB: '선택지 B',
-                shortDescA: _descAController.text,
-                shortDescB: _descBController.text,
-                tags: _tagsController.text.split(RegExp(r'[#,\s]+')).where((t) => t.isNotEmpty).toList(),
-                likesCount: 0,
-                commentsCount: 0,
-                voteCountA: '0',
-                voteCountB: '0',
-                percentA: '0%',
-                percentB: '0%',
-              );
-
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => ChannelScreen(
-                  uploaderId: newPost.uploaderId,
-                  allPosts: [newPost], 
-                  initialPost: newPost,
-                )),
-              );
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('"${_titleController.text}" 질문이 내 채널에 등록되었습니다!'),
-                  backgroundColor: Colors.cyanAccent.withValues(alpha: 0.9),
-                ),
-              );
-            },
+            onPressed: _handleUpload,
             child: const Text('등록', style: TextStyle(color: Colors.cyanAccent, fontSize: 16, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(width: 8),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _contentBlock(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 질문 제목 블록
+              _cardBlock(
+                title: '질문 제목',
+                child: _inputField(_titleController, '무엇이 더 나은지 물어보세요'),
+              ),
+              const SizedBox(height: 16),
+
+            // 비교 대상 및 설명 블록
+            _cardBlock(
+              title: '비교 대상 업로드',
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('질문 제목', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
-                  TextField(
-                    controller: _titleController,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                    decoration: const InputDecoration(
-                      hintText: '무엇이 더 나은지 물어보세요',
-                      hintStyle: TextStyle(color: Colors.white24, fontSize: 16),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 12),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(child: _abUploadCard('A', _imagePathA, (path) => setState(() => _imagePathA = path))),
+                      const SizedBox(width: 12),
+                      Expanded(child: _abUploadCard('B', _imagePathB, (path) => setState(() => _imagePathB = path))),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _inputField(_descAController, 'A 설명 (예: 빨강)', isSmall: true)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _inputField(_descBController, 'B 설명 (예: 파랑)', isSmall: true)),
+                    ],
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: _imagePickerBlock('A', _imagePathA, (path) => setState(() => _imagePathA = path))),
-                const SizedBox(width: 12),
-                Expanded(child: _imagePickerBlock('B', _imagePathB, (path) => setState(() => _imagePathB = path))),
-              ],
+
+            // 상세 설명 블록
+            _cardBlock(
+              title: '상세 설명 (선택)',
+              child: _inputField(_descController, '질문에 대해 더 자세히 알려주세요...', maxLines: 3),
             ),
             const SizedBox(height: 16),
-             _contentBlock(
+
+            // 진행 시간 및 목표 Pick 블록 (중요 설정 덩어리)
+            _cardBlock(
+              title: '진행 설정',
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('상세 설명 (선택)', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
-                  TextField(
-                    controller: _descController,
-                    maxLines: 3,
-                    style: const TextStyle(color: Colors.white, fontSize: 15),
-                    decoration: const InputDecoration(
-                      hintText: '질문에 대해 더 자세히 알려주세요...',
-                      hintStyle: TextStyle(color: Colors.white24, fontSize: 15),
-                      border: InputBorder.none,
-                    ),
+                  _durationPicker(),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(color: Colors.white10, height: 1),
                   ),
+                  _targetPickSelector(),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            _contentBlock(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('태그', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
-                  TextField(
-                    controller: _tagsController,
-                    style: const TextStyle(color: Colors.cyanAccent, fontSize: 15),
-                    decoration: const InputDecoration(
-                      hintText: '#데일리룩 #패션 #추천',
-                      hintStyle: TextStyle(color: Colors.white24, fontSize: 15),
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ],
+
+            // 태그 블록
+            _cardBlock(
+              title: '태그',
+              child: _inputField(_tagsController, '#데일리룩 #패션 #추천 (내부 검색용)'),
+            ),
+            const SizedBox(height: 32),
+
+            _precautionsBlock(),
+            const SizedBox(height: 32),
+
+            // 하단 대형 등록 버튼
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: _handleUpload,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.cyanAccent,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 0,
+                ),
+                child: const Text('질문 등록하기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
               ),
             ),
-            const SizedBox(height: 16),
-            _settingsBlock(),
             const SizedBox(height: 40),
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _contentBlock({required Widget child}) {
+  Widget _cardBlock({required String title, required Widget child}) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: child,
-    );
-  }
-
-  Widget _imagePickerBlock(String label, String? path, Function(String) onPick) {
-    return GestureDetector(
-      onTap: () => onPick('https://picsum.photos/seed/${label.toLowerCase()}/800/1000'),
-      child: Container(
-        height: 200,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          image: path != null ? DecorationImage(image: NetworkImage(path), fit: BoxFit.cover) : null,
-        ),
-        child: path == null ? Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.add_photo_alternate_outlined, color: Colors.white38, size: 32),
-            const SizedBox(height: 8),
-            Text('이미지 $label', style: const TextStyle(color: Colors.white38, fontSize: 14)),
-          ],
-        ) : null,
-      ),
-    );
-  }
-
-  Widget _settingsBlock() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.03), width: 1),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _settingItem(Icons.timer_outlined, '진행 기간', '$_selectedHours시간 00분'),
-          _settingItem(Icons.ads_click_outlined, '목표 참여수', _useTargetGoal ? '${_targetVotesController.text}명' : '무제한'),
-          _settingItem(Icons.comment_outlined, '댓글 허용', _allowComments ? '예' : '아니오', isToggle: true, toggleValue: _allowComments, onChanged: (v) => setState(() => _allowComments = v)),
-          _settingItem(Icons.psychology_outlined, 'AI 생성 콘텐츠', _isAIContent ? '예' : '아니오', isToggle: true, toggleValue: _isAIContent, onChanged: (v) => setState(() => _isAIContent = v)),
-          _settingItem(Icons.explicit_outlined, '성인 콘텐츠', _isAdultContent ? '예' : '아니오', isToggle: true, toggleValue: _isAdultContent, onChanged: (v) => setState(() => _isAdultContent = v)),
+          _sectionTitle(title),
+          const SizedBox(height: 12),
+          child,
         ],
       ),
     );
   }
 
-  Widget _settingItem(IconData icon, String title, String displayValue, {bool isToggle = false, bool toggleValue = false, Function(bool)? onChanged}) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.white60, size: 20),
-      title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 15)),
-      trailing: isToggle ? Switch(
-        value: toggleValue, 
-        onChanged: onChanged,
-        activeThumbColor: Colors.cyanAccent,
-      ) : Text(displayValue, style: const TextStyle(color: Colors.white38, fontSize: 14)),
+  void _handleUpload() {
+    if (_titleController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('제목을 입력해주세요.')));
+      return;
+    }
+    
+    final int totalMinutes = (_selectedHours * 60) + _selectedMinutes;
+    final int? targetCount = _useTargetPick ? (int.tryParse(_targetPickController.text) ?? 100) : null;
+
+    final newPost = PostData(
+      id: 'post_${DateTime.now().millisecondsSinceEpoch}',
+      uploaderId: gNameText,
+      uploaderImage: gProfileImage,
+      title: _titleController.text,
+      fullDescription: _descController.text,
+      timeLocation: '방금 전 · 서울',
+      imageA: _imagePathA ?? 'https://picsum.photos/seed/a/800/1000',
+      imageB: _imagePathB ?? 'https://picsum.photos/seed/b/800/1000',
+      descriptionA: _descAController.text.isEmpty ? '선택지 A' : _descAController.text,
+      descriptionB: _descBController.text.isEmpty ? '선택지 B' : _descBController.text,
+      tags: _tagsController.text.split(RegExp(r'[#,\s]+')).where((t) => t.isNotEmpty).toList(),
+      durationMinutes: totalMinutes,
+      targetPickCount: targetCount,
+      likesCount: 0,
+      commentsCount: 0,
+      voteCountA: '0',
+      voteCountB: '0',
+      percentA: '0%',
+      percentB: '0%',
+    );
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => ChannelScreen(
+        uploaderId: newPost.uploaderId,
+        allPosts: [newPost], 
+        initialPost: newPost,
+      )),
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('"${_titleController.text}" 질문이 등록되었습니다!'),
+        backgroundColor: Colors.cyanAccent.withValues(alpha: 0.9),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Text(
+      title, 
+      style: const TextStyle(color: Colors.cyanAccent, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: -0.5)
+    );
+  }
+
+  Widget _inputField(TextEditingController controller, String hint, {int maxLines = 1, bool isSmall = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(isSmall ? 15 : 20),
+      ),
+      child: TextField(
+        controller: controller,
+        maxLines: maxLines,
+        style: TextStyle(color: Colors.white, fontSize: isSmall ? 13 : 15),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.white24),
+          border: InputBorder.none,
+        ),
+      ),
+    );
+  }
+
+  Widget _abUploadCard(String label, String? path, Function(String) onPick) {
+    return GestureDetector(
+      onTap: () => onPick('https://picsum.photos/seed/${label.toLowerCase()}${DateTime.now().millisecondsSinceEpoch}/800/1000'),
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(20),
+            image: path != null ? DecorationImage(image: NetworkImage(path), fit: BoxFit.cover) : null,
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (path == null) ...[
+                Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.03), fontSize: 80, fontWeight: FontWeight.w900)),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.add_a_photo_outlined, color: Colors.cyanAccent, size: 32),
+                    const SizedBox(height: 8),
+                    Text('$label 업로드', style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ],
+              if (path != null)
+                Positioned(
+                  top: 8, right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                    child: const Icon(Icons.refresh, color: Colors.white, size: 16),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _durationPicker() {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('시간 선택', style: TextStyle(color: Colors.white38, fontSize: 11)),
+              DropdownButton<int>(
+                value: _selectedHours,
+                isExpanded: true,
+                dropdownColor: const Color(0xFF1E1E1E),
+                underline: const SizedBox(),
+                icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white24),
+                items: List.generate(73, (i) => i).map((i) => DropdownMenuItem(
+                  value: i,
+                  child: Text('$i시간', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                )).toList(),
+                onChanged: (val) => setState(() => _selectedHours = val ?? 0),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('분 선택', style: TextStyle(color: Colors.white38, fontSize: 11)),
+              DropdownButton<int>(
+                value: _selectedMinutes,
+                isExpanded: true,
+                dropdownColor: const Color(0xFF1E1E1E),
+                underline: const SizedBox(),
+                icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white24),
+                items: List.generate(60, (i) => i).map((i) => DropdownMenuItem(
+                  value: i,
+                  child: Text('$i분', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+                )).toList(),
+                onChanged: (val) => setState(() => _selectedMinutes = val ?? 0),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _targetPickSelector() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('목표 Pick 조기 마감', style: TextStyle(color: Colors.white, fontSize: 14)),
+            Switch(
+              value: _useTargetPick, 
+              onChanged: (v) => setState(() => _useTargetPick = v),
+              activeTrackColor: Colors.cyanAccent.withValues(alpha: 0.3),
+              activeThumbColor: Colors.cyanAccent,
+            ),
+          ],
+        ),
+        if (_useTargetPick)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.ads_click_outlined, color: Colors.white38, size: 16),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _targetPickController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
+                    decoration: const InputDecoration(
+                      hintText: '목표 숫자 입력',
+                      hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                const Text('Pick 도달 시 마감', style: TextStyle(color: Colors.white38, fontSize: 12)),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _precautionsBlock() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.white10),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.white38, size: 16),
+              SizedBox(width: 8),
+              Text('업로드 시 주의사항', style: TextStyle(color: Colors.white38, fontSize: 13, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          SizedBox(height: 8),
+          Text('• 타인의 저작권을 침해하거나 불쾌감을 주는 콘텐츠는 제재될 수 있습니다.', style: TextStyle(color: Colors.white24, fontSize: 11)),
+          Text('• 허위 사실 유포나 부적절한 태그 사용 시 게시물이 삭제될 수 있습니다.', style: TextStyle(color: Colors.white24, fontSize: 11)),
+          Text('• 진행 시간은 등록 후 수정이 불가능하니 신중히 선택해주세요.', style: TextStyle(color: Colors.white24, fontSize: 11)),
+        ],
+      ),
     );
   }
 }

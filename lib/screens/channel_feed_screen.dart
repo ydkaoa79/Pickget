@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/post_data.dart';
 import '../widgets/post_view.dart';
+import '../core/app_state.dart';
 import 'channel_screen.dart';
 
 class ChannelFeedScreen extends StatefulWidget {
@@ -51,6 +52,10 @@ class _ChannelFeedScreenState extends State<ChannelFeedScreen> {
                 key: ValueKey('channel_feed_${post.id}'),
                 post: post,
                 onLike: () {
+                  if (!gIsLoggedIn) {
+                    gShowLoginPopup?.call();
+                    return;
+                  }
                   setState(() {
                     post.isLiked = !post.isLiked;
                     if (post.isLiked) {
@@ -62,6 +67,10 @@ class _ChannelFeedScreenState extends State<ChannelFeedScreen> {
                   HapticFeedback.lightImpact();
                 },
                 onFollow: () {
+                  if (!gIsLoggedIn) {
+                    gShowLoginPopup?.call();
+                    return;
+                  }
                   setState(() {
                     bool newStatus = !post.isFollowing;
                     for (var p in widget.allPosts) {
@@ -73,6 +82,10 @@ class _ChannelFeedScreenState extends State<ChannelFeedScreen> {
                   HapticFeedback.mediumImpact();
                 },
                 onBookmark: () {
+                  if (!gIsLoggedIn) {
+                    gShowLoginPopup?.call();
+                    return;
+                  }
                   setState(() {
                     post.isBookmarked = !post.isBookmarked;
                   });
@@ -93,11 +106,19 @@ class _ChannelFeedScreenState extends State<ChannelFeedScreen> {
                   );
                 },
                 onVote: (side) {
+                  if (!gIsLoggedIn) {
+                    gShowLoginPopup?.call();
+                    return;
+                  }
                   setState(() {
                     post.userVotedSide = side;
                   });
                 },
                 onProfileTap: () {
+                  if (!gIsLoggedIn) {
+                    gShowLoginPopup?.call();
+                    return;
+                  }
                   Navigator.push(
                     context,
                     MaterialPageRoute(
