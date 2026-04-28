@@ -62,13 +62,14 @@ class _MainScreenState extends State<MainScreen> {
   final PageController _pageController = PageController();
   int _userPoints = 0;
   int _selectedTopTabIndex = 0;
+  bool _hasNewNotifications = true;
 
   @override
   void initState() {
     super.initState();
     _posts = [
       PostData(id: '1', title: '오늘의 데이트 룩, 뭐가 더 심쿵해?', uploaderId: '@style_guru', uploaderImage: 'assets/profiles/profile_11.jpg', timeLocation: '서울 강남구 ? 2시간 전', imageA: 'assets/images/post1_a.jpg', imageB: 'assets/images/post1_b.jpg', descriptionA: '트렌디한 오버사이즈 핏과 미니멀한 블랙 코디의 정석', descriptionB: '화려한 패턴과 유니크한 액세서리로 완성된 힙스터 룩', likesCount: 1200, commentsCount: 342, voteCountA: '1.2k', voteCountB: '800', percentA: '60%', percentB: '40%', isFollowing: true, fullDescription: '오늘은 홍대에서 데이트하기 좋은 룩 두 가지를 준비해봤어요! 여러분의 선택은 무엇인가요?', tags: ['데이트', '코디', '홍대']),
-      PostData(id: '2', title: '출근룩 이거 어떰?', uploaderId: '@office_worker', uploaderImage: 'assets/profiles/profile_32.jpg', timeLocation: '판교 ? 5시간 전', imageA: 'assets/images/post2_a.jpg', imageB: 'assets/images/post2_b.jpg', descriptionA: '깔끔한 셔츠와 슬랙스 조합, 신뢰감을 주는 비즈니스 캐주얼', descriptionB: '편안한 니트와 베이지 면바지, 다정하고 부드러운 오피스 룩', likesCount: 850, commentsCount: 120, voteCountA: '450', voteCountB: '400', percentA: '53%', percentB: '47%', fullDescription: '월요병을 이겨낼 수 있는 상큼한 출근룩 제안입니다. 투표 부탁드려요!', tags: ['출근룩', '오피스', '비즈니스']),
+      PostData(id: '2', title: '출근룩 이거 어떰?', uploaderId: '@office_worker', uploaderImage: 'assets/profiles/profile_32.jpg', timeLocation: '판교 ? 5시간 전', imageA: 'assets/images/post2_a.jpg', imageB: 'assets/images/post2_b.jpg', descriptionA: '깔끔한 셔츠와 슬랙스 조합, 신뢰감을 주는 비즈니스 캐주얼', descriptionB: '편안한 니트와 베이지 면바지, 다정하고 부드러운 오피스 룩', likesCount: 850, commentsCount: 120, voteCountA: '450', voteCountB: '400', percentA: '53%', percentB: '47%', fullDescription: '월요병을 이겨낼 수 있는 상큼한 출근룩 제안입니다. 선택 부탁드려요!', tags: ['출근룩', '오피스', '비즈니스']),
       PostData(id: '3', title: '휴양지 패션 추천좀!', uploaderId: '@traveler_j', uploaderImage: 'assets/profiles/profile_44.jpg', timeLocation: '제주도 ? 1일 전', imageA: 'assets/images/post3_a.jpg', imageB: 'assets/images/post3_b.jpg', descriptionA: '시원한 리넨 셔츠와 반바지, 휴양지의 여유가 느껴지는 스타일', descriptionB: '에스닉한 무드와 로브로 인생샷을 부르는 화려한 바캉스 룩', likesCount: 2500, commentsCount: 890, voteCountA: '1.8k', voteCountB: '700', percentA: '72%', percentB: '28%', isFollowing: true, fullDescription: '다음 주에 발리로 떠나는데 어떤 옷이 더 잘 어울릴까요? 현지 분위기에 맞춰서 골라주세요.', isExpired: true, tags: ['휴양지', '여행', '발리']),
       PostData(id: '4', title: '운동복 뭐가 나을까?', uploaderId: '@gym_rat', uploaderImage: 'assets/profiles/profile_12.jpg', timeLocation: '부산 ? 3시간 전', imageA: 'assets/images/post4_a.jpg', imageB: 'assets/images/post4_b.jpg', descriptionA: '기능성에 집중한 컴프레션 웨어, 운동 효율을 높여주는 복장', descriptionB: '트렌디한 디자인의 조거 팬츠와 후드, 짐웨어로도 일상복으로도 만점', likesCount: 500, commentsCount: 40, voteCountA: '300', voteCountB: '200', percentA: '60%', percentB: '40%', fullDescription: '오운완! 오늘 새로 산 운동복인데 둘 중에 뭐가 더 핏이 좋아 보이나요?', isExpired: true, tags: ['운동', '헬스', '짐웨어']),
       PostData(id: '5', title: '오늘 저녁 뭐 먹지?', uploaderId: '@foodie_kim', uploaderImage: 'assets/profiles/profile_60.jpg', timeLocation: '홍대 ? 10분 전', imageA: 'assets/images/post5_a.jpg', imageB: 'assets/images/post5_b.jpg', descriptionA: '매콤한 감칠맛이 일품인 전통 한식 메뉴, 한국인의 소울 푸드', descriptionB: '치즈가 듬뿍 들어간 정통 이탈리안 파스타, 특별한 날에 어울리는 맛', likesCount: 3000, commentsCount: 1200, voteCountA: '2k', voteCountB: '1k', percentA: '67%', percentB: '33%', isFollowing: true, fullDescription: '결정장애 왔어요... 한식 vs 양식! 여러분의 픽으로 오늘 저녁 메뉴를 정하겠습니다.', tags: ['맛집', '저녁', '메뉴추천']),
@@ -125,24 +126,32 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   List<PostData> get _filteredPosts {
-    // 공통 규칙: 투표 종료된 컨텐츠는 메인 피드에서 제외 (Pick 탭 제외), 숨김 처리된 컨텐츠도 제외
-    List<PostData> filtered = _posts.where((p) => !p.isExpired && !p.isHidden).toList();
+    // 기본 필터: 숨김 처리되지 않은 게시물
+    List<PostData> visiblePosts = _posts.where((p) => !p.isHidden).toList();
 
     switch (_selectedTopTabIndex) {
-      case 0: // Recommended: Mixed & Shuffled
+      case 0: // 추천
         return _recommendedPosts.where((p) => !p.isExpired || _forcedVisibleIds.contains(p.id)).toList();
-      case 1: // 팔로우: 내가 팔로우한 채널만
-        filtered = filtered.where((p) => p.isFollowing).toList();
-        break;
-      case 2: // 즐겨찾기: 내가 즐겨찾기한 컨텐츠만
-        filtered = filtered.where((p) => p.isBookmarked).toList();
-        break;
-      case 3: // Pick: 내가 선택한 진행중인 컨텐츠만
-        filtered = filtered.where((p) => p.userVotedSide != 0).toList();
-        break;
+      case 1: // 팔로우
+        return visiblePosts.where((p) => p.isFollowing && !p.isExpired).toList();
+      case 2: // 즐겨찾기
+        return visiblePosts.where((p) => p.isBookmarked && !p.isExpired).toList();
+      case 3: // Pick: 내가 선택한 게시물 (정렬: 진행중 짧은시간순 -> 마감됨)
+        List<PostData> picked = visiblePosts.where((p) => p.userVotedSide != 0).toList();
+        
+        // 정렬 로직
+        List<PostData> ongoing = picked.where((p) => !p.isExpired).toList();
+        List<PostData> expired = picked.where((p) => p.isExpired).toList();
+        
+        // 진행 중인 건 시간이 짧게 남은 순 (remainingSeconds 기준은 아니지만, prototype용으로 durationMinutes 등 활용 가능)
+        // 여기서는 durationMinutes나 생성 시간 등을 고려하여 정렬할 수 있습니다. 
+        // PostData에 구체적인 마감 시각 필드가 있다면 더 정확합니다.
+        ongoing.sort((a, b) => (a.durationMinutes ?? 0).compareTo(b.durationMinutes ?? 0)); 
+        
+        return [...ongoing, ...expired];
+      default:
+        return [];
     }
-    if (!gIsLoggedIn && _selectedTopTabIndex != 0) return [];
-    return filtered;
   }
 
   void _showLoginSuccessSnackBar(String platform) {
@@ -416,7 +425,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildLoginRequiredView() {
-    String tabName = ['', '팔로우한 채널', '즐겨찾기한 픽겟', '투표한 픽겟'][_selectedTopTabIndex];
+    String tabName = ['', '팔로우한 채널', '즐겨찾기한 픽겟', '선택한 픽겟'][_selectedTopTabIndex];
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -464,77 +473,91 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildTopBar() {
-    return SafeArea(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Image.asset('assets/logo.png', height: 30, fit: BoxFit.contain),
-                Row(
+    return Positioned(
+      top: 0, left: 0, right: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    GestureDetector(
-                      onTap: () {
-                        if (!gIsLoggedIn) {
-                          _showLoginPopup();
-                          return;
-                        }
-                        HapticFeedback.lightImpact();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => PointScreen(currentPoints: _userPoints)),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(22)),
-                        child: Row(
-                          children: [
-                            const Text('P ', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.w900, fontSize: 14)),
-                            Text(
-                              _userPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"),
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                    Image.asset('assets/logo.png', height: 30, fit: BoxFit.contain),
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            if (!gIsLoggedIn) {
+                              _showLoginPopup();
+                              return;
+                            }
+                            HapticFeedback.lightImpact();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => PointScreen(currentPoints: _userPoints)),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(22)),
+                            child: Row(
+                              children: [
+                                const Text('P ', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.w900, fontSize: 14)),
+                                Text(
+                                  _userPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"),
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 18),
-                    GestureDetector(
-                      onTap: () {
-                        if (!gIsLoggedIn) {
-                          _showLoginPopup();
-                          return;
-                        }
-                        HapticFeedback.lightImpact();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => SearchScreen(allPosts: _posts)),
-                        );
-                      },
-                      child: const Icon(Icons.search, color: Colors.white, size: 32),
+                        const SizedBox(width: 18),
+                        GestureDetector(
+                          onTap: () {
+                            if (!gIsLoggedIn) {
+                              _showLoginPopup();
+                              return;
+                            }
+                            HapticFeedback.lightImpact();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => SearchScreen(allPosts: _posts)),
+                            );
+                          },
+                          child: const Icon(Icons.search, color: Colors.white, size: 32),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 25),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _topTab('추천', 0),
-              const SizedBox(width: 25),
-              _topTab('팔로우', 1),
-              const SizedBox(width: 25),
-              _topTab('즐겨찾기', 2),
-              const SizedBox(width: 25),
-              _topTab('Pick', 3),
+              ),
+              const SizedBox(height: 15),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _topTab('추천', 0),
+                  const SizedBox(width: 25),
+                  _topTab('팔로우', 1),
+                  const SizedBox(width: 25),
+                  _topTab('즐겨찾기', 2),
+                  const SizedBox(width: 25),
+                  _topTab('Pick', 3),
+                ],
+              ),
+              const SizedBox(height: 10),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -655,9 +678,23 @@ class _MainScreenState extends State<MainScreen> {
                   return;
                 }
                 HapticFeedback.mediumImpact();
+                setState(() { _hasNewNotifications = false; }); // 알림 확인 시 점 제거
                 _showNotificationSheet(context);
               },
-              child: const Icon(Icons.notifications_none, color: Colors.white, size: 20),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.notifications_none, color: Colors.white, size: 20),
+                  if (gIsLoggedIn && _hasNewNotifications)
+                    Positioned(
+                      top: -2, right: -2,
+                      child: Container(
+                        width: 8, height: 8,
+                        decoration: const BoxDecoration(color: Colors.cyanAccent, shape: BoxShape.circle),
+                      ),
+                    ),
+                ],
+              ),
             ),
             GestureDetector(
               onTap: () { 
@@ -705,11 +742,12 @@ class _MainScreenState extends State<MainScreen> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
-                    _notificationItem(Icons.favorite, Colors.redAccent, '내 포스트에 좋아요가 달렸습니다.', '3분 전'),
-                    _notificationItem(Icons.chat_bubble, Colors.cyanAccent, '새로운 댓글이 추가되었습니다: "와 저도 A!"', '12분 전'),
-                    _notificationItem(Icons.monetization_on, Colors.amberAccent, '투표 참여로 10P를 획득했습니다.', '1시간 전'),
-                    _notificationItem(Icons.person_add, Colors.purpleAccent, 'traveler_j님이 회원님을 팔로우하기 시작했습니다.', '3시간 전'),
-                    _notificationItem(Icons.star, Colors.orangeAccent, '이번 주의 인기 Pick으로 선정되었습니다!', '어제'),
+                    _notificationItem(Icons.campaign, Colors.cyanAccent, '[공지] PickGet 베타 서비스 오픈! 환영합니다. ✨', '방금 전'),
+                    _notificationItem(Icons.check_circle, Colors.amberAccent, '선택 종료: "휴양지 패션 추천좀!" 결과가 나왔습니다! 🏆', '10분 전'),
+                    _notificationItem(Icons.chat_bubble, Colors.blueAccent, '내 댓글에 답글이 달렸습니다: "진짜 공감되네요!"', '1시간 전'),
+                    _notificationItem(Icons.check_circle, Colors.amberAccent, '선택 종료: "운동복 뭐가 나을까?" 결과를 확인해보세요.', '2시간 전'),
+                    _notificationItem(Icons.savings, Colors.greenAccent, '데일리 Pick 보너스 10P가 적립되었습니다. 💰', '3시간 전'),
+                    _notificationItem(Icons.favorite, Colors.redAccent, '내 게시물 "오늘 저녁 뭐 먹지?"에 좋아요 100개 돌파!', '5시간 전'),
                   ],
                 ),
               ),
@@ -769,7 +807,7 @@ class _MainScreenState extends State<MainScreen> {
               const SizedBox(height: 20),
               const Text('어제 인기 Pick (TOP 10)', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
               const SizedBox(height: 4),
-              const Text('지난 24시간 동안 가장 뜨거웠던 투표', style: TextStyle(color: Colors.white38, fontSize: 12)),
+              const Text('지난 24시간 동안 가장 뜨거웠던 Pick', style: TextStyle(color: Colors.white38, fontSize: 12)),
               const Divider(color: Colors.white10, height: 30),
               Expanded(
                 child: ListView.builder(

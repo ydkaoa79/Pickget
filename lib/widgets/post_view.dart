@@ -594,7 +594,72 @@ class _PostViewState extends State<PostView> {
                     },
                   ),
                 ),
-              if (_showAlreadySelectedToast)
+              // 마감된 결과 리포트 배너
+              if (isExpired)
+                Positioned(
+                  bottom: 120 + MediaQuery.of(context).padding.bottom,
+                  left: 20, right: 20,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: const Duration(milliseconds: 800),
+                    curve: Curves.easeOutBack,
+                    builder: (context, val, child) {
+                      final bool isAWin = (double.tryParse(widget.post.percentA.replaceAll('%', '')) ?? 0) > (double.tryParse(widget.post.percentB.replaceAll('%', '')) ?? 0);
+                      final bool isBWin = (double.tryParse(widget.post.percentB.replaceAll('%', '')) ?? 0) > (double.tryParse(widget.post.percentA.replaceAll('%', '')) ?? 0);
+                      final bool myPickWon = (_votedSide == 1 && isAWin) || (_votedSide == 2 && isBWin);
+                      
+                      return Transform.scale(
+                        scale: val,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
+                            boxShadow: [BoxShadow(color: Colors.cyanAccent.withValues(alpha: 0.2), blurRadius: 20)],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(color: myPickWon ? Colors.amberAccent : Colors.white10, shape: BoxShape.circle),
+                                child: Icon(myPickWon ? Icons.emoji_events : Icons.check_circle_outline, color: myPickWon ? Colors.black : Colors.white38, size: 24),
+                              ),
+                              const SizedBox(width: 15),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      myPickWon ? '나의 선택 승리! 🏆' : 'Pick 결과 확인',
+                                      style: TextStyle(color: myPickWon ? Colors.amberAccent : Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${isAWin ? "A" : (isBWin ? "B" : "무승부")} 선택지가 최종 선택되었습니다.',
+                                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => _showCommentsSheet(context),
+                                style: TextButton.styleFrom(
+                                  backgroundColor: Colors.cyanAccent.withValues(alpha: 0.1),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                child: const Text('댓글 보기', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
+              if (_showAlreadySelectedToast && !isExpired)
                 Positioned(
                   top: 260, 
                   left: 0, right: 0,
@@ -815,7 +880,7 @@ class _PostViewState extends State<PostView> {
                     decoration: InputDecoration(
                       hintText: (widget.post.uploaderId == '나의 픽겟' || widget.post.uploaderId == 'me' || _votedSide != 0) 
                           ? '의견을 나눠보세요...' 
-                          : '투표 후 참여 가능합니다.', 
+                          : '선택 후 참여 가능합니다.', 
                       hintStyle: const TextStyle(color: Colors.white38), 
                       border: InputBorder.none,
                     ),
@@ -956,7 +1021,7 @@ class _PostViewState extends State<PostView> {
     return Positioned(
       bottom: 67 + MediaQuery.of(context).padding.bottom, right: 35,
       child: SizedBox(
-        width: 120, height: 90,
+        width: 120, height: 110, // Increased height to accommodate label
         child: Stack(
           alignment: Alignment.topCenter,
           children: [
@@ -969,18 +1034,45 @@ class _PostViewState extends State<PostView> {
             ),
             if (hasVoted) Positioned(
               top: 48, left: 0, right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Column(
                 children: [
-                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [_shadowText(post.percentA, color: Colors.cyanAccent, size: 13, weight: FontWeight.w900), _shadowText(post.voteCountA, color: Colors.white70, size: 9, weight: FontWeight.bold)]),
-                  const SizedBox(width: 35),
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_shadowText(post.percentB, color: Colors.redAccent, size: 13, weight: FontWeight.w900), _shadowText(post.voteCountB, color: Colors.white70, size: 9, weight: FontWeight.bold)]),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end, 
+                        children: [
+                          if (_votedSide == 1) _myPickLabel(),
+                          _shadowText(post.percentA, color: Colors.cyanAccent, size: 13, weight: FontWeight.w900), 
+                          _shadowText(post.voteCountA, color: Colors.white70, size: 9, weight: FontWeight.bold)
+                        ]
+                      ),
+                      const SizedBox(width: 35),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start, 
+                        children: [
+                          if (_votedSide == 2) _myPickLabel(),
+                          _shadowText(post.percentB, color: Colors.redAccent, size: 13, weight: FontWeight.w900), 
+                          _shadowText(post.voteCountB, color: Colors.white70, size: 9, weight: FontWeight.bold)
+                        ]
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _myPickLabel() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      margin: const EdgeInsets.only(bottom: 2),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
+      child: const Text('My Pick', style: TextStyle(color: Colors.black, fontSize: 7, fontWeight: FontWeight.w900)),
     );
   }
 
