@@ -4,6 +4,7 @@ import '../models/post_data.dart';
 import '../widgets/post_view.dart';
 import '../core/app_state.dart';
 import 'channel_screen.dart';
+import '../services/supabase_service.dart';
 
 class ChannelFeedScreen extends StatefulWidget {
   final int initialIndex;
@@ -122,6 +123,19 @@ class _ChannelFeedScreenState extends State<ChannelFeedScreen> {
                       Navigator.pop(context);
                     }
                   });
+                },
+                onToggleHide: (postId) async {
+                  setState(() {
+                    post.isHidden = !post.isHidden;
+                  });
+                  try {
+                    await SupabaseService.client
+                        .from('posts')
+                        .update({'tags': post.isHidden ? [...(post.tags ?? []), '#hidden#'] : (post.tags ?? []).where((t) => t != '#hidden#').toList()})
+                        .eq('id', postId);
+                  } catch (e) {
+                    print('숨기기 동기화 에러: $e');
+                  }
                 },
                 onProfileTap: () {
                   if (!gIsLoggedIn) {

@@ -18,6 +18,7 @@ class PostView extends StatefulWidget {
   final Function(String reason) onReport;
   final Function(int side) onVote;
   final Function(String postId) onDelete;
+  final Function(String postId) onToggleHide;
   final VoidCallback? onProfileTap;
 
   const PostView({
@@ -31,6 +32,7 @@ class PostView extends StatefulWidget {
     required this.onReport, 
     required this.onVote, 
     required this.onDelete,
+    required this.onToggleHide,
     this.onProfileTap
   });
   @override
@@ -434,50 +436,89 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                                 _showReportSheet(context);
                               } else if (value == '삭제') {
                                 _deletePost();
+                              } else if (value == '숨기기' || value == '보이기') {
+                                widget.onToggleHide(widget.post.id);
                               }
                             },
-                            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                              const PopupMenuItem<String>(
-                                value: '설명',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.info_outline, color: Colors.white70, size: 20),
-                                    SizedBox(width: 12),
-                                    Text('설명', style: TextStyle(color: Colors.white, fontSize: 14)),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem<String>(
-                                value: '관심없음',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.block, color: Colors.white70, size: 20),
-                                    SizedBox(width: 12),
-                                    Text('관심없음', style: TextStyle(color: Colors.white, fontSize: 14)),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem<String>(
-                                value: '채널 추천 안함',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.person_off_outlined, color: Colors.white70, size: 20),
-                                    SizedBox(width: 12),
-                                    Text('채널 추천 안함', style: TextStyle(color: Colors.white, fontSize: 14)),
-                                  ],
-                                ),
-                              ),
-                              const PopupMenuItem<String>(
-                                value: '신고',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.report_gmailerrorred, color: Colors.redAccent, size: 20),
-                                    SizedBox(width: 12),
-                                    Text('신고', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                              ),
-                            ],
+                            itemBuilder: (BuildContext context) {
+                              if (isMe) {
+                                return <PopupMenuEntry<String>>[
+                                  const PopupMenuItem<String>(
+                                    value: '설명',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.info_outline, color: Colors.white70, size: 20),
+                                        SizedBox(width: 12),
+                                        Text('설명', style: TextStyle(color: Colors.white, fontSize: 14)),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem<String>(
+                                    value: widget.post.isHidden ? '보이기' : '숨기기',
+                                    child: Row(
+                                      children: [
+                                        Icon(widget.post.isHidden ? Icons.visibility : Icons.visibility_off, color: Colors.white70, size: 20),
+                                        SizedBox(width: 12),
+                                        Text(widget.post.isHidden ? '보이기' : '숨기기', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem<String>(
+                                    value: '삭제',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                        SizedBox(width: 12),
+                                        Text('삭제', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ];
+                              } else {
+                                return <PopupMenuEntry<String>>[
+                                  const PopupMenuItem<String>(
+                                    value: '설명',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.info_outline, color: Colors.white70, size: 20),
+                                        SizedBox(width: 12),
+                                        Text('설명', style: TextStyle(color: Colors.white, fontSize: 14)),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem<String>(
+                                    value: '관심없음',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.block, color: Colors.white70, size: 20),
+                                        SizedBox(width: 12),
+                                        Text('관심없음', style: TextStyle(color: Colors.white, fontSize: 14)),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem<String>(
+                                    value: '채널 추천 안함',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.person_off_outlined, color: Colors.white70, size: 20),
+                                        SizedBox(width: 12),
+                                        Text('채널 추천 안함', style: TextStyle(color: Colors.white, fontSize: 14)),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem<String>(
+                                    value: '신고',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.report_gmailerrorred, color: Colors.redAccent, size: 20),
+                                        SizedBox(width: 12),
+                                        Text('신고', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ),
+                                ];
+                              }
+                            },
                           ),
                         ]
                       )

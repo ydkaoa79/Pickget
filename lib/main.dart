@@ -640,6 +640,20 @@ class _MainScreenState extends State<MainScreen> {
                     _refreshRecommended();
                   });
                 },
+                onToggleHide: (postId) async {
+                  setState(() {
+                    post.isHidden = !post.isHidden;
+                    _refreshRecommended();
+                  });
+                  try {
+                    await SupabaseService.client
+                        .from('posts')
+                        .update({'tags': post.isHidden ? [...(post.tags ?? []), '#hidden#'] : (post.tags ?? []).where((t) => t != '#hidden#').toList()})
+                        .eq('id', postId);
+                  } catch (e) {
+                    print('숨기기 동기화 에러: $e');
+                  }
+                },
                 onProfileTap: () {
                   if (!gIsLoggedIn) {
                     _showLoginPopup();

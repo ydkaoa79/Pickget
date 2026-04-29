@@ -811,7 +811,13 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => ChannelFeedScreen(initialIndex: index, channelPosts: _channelPosts, allPosts: widget.allPosts,)),
-              );
+              ).then((_) {
+                if (mounted) {
+                  setState(() {
+                    _loadPosts();
+                  });
+                }
+              });
             }
           },
           child: Stack(
