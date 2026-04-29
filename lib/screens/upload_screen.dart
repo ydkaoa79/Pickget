@@ -210,6 +210,7 @@ class _UploadScreenState extends State<UploadScreen> {
       final response = await SupabaseService.client.from('posts').insert({
         'title': _titleController.text,
         'uploader_id': gIdText,
+        'uploader_internal_id': gUserInternalId, // 주민번호 시스템 도입!
         'image_a': urlA,
         'image_b': urlB,
         'description_a': _descAController.text.isEmpty ? '선택지 A' : _descAController.text,
@@ -220,6 +221,8 @@ class _UploadScreenState extends State<UploadScreen> {
       final newPost = PostData(
         id: response['id'].toString(),
         uploaderId: gIdText,
+        uploaderInternalId: gUserInternalId, // 🆔 등록 시 주민번호 기록!
+        uploaderName: gNameText,
         uploaderImage: gProfileImage,
         title: _titleController.text,
         fullDescription: _descController.text,

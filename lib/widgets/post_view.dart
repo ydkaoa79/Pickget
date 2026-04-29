@@ -101,10 +101,16 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   }
 
   bool get isMe {
+    // 🆔 오직 주민번호(UUID) 하나로만 판단 (진짜 정석!)
+    String nId(String? s) => (s ?? '').trim().toLowerCase();
+    if (widget.post.uploaderInternalId != null && gUserInternalId != null) {
+      if (nId(widget.post.uploaderInternalId) == nId(gUserInternalId)) return true;
+    }
+    // 예외/안전장치 (아이디 기반)
     String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
-    String myId = normalized('나의 픽겟');
-    String uploaderId = normalized(widget.post.uploaderId);
-    return uploaderId == myId || widget.post.uploaderId == 'me' || uploaderId == normalized(gIdText);
+    return normalized(widget.post.uploaderId) == normalized('나의 픽겟') || 
+           widget.post.uploaderId == 'me' || 
+           normalized(widget.post.uploaderId) == normalized(gIdText);
   }
 
   Future<void> _deletePost() async {
@@ -157,22 +163,50 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     });
   }
 
-  void _onVote(int side) {
+  void _onVote(int side) async {
     if (!gIsLoggedIn) {
       gShowLoginPopup?.call();
       return;
     }
     if (_votedSide != 0) return;
     
-    String normalizedId(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
-    if (normalizedId(widget.post.uploaderId) == normalizedId('나의 픽겟') || widget.post.uploaderId == 'me') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('본인이 올린 질문에는 참여할 수 없습니다.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+    // 🆔 오직 주민번호(UUID) 하나로만 판단 (진짜 정석!)
+    String normalized(String? s) => (s ?? '').trim().toLowerCase();
+    bool isMe = (widget.post.uploaderInternalId != null && gUserInternalId != null && 
+                 normalized(widget.post.uploaderInternalId) == normalized(gUserInternalId));
+    
+    print('DEBUG [VOTE]: gUserInternalId=$gUserInternalId, postUploaderInternalId=${widget.post.uploaderInternalId}, isMe=$isMe');
+
+    if (isMe) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('본인이 올린 질문에는 참여할 수 없습니다.')));
       return;
+    }
+
+    // 💾 진짜 투표 및 포인트 적립 로직 (정석!)
+    try {
+      // 1. 투표 기록 저장
+      await SupabaseService.client.from('votes').insert({
+        'post_id': widget.post.id,
+        'user_internal_id': gUserInternalId, // 🆔 주민번호 기록!
+        'side': side,
+      });
+
+      // 2. 포인트 적립 (+10P)
+      await SupabaseService.client.from('points_history').insert({
+        'user_internal_id': gUserInternalId, // 🆔 주민번호 기록!
+        'amount': 10,
+        'description': '질문 참여 보너스',
+      });
+
+      // 3. 앱 내 점수 즉시 반영
+      if (mounted) {
+        setState(() {
+          gUserPoints += 10;
+        });
+      }
+      print('DEBUG [VOTE]: Real vote & 10P recorded for $gUserInternalId');
+    } catch (e) {
+      print('DEBUG [VOTE]: Error recording vote: $e');
     }
 
     setState(() {
@@ -605,16 +639,17 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                                   children: [
                                     Flexible(
                                       child: Text(
-                                        widget.post.uploaderId, 
+                                        widget.post.uploaderName, 
                                         style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, shadows: [Shadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 8, offset: const Offset(0, 1))]),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    GestureDetector(
-                                      onTap: widget.onFollow,
-                                      child: _followBtn(widget.post.isFollowing),
-                                    ),
+                                    if (!isMe) 
+                                      GestureDetector(
+                                        onTap: widget.onFollow,
+                                        child: _followBtn(widget.post.isFollowing),
+                                      ),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
@@ -779,18 +814,39 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       
       print('DEBUG: Fetched ${data.length} comments from server.');
       
-      // First, create all CommentData objects
-      final allComments = data.map((json) => CommentData(
-        id: json['id'],
-        parentId: json['parent_id'],
-        user: json['user_name'] ?? '익명',
-        userId: json['user_id'] ?? '',
-        text: json['text'] ?? '',
-        side: json['side'] ?? 0,
-        image: json['user_image'] ?? 'assets/profiles/profile_11.jpg',
-        isPinned: json['is_pinned'] ?? false,
-        isHidden: json['is_hidden'] ?? false,
-      )).toList();
+      // 1-b. Fetch user profiles for commenters to enable real-time sync
+      final List<dynamic> commentersProfiles = await SupabaseService.client
+          .from('user_profiles')
+          .select('id, user_id, nickname, profile_image');
+      
+      final Map<String, dynamic> profileById = {
+        for (var p in commentersProfiles) p['id'].toString(): p
+      };
+      final Map<String, dynamic> profileByHandle = {
+        for (var p in commentersProfiles) p['user_id'].toString(): p
+      };
+
+      // First, create all CommentData objects with merged profile info
+      final allComments = data.map((json) {
+        final String? internalId = json['user_internal_id']?.toString();
+        final String handle = json['user_id'] ?? '';
+        
+        // Propagation Magic: Match by Internal ID (String/UUID), fallback to handle snapshot
+        final profile = (internalId != null) ? profileById[internalId] : profileByHandle[handle];
+        
+        return CommentData(
+          id: json['id'],
+          parentId: json['parent_id'],
+          user: (profile != null) ? (profile['nickname'] ?? '익명') : (json['user_name'] ?? '익명'),
+          userId: json['user_id'] ?? '',
+          userInternalId: json['user_internal_id']?.toString(), // 🆔 주민번호 불러오기
+          text: json['text'] ?? '',
+          side: json['side'] ?? 0,
+          image: (profile != null) ? (profile['profile_image'] ?? 'assets/profiles/profile_11.jpg') : (json['user_image'] ?? 'assets/profiles/profile_11.jpg'),
+          isPinned: json['is_pinned'] ?? false,
+          isHidden: json['is_hidden'] ?? false,
+        );
+      }).toList();
 
       // Second, rebuild the tree
       final List<CommentData> rootComments = [];
@@ -846,10 +902,13 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       return;
     }
 
-    String normalizedId(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
-    bool isMe = normalizedId(widget.post.uploaderId) == normalizedId('나의 픽겟') || widget.post.uploaderId == 'me';
+    // 🆔 주민번호 기반 주인 확인 (진짜 정석!)
+    bool isMe = (widget.post.uploaderInternalId != null && gUserInternalId != null && 
+                 widget.post.uploaderInternalId!.trim().toLowerCase() == gUserInternalId!.trim().toLowerCase());
     
+    print('DEBUG [COMMENT]: gUserInternalId=$gUserInternalId, postUploaderInternalId=${widget.post.uploaderInternalId}, isMe=$isMe, _votedSide=$_votedSide, isExpired=$isExpired');
     if (_votedSide == 0 && !isExpired && !isMe) {
+      print('DEBUG [COMMENT]: BLOCKED! Showing AlertDialog.');
       await showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -965,30 +1024,32 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                     textInputAction: TextInputAction.send,
                     style: const TextStyle(color: Colors.white, fontSize: 14),
                     onSubmitted: (val) async {
-                      if (!gIsLoggedIn) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('로그인이 필요한 기능입니다.'), backgroundColor: Colors.redAccent, duration: Duration(seconds: 1))
-                        );
-                        gShowLoginPopup?.call();
-                        return;
-                      }
                       final text = val.trim();
                       if (text.isNotEmpty) {
+                        if (!gIsLoggedIn) {
+                          gShowLoginPopup?.call();
+                          return;
+                        }
+                        
+                        // 🆔 진짜 주인 확인 (정석!)
+                        bool isMe = (widget.post.uploaderInternalId != null && widget.post.uploaderInternalId == gUserInternalId);
+                        
+                        // 일반 유저는 투표 필수! 단, 주인님이거나 투표 종료된 글은 프리패스!
+                        if (_votedSide == 0 && !isMe && !isExpired) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('투표를 먼저 해주세요!')));
+                          return;
+                        }
+
                         final newComment = CommentData(
                           user: gNameText, 
                           userId: gIdText,
+                          userInternalId: gUserInternalId, // 🆔 주민번호 장착!
                           text: text, 
                           side: _votedSide, 
                           image: gProfileImage,
                           parentId: replyingTo?.id,
                         );
 
-                        print('DEBUG: Submitting comment. replyingTo is null? ${replyingTo == null}');
-                        if (replyingTo != null) {
-                          print('DEBUG: replyingTo.id: ${replyingTo.id}');
-                        }
-                        
-                        // 1. Update sheet state (for the list in the drawer)
                         setSheetState(() {
                           if (replyingTo != null) {
                             replyingTo.replies.add(newComment);
@@ -999,70 +1060,33 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           widget.post.commentsCount++;
                           controller.clear();
                         });
+                        if (mounted) setState(() {}); 
 
-                        // 2. Update parent state (for the feed icon)
-                        if (mounted) {
-                          setState(() {}); 
-                        }
-
-                        // 3. Sync to Supabase
                         try {
-                          final String? pId = newComment.parentId;
-                          print('DEBUG: Attempting to insert comment for post_id: ${widget.post.id}, parent_id: $pId');
-
-                          // Update comments count on post
-                          await SupabaseService.client
-                            .from('posts')
-                            .update({'comments_count': widget.post.commentsCount})
-                            .eq('id', widget.post.id);
-                          
-                          // Insert real comment into comments table
-                          final response = await SupabaseService.client
-                            .from('comments')
-                            .insert({
-                              'post_id': widget.post.id,
-                              'parent_id': pId,
-                              'user_name': gNameText,
-                              'user_id': gIdText,
-                              'text': text,
-                              'user_image': gProfileImage,
-                              'side': _votedSide,
-                            })
-                            .select();
-                          
-                          final insertedJson = (response as List).first;
-                          newComment.id = insertedJson['id'];
-                          newComment.parentId = insertedJson['parent_id'];
-                          
-                          print('DEBUG: Insert SUCCESS! Server response: $response');
+                          await SupabaseService.client.from('comments').insert({
+                            'post_id': widget.post.id,
+                            'parent_id': newComment.parentId,
+                            'user_name': gNameText,
+                            'user_id': gIdText,
+                            'user_internal_id': gUserInternalId,
+                            'text': text,
+                            'user_image': gProfileImage,
+                            'side': _votedSide,
+                          });
                         } catch (e) {
-                          print('DEBUG: Insert FAILED! Error: $e');
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('저장 실패: $e'), backgroundColor: Colors.redAccent)
-                            );
-                          }
+                          print('댓글 저장 실패: $e');
                         }
-
-                        // Scroll to bottom
-                        Future.delayed(const Duration(milliseconds: 150), () {
-                          if (scrollController.hasClients) {
-                            scrollController.animateTo(
-                              scrollController.position.maxScrollExtent, 
-                              duration: const Duration(milliseconds: 500), 
-                              curve: Curves.easeOutCubic
-                            );
-                          }
-                        });
                       }
                       FocusManager.instance.primaryFocus?.unfocus();
                     },
                     decoration: InputDecoration(
-                      hintText: (widget.post.uploaderId == '나의 픽겟' || widget.post.uploaderId == 'me' || _votedSide != 0) 
-                          ? '의견을 나눠보세요...' 
-                          : '선택 후 참여 가능합니다.', 
-                      hintStyle: const TextStyle(color: Colors.white38), 
+                      hintText: (_votedSide == 0 && !((widget.post.uploaderInternalId != null && widget.post.uploaderInternalId == gUserInternalId) || 
+                                 (widget.post.uploaderId.replaceAll(RegExp(r'[@\s_]'), '').trim() == gIdText.replaceAll(RegExp(r'[@\s_]'), '').trim()))) 
+                                 ? '투표 후 댓글을 남겨주세요' 
+                                 : '댓글을 입력하세요...',
+                      hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
                       border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
@@ -1070,30 +1094,30 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
               const SizedBox(width: 12),
               GestureDetector(
                 onTap: () async {
-                  if (!gIsLoggedIn) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('로그인이 필요한 기능입니다.'), backgroundColor: Colors.redAccent, duration: Duration(seconds: 1))
-                    );
-                    gShowLoginPopup?.call();
-                    return;
-                  }
                   final text = controller.text.trim();
                   if (text.isNotEmpty) {
+                    if (!gIsLoggedIn) {
+                      gShowLoginPopup?.call();
+                      return;
+                    }
+
+                    bool isMe = (widget.post.uploaderInternalId != null && widget.post.uploaderInternalId == gUserInternalId);
+                    
+                    if (_votedSide == 0 && !isMe && !isExpired) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('투표를 먼저 해주세요!')));
+                      return;
+                    }
+
                     final newComment = CommentData(
                       user: gNameText, 
                       userId: gIdText,
+                      userInternalId: gUserInternalId, // 🆔 주민번호 장착!
                       text: text, 
                       side: _votedSide, 
                       image: gProfileImage,
                       parentId: replyingTo?.id,
                     );
 
-                    print('DEBUG (Icon): Submitting comment. replyingTo is null? ${replyingTo == null}');
-                    if (replyingTo != null) {
-                      print('DEBUG (Icon): replyingTo.id: ${replyingTo.id}');
-                    }
-
-                    // 1. Update sheet state
                     setSheetState(() {
                       if (replyingTo != null) {
                         replyingTo.replies.add(newComment);
@@ -1104,61 +1128,22 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                       widget.post.commentsCount++;
                       controller.clear();
                     });
+                    if (mounted) setState(() {}); 
 
-                    // 2. Update parent state
-                    if (mounted) {
-                      setState(() {});
-                    }
-
-                    // 3. Sync to Supabase
                     try {
-                      final String? pId = newComment.parentId;
-                      print('DEBUG (Icon) [VER-2.0]: Attempting to insert comment for post_id: ${widget.post.id}, parent_id: $pId');
-
-                      // Update comments count on post
-                      await SupabaseService.client
-                        .from('posts')
-                        .update({'comments_count': widget.post.commentsCount})
-                        .eq('id', widget.post.id);
-                      
-                      // Insert real comment into comments table
-                      final response = await SupabaseService.client
-                        .from('comments')
-                        .insert({
-                          'post_id': widget.post.id,
-                          'parent_id': pId,
-                          'user_name': gNameText,
-                          'user_id': gIdText,
-                          'text': text,
-                          'user_image': gProfileImage,
-                          'side': _votedSide,
-                        })
-                        .select();
-                      
-                      final insertedJson = (response as List).first;
-                      newComment.id = insertedJson['id'];
-                      newComment.parentId = insertedJson['parent_id'];
-                      
-                      print('DEBUG (Icon): Insert SUCCESS! Server response: $response');
+                      await SupabaseService.client.from('comments').insert({
+                        'post_id': widget.post.id,
+                        'parent_id': newComment.parentId,
+                        'user_name': gNameText,
+                        'user_id': gIdText,
+                        'user_internal_id': gUserInternalId,
+                        'text': text,
+                        'user_image': gProfileImage,
+                        'side': _votedSide,
+                      });
                     } catch (e) {
-                      print('DEBUG (Icon): Insert FAILED! Error: $e');
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('저장 실패: $e'), backgroundColor: Colors.redAccent)
-                        );
-                      }
+                      print('댓글 저장 실패: $e');
                     }
-
-                    // Scroll to bottom
-                    Future.delayed(const Duration(milliseconds: 150), () {
-                      if (scrollController.hasClients) {
-                        scrollController.animateTo(
-                          scrollController.position.maxScrollExtent, 
-                          duration: const Duration(milliseconds: 500), 
-                          curve: Curves.easeOutCubic
-                        );
-                      }
-                    });
                   }
                   FocusManager.instance.primaryFocus?.unfocus();
                 },
@@ -1326,9 +1311,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   }
 
   Widget _commentItem(CommentData c, int index, StateSetter setSheetState, Function(CommentData) onReplyTap, {double depth = 0}) {
-    String normalized(String s) => s.replaceAll(RegExp(r'[@\s_]'), '').trim();
-    bool isPostAuthor = normalized(widget.post.uploaderId) == normalized('나의픽겟') || normalized(widget.post.uploaderId) == 'me';
-    bool isCommentAuthor = normalized(c.userId) == normalized(gIdText);
+    bool isPostAuthor = (widget.post.uploaderInternalId != null && widget.post.uploaderInternalId == gUserInternalId);
+    bool isCommentAuthor = (c.userInternalId != null && c.userInternalId == gUserInternalId);
     
     if (c.isHidden && !isPostAuthor) {
       return const SizedBox.shrink();
@@ -1367,14 +1351,12 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                       children: [
                         Builder(
                           builder: (context) {
-                            bool isMe = normalized(c.userId) == normalized(gIdText);
-                            bool isPostAuthorTag = normalized(c.userId) == normalized(widget.post.uploaderId) || 
-                                               (isMe && (normalized(widget.post.uploaderId) == '나의픽겟' || widget.post.uploaderId == 'me'));
+                            // 주민번호(internal_id)를 우선으로 작성자/본인 판별 (정석!)
+                            bool isMe = (c.userInternalId != null && c.userInternalId == gUserInternalId);
+                            bool isPostAuthorTag = (c.userInternalId != null && widget.post.uploaderInternalId != null && c.userInternalId == widget.post.uploaderInternalId);
                             
                             if (isPostAuthorTag) {
-                              String displayName = (normalized(widget.post.uploaderId) == '나의픽겟' || widget.post.uploaderId == 'me') 
-                                                  ? '나의 픽겟' 
-                                                  : widget.post.uploaderId;
+                              String displayName = isMe ? '나의 픽겟' : widget.post.uploaderId;
                               String badge = isMe ? '(본인)' : '(작성자)';
                               
                               return Container(

@@ -80,7 +80,7 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _posts = [];
-    _fetchPostsFromSupabase();
+    fetchPosts();
     
     gShowLoginPopup = _showLoginPopup;
     gOnLogout = () {
@@ -92,12 +92,13 @@ class _MainScreenState extends State<MainScreen> {
           _notifications = [];
         });
       }
-      _fetchPostsFromSupabase();
+      fetchPosts();
     };
+    gRefreshFeed = fetchPosts;
     _startLoginTimer();
   }
 
-  Future<void> _fetchPostsFromSupabase() async {
+  Future<void> fetchPosts() async {
     try {
       // 1. Fetch user-specific data ONLY if logged in
       Set<String> likedPostIds = {};
@@ -107,6 +108,19 @@ class _MainScreenState extends State<MainScreen> {
       
       if (gIsLoggedIn) {
         try {
+          // 🏛️ '테스트용' 시리즈 정석 통합 작전!
+          if (gIdText.startsWith('테스트용')) {
+            // 1. 모든 '테스트용' 계열 글/댓글 주민번호를 진짜로 통일!
+            await SupabaseService.client.from('posts').update({'uploader_internal_id': '3ee25993-1578-4283-a99b-109a51fe5f78'}).ilike('uploader_id', '테스트용%'); 
+            await SupabaseService.client.from('comments').update({'user_internal_id': '3ee25993-1578-4283-a99b-109a51fe5f78'}).ilike('user_id', '테스트용%');
+
+            // 2. 가짜 신분증(중복 프로필) 삭제
+            await SupabaseService.client.from('user_profiles').delete().eq('user_id', gIdText).neq('id', '3ee25993-1578-4283-a99b-109a51fe5f78');
+
+            // 3. 진짜 신분증의 이름표를 현재 아이디로 업데이트!
+            await SupabaseService.client.from('user_profiles').update({'user_id': gIdText}).eq('id', '3ee25993-1578-4283-a99b-109a51fe5f78');
+          }
+          
           final List<dynamic> userLikes = await SupabaseService.client
               .from('likes')
               .select('post_id')
@@ -125,31 +139,55 @@ class _MainScreenState extends State<MainScreen> {
               .eq('follower_id', gIdText);
           followedUserIds = userFollows.map((f) => f['following_id'].toString()).toSet();
 
-          // 1-2. 유저 포인트 잔액 가져오기
-          final profileData = await SupabaseService.client
-              .from('user_profiles')
-              .select('points')
-              .eq('user_id', gIdText)
-              .maybeSingle();
+          print('DEBUG [PROFILE]: Initializing for User ID: $gUserInternalId (Handle: $gIdText)');
+          
+          Map<String, dynamic>? profileData;
+          
+          // 1. 주민번호(Internal ID)가 있다면 그것으로 주인님을 먼저 찾습니다. (정석!)
+          if (gUserInternalId != null) {
+            profileData = await SupabaseService.client
+                .from('user_profiles')
+                .select('id, points, user_id, nickname, profile_image, bio')
+                .eq('id', gUserInternalId!)
+                .maybeSingle();
+          }
+          
+          // 2. 주민번호로 못 찾았거나 처음인 경우만 아이디(핸들)로 찾습니다.
+          if (profileData == null) {
+            profileData = await SupabaseService.client
+                .from('user_profiles')
+                .select('id, points, user_id, nickname, profile_image, bio')
+                .eq('user_id', gIdText)
+                .maybeSingle();
+          }
           
           if (profileData != null) {
+            print('DEBUG [PROFILE]: SUCCESS! Data: $profileData');
             setState(() {
+              gUserInternalId = profileData!['id'].toString();
               gUserPoints = profileData['points'] ?? 0;
+              gIdText = profileData['user_id'] ?? gIdText;
+              gNameText = profileData['nickname'] ?? gNameText;
+              gProfileImage = profileData['profile_image'] ?? gProfileImage;
+              gBioText = profileData['bio'] ?? gBioText;
             });
-            print('DEBUG [FETCH]: Points balance found: $gUserPoints');
           } else {
-            // 지갑이 없으면 즉시 생성 (5,000 포인트 선물!)
-            print('DEBUG [FETCH]: No profile found. Creating one...');
-            await SupabaseService.client
+            print('DEBUG [PROFILE]: NOT FOUND! Creating new profile...');
+            // ... (생성 로직 동일)
+            final newProfile = await SupabaseService.client
                 .from('user_profiles')
-                .insert({'user_id': gIdText, 'points': 5000});
-            
-            await SupabaseService.client
-                .from('points_history')
-                .insert({'user_id': gIdText, 'amount': 5000, 'description': '신규 가입 축하 포인트 🎁'});
-            
+                .insert({
+                  'user_id': gIdText, 
+                  'points': 5000,
+                  'nickname': gNameText,
+                  'profile_image': gProfileImage,
+                })
+                .select()
+                .single();
+            print('DEBUG [PROFILE]: CREATED! New ID: ${newProfile['id']}');
             setState(() {
               gUserPoints = 5000;
+              gUserInternalId = newProfile['id'].toString();
             });
           }
 
@@ -175,18 +213,59 @@ class _MainScreenState extends State<MainScreen> {
         });
       }
 
-      // 2. Fetch all posts (always)
-      final List<dynamic> data = await SupabaseService.client
+      // DEBUG: Check posts columns
+      try {
+        final debugPost = await SupabaseService.client.from('posts').select().limit(1).maybeSingle();
+        print('DEBUG [SCHEMA]: posts columns: ${debugPost?.keys}');
+      } catch (e) {
+        print('DEBUG [SCHEMA]: posts fetch failed: $e');
+      }
+
+      // 2. Fetch all posts and user profiles for real-time profile merging
+      final List<dynamic> postsData = await SupabaseService.client
           .from('posts')
           .select()
           .order('created_at', ascending: false);
       
-      final loadedPosts = data.map((json) {
+      final List<dynamic> profilesData = await SupabaseService.client
+          .from('user_profiles')
+          .select('id, user_id, nickname, profile_image');
+
+      // Create maps for quick profile lookup (by ID and by Handle)
+      final Map<String, dynamic> profileById = {
+        for (var p in profilesData) 
+          p['id'].toString(): p
+      };
+      final Map<String, dynamic> profileByHandle = {
+        for (var p in profilesData) p['user_id'].toString(): p
+      };
+      
+      final loadedPosts = postsData.map((json) {
+        final String handle = json['uploader_id']?.toString() ?? '';
+        final String? internalId = json['uploader_internal_id']?.toString();
+        
+        // Priority: Match by Internal ID, then fallback to Handle
+        final profile = (internalId != null) ? profileById[internalId] : profileByHandle[handle];
+        
+        final String latestId = (profile != null && profile['user_id'] != null)
+            ? profile['user_id'].toString()
+            : handle;
+        final String nickname = (profile != null && profile['nickname'] != null) 
+            ? profile['nickname'].toString() 
+            : (json['uploader_id'] ?? '익명');
+        final String profileImg = (profile != null && profile['profile_image'] != null)
+            ? profile['profile_image'].toString()
+            : (json['uploader_image'] ?? 'assets/profiles/profile_11.jpg');
+
+        final String? finalInternalId = internalId ?? profile?['id']?.toString();
+        
         final post = PostData(
           id: json['id'].toString(),
           title: json['title'] ?? '제목 없음',
-          uploaderId: json['uploader_id'] ?? '익명',
-          uploaderImage: json['uploader_image'] ?? 'assets/profiles/profile_11.jpg',
+          uploaderId: latestId, // Use the latest handle!
+          uploaderInternalId: finalInternalId, // 🆔 비어있으면 프로필에서 가져온 진짜 주민번호 이식!
+          uploaderName: nickname,
+          uploaderImage: profileImg,
           timeLocation: '방금 전',
           imageA: json['image_a'] ?? '',
           imageB: json['image_b'] ?? '',
@@ -246,8 +325,8 @@ class _MainScreenState extends State<MainScreen> {
 
       setState(() {
         _posts = loadedPosts.where((p) {
-          String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
-          bool isMine = normalized(p.uploaderId) == normalized('나의 픽겟') || p.uploaderId == 'me';
+          // 🆔 이름표(아이디)는 무시! 오직 주민번호(UUID)로만 내 글 확인!
+          bool isMine = p.uploaderInternalId != null && p.uploaderInternalId == gUserInternalId;
           return isMine || !p.isHidden;
         }).toList();
         _refreshRecommended();
@@ -279,22 +358,25 @@ class _MainScreenState extends State<MainScreen> {
       return;
     }
     
-    // Mix 50% Popular, 50% Others
-    List<PostData> popular = nonExpired.where((p) => (p.likesCount + p.commentsCount) >= 1000).toList();
-    List<PostData> others = nonExpired.where((p) => (p.likesCount + p.commentsCount) < 1000).toList();
+    // 1. 내 글 분리 (우선 노출용)
+    List<PostData> myPosts = nonExpired.where((p) => p.uploaderInternalId == gUserInternalId).toList();
+    List<PostData> otherPosts = nonExpired.where((p) => p.uploaderInternalId != gUserInternalId).toList();
+
+    // 2. 남의 글은 인기글/일반글로 섞기
+    List<PostData> popular = otherPosts.where((p) => (p.likesCount + p.commentsCount) >= 1000).toList();
+    List<PostData> others = otherPosts.where((p) => (p.likesCount + p.commentsCount) < 1000).toList();
     
     popular.shuffle();
     others.shuffle();
     
-    int half = (nonExpired.length / 2).ceil();
-    List<PostData> mixed = [
-      ...popular.take(half),
-      ...others.take(nonExpired.length - popular.take(half).length)
+    List<PostData> mixedOthers = [
+      ...popular,
+      ...others
     ];
-    mixed.shuffle();
     
+    // 🎯 정석 로직: [내 글] + [섞인 남의 글] 순서로 배치
     setState(() {
-      _recommendedPosts = mixed;
+      _recommendedPosts = [...myPosts, ...mixedOthers];
     });
   }
 
@@ -389,18 +471,22 @@ class _MainScreenState extends State<MainScreen> {
                     textColor: const Color(0xFF191919).withValues(alpha: 0.85),
                     iconSize: 28, 
                     onTap: () async {
+                      // 1. 로그인 상태로 변경
                       setState(() { gIsLoggedIn = true; });
-                      _fetchPostsFromSupabase();
+                      
+                      // 2. 프로필 및 주민번호 즉시 확보 (정석!)
+                      await fetchPosts(); 
+                      
                       Navigator.pop(context);
                       
-                      // Show Profile Setup after login
+                      // Show Profile Setup after login (only if needed)
                       final result = await Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
                       );
                       
                       if (result != null) {
-                        setState(() { _userPoints += 100; }); // Balanced Welcome Bonus
+                        setState(() { _userPoints += 100; }); // Welcome Bonus
                         _showLoginSuccessSnackBar('카카오');
                       }
                     },
@@ -415,7 +501,7 @@ class _MainScreenState extends State<MainScreen> {
                     fontWeight: FontWeight.bold,
                     onTap: () async {
                       setState(() { gIsLoggedIn = true; });
-                      _fetchPostsFromSupabase();
+                      await fetchPosts(); // Identity check!
                       Navigator.pop(context);
                       
                       final result = await Navigator.push(
@@ -424,7 +510,7 @@ class _MainScreenState extends State<MainScreen> {
                       );
                       
                       if (result != null) {
-                        setState(() { _userPoints += 100; }); // Balanced Welcome Bonus
+                        setState(() { _userPoints += 100; }); 
                         _showLoginSuccessSnackBar('네이버');
                       }
                     },
@@ -440,7 +526,7 @@ class _MainScreenState extends State<MainScreen> {
                     letterSpacing: 0.5,
                     onTap: () async {
                       setState(() { gIsLoggedIn = true; });
-                      _fetchPostsFromSupabase();
+                      await fetchPosts(); // Identity check!
                       Navigator.pop(context);
                       
                       final result = await Navigator.push(
@@ -449,7 +535,7 @@ class _MainScreenState extends State<MainScreen> {
                       );
                       
                       if (result != null) {
-                        setState(() { _userPoints += 100; }); // Balanced Welcome Bonus
+                        setState(() { _userPoints += 100; }); 
                         _showLoginSuccessSnackBar('Google');
                       }
                     },
@@ -507,46 +593,56 @@ class _MainScreenState extends State<MainScreen> {
                     return;
                   }
                   final bool nowLiked = !post.isLiked;
+                  
+                  // 1. UI 즉시 반영 (선체감)
                   setState(() { 
                     post.isLiked = nowLiked; 
                     if (nowLiked) {
                       post.likesCount++;
+                      gUserPoints += 1; // 포인트 UI 즉시 반영
                     } else {
                       post.likesCount--;
                     }
                     HapticFeedback.lightImpact();
                   }); 
 
+                  // 2. 서버 연동 (주민번호 기준!)
                   try {
-                    // 1. Insert or Delete from likes table FIRST
                     if (nowLiked) {
+                      // 하트 기록
                       await SupabaseService.client
                         .from('likes')
-                        .insert({'user_id': gIdText, 'post_id': post.id});
+                        .insert({
+                          'user_internal_id': gUserInternalId, // 🆔 정석 도입!
+                          'post_id': post.id
+                        });
+                      
+                      // 포인트 내역 기록 (+1P)
+                      await SupabaseService.client
+                        .from('points_history')
+                        .insert({
+                          'user_internal_id': gUserInternalId,
+                          'amount': 1,
+                          'description': '게시물 좋아요 보너스',
+                        });
                     } else {
+                      // 하트 취소
                       await SupabaseService.client
                         .from('likes')
                         .delete()
-                        .match({'user_id': gIdText, 'post_id': post.id});
+                        .match({
+                          'user_internal_id': gUserInternalId!, 
+                          'post_id': post.id
+                        });
                     }
 
-                    // 2. Fetch the REAL count from the likes table
-                    final likesResponse = await SupabaseService.client
-                      .from('likes')
-                      .select('*')
-                      .eq('post_id', post.id);
-                    
-                    final int realCount = (likesResponse as List).length;
-
-                    // 3. Update the posts table with the real count
+                    // 3. 게시물 테이블의 하트 수 실시간 동기화
                     await SupabaseService.client
                       .from('posts')
-                      .update({'likes_count': realCount})
+                      .update({'likes_count': post.likesCount})
                       .eq('id', post.id);
                     
-                    setState(() {
-                      post.likesCount = realCount;
-                    });
+                    setState(() {}); // UI 갱신만 수행
                   } catch (e) {
                     print('좋아요 서버 동기화 에러 상세: $e');
                   }
@@ -935,7 +1031,7 @@ class _MainScreenState extends State<MainScreen> {
                   MaterialPageRoute(builder: (context) => const UploadScreen()),
                 ).then((_) async {
                   // 1. 서버에서 최신 데이터 가져오기
-                  await _fetchPostsFromSupabase();
+                  await fetchPosts();
                   
                   // 2. 자동으로 첫 번째 페이지(새 글)로 이동!
                   if (_pageController.hasClients) {
@@ -991,6 +1087,7 @@ class _MainScreenState extends State<MainScreen> {
                     initialPost: firstPost ?? PostData(
                       id: 'dummy', 
                       uploaderId: '나의픽겟', 
+                      uploaderName: gNameText,
                       uploaderImage: gProfileImage,
                       title: '첫 포스트를 올려보세요!',
                       timeLocation: '방금 전',

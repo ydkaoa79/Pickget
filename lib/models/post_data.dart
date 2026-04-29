@@ -4,6 +4,8 @@ class PostData {
   final String id;
   final String title;
   final String uploaderId;
+  final String? uploaderInternalId; // 🆔 주민번호 필드 추가!
+  final String uploaderName;
   final String uploaderImage;
   final String timeLocation;
   final String imageA;
@@ -37,6 +39,8 @@ class PostData {
     required this.id,
     required this.title,
     required this.uploaderId,
+    this.uploaderInternalId,
+    required this.uploaderName,
     required this.uploaderImage,
     required this.timeLocation,
     required this.imageA,

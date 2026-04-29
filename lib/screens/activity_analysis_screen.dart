@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/post_data.dart';
 import '../core/app_state.dart';
 import 'point_screen.dart';
+import '../services/supabase_service.dart';
 
 class ActivityAnalysisScreen extends StatefulWidget {
   final List<PostData> userPosts;
@@ -24,50 +25,56 @@ class _ActivityAnalysisScreenState extends State<ActivityAnalysisScreen> {
     _calculateStats();
   }
 
-  void _calculateStats() {
-    int picks = 0;
-    int likes = 0;
-    Map<int, int> dailyPicks = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0};
-    
-    DateTime now = DateTime.now();
+  Future<void> _calculateStats() async {
+    try {
+      // 1. 내가 투표한 모든 내역 가져오기
+      final List<dynamic> myVotes = await SupabaseService.client
+          .from('votes')
+          .select('post_id, side')
+          .eq('user_internal_id', gUserInternalId!);
 
-    for (var post in widget.userPosts) {
-      int vA = _parseVotes(post.voteCountA);
-      int vB = _parseVotes(post.voteCountB);
-      int postTotal = vA + vB;
-      picks += postTotal;
-      likes += post.likesCount;
-      
-      // Calculate trends for last 7 days
-      if (post.createdAt != null) {
-        int dayDiff = now.difference(post.createdAt!).inDays;
-        if (dayDiff >= 0 && dayDiff < 7) {
-          int index = 6 - dayDiff; // 0 is 6 days ago, 6 is today
-          weeklyPicks[index] += postTotal;
-        }
+      if (myVotes.isEmpty) {
+        setState(() { empathyRate = 0.0; });
+        return;
       }
 
-      // Analyze categories from tags
-      if (post.tags != null) {
-        for (var tag in post.tags!) {
-          String t = tag.replaceAll('#', '').trim();
-          if (t.isNotEmpty) {
-            categoryCounts[t] = (categoryCounts[t] ?? 0) + 1;
+      int totalVotedCount = myVotes.length;
+      int matchCount = 0;
+
+      // 2. 투표한 게시물들의 실제 결과와 비교하기
+      for (var vote in myVotes) {
+        final postId = vote['post_id'].toString();
+        final mySide = vote['side'] as int;
+
+        // 해당 게시물의 최신 득표 현황 가져오기
+        final postData = await SupabaseService.client
+            .from('posts')
+            .select('vote_count_a, vote_count_b')
+            .eq('id', postId)
+            .maybeSingle();
+
+        if (postData != null) {
+          int countA = postData['vote_count_a'] ?? 0;
+          int countB = postData['vote_count_b'] ?? 0;
+          
+          int winnerSide = (countA > countB) ? 1 : (countB > countA ? 2 : 0);
+          
+          // 내 선택이 다수결(승자)과 일치하거나, 비겼을 때 공감으로 인정
+          if (mySide == winnerSide || winnerSide == 0) {
+            matchCount++;
           }
         }
       }
-    }
 
-    setState(() {
-      totalPicks = picks;
-      totalLikes = likes;
-      // Empathy rate based on how many people liked vs picked (realer metric)
-      if (picks == 0) {
-        empathyRate = 0.0;
-      } else {
-        empathyRate = ((likes / picks) * 200 + 70).clamp(70.0, 99.0);
-      }
-    });
+      setState(() {
+        totalPicks = widget.userPosts.length;
+        totalLikes = widget.userPosts.fold(0, (sum, p) => sum + p.likesCount);
+        // 🎯 주인님의 정석 공식: (맞춘 횟수 / 총 투표 횟수) * 100
+        empathyRate = (matchCount / totalVotedCount) * 100;
+      });
+    } catch (e) {
+      print('공감도 계산 실패: $e');
+    }
   }
 
   int _parseVotes(String s) {
@@ -165,10 +172,10 @@ class _ActivityAnalysisScreenState extends State<ActivityAnalysisScreen> {
       children: [
         _statCard('콘텐츠 수', _formatNumber(widget.userPosts.length), Icons.article_outlined),
         _statCard('받은 Pick', _formatNumber(totalPicks), Icons.front_hand_outlined),
-        _statCard('받은 공감', _formatNumber(totalLikes), Icons.favorite_border),
+        _statCard('받은 하트', _formatNumber(totalLikes), Icons.favorite_border),
         GestureDetector(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PointScreen(currentPoints: 1250))),
-          child: _statCard('활동 포인트', '1,250', Icons.stars_outlined, isLink: true),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => PointScreen(currentPoints: gUserPoints))),
+          child: _statCard('활동 포인트', gUserPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"), Icons.stars_outlined, isLink: true),
         ),
       ],
     );

@@ -77,6 +77,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _searchResults = widget.allPosts.where((p) => 
         p.title.toLowerCase().contains(query.toLowerCase()) || 
         p.uploaderId.toLowerCase().contains(query.toLowerCase()) || 
+        p.uploaderName.toLowerCase().contains(query.toLowerCase()) || 
         (p.tags?.any((t) => t.toLowerCase().contains(query.toLowerCase())) == true)
       ).toList();
     });
@@ -515,7 +516,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
-                                      post.uploaderId, 
+                                      post.uploaderName, 
                                       style: const TextStyle(
                                         color: Colors.cyanAccent, 
                                         fontSize: 10, 

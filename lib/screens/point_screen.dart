@@ -55,7 +55,7 @@ class _PointScreenState extends State<PointScreen> {
       final List<dynamic> data = await SupabaseService.client
           .from('points_history')
           .select()
-          .eq('user_id', gIdText)
+          .eq('user_internal_id', gUserInternalId!)
           .order('created_at', ascending: false);
       
       setState(() {

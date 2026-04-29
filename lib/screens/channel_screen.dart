@@ -34,23 +34,44 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
   final Set<String> _selectedPostIds = {};
 
   bool get isMe {
+    // 🆔 오직 주민번호(UUID) 하나로만 판단 (진짜 정석!)
+    String nId(String? s) => (s ?? '').trim().toLowerCase();
+    
+    if (widget.initialPost.uploaderInternalId != null && gUserInternalId != null) {
+      if (nId(widget.initialPost.uploaderInternalId) == nId(gUserInternalId)) {
+        return true;
+      }
+    }
+    
+    // 예외/안전장치 (아이디 기반)
     String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
-    return normalized(widget.uploaderId) == normalized('나의 픽겟') || widget.uploaderId == 'me';
+    return normalized(widget.uploaderId) == normalized('나의 픽겟') || 
+           widget.uploaderId == 'me' || 
+           normalized(widget.uploaderId) == normalized(gIdText);
   }
 
   @override
   void initState() {
     super.initState();
-    // ID 정규화 (공백, @, _ 제거)
-    String normalizedId(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
-    String myId = normalizedId('나의픽겟');
-    String targetId = normalizedId(widget.uploaderId);
-
-    if (targetId == myId) { _dName = gNameText; _dImg = gProfileImage; _dBio = gBioText; }
-    else { _dName = widget.uploaderId; _dImg = widget.initialPost.uploaderImage; _dBio = '안녕하세요! ${widget.uploaderId}의 픽겟 공간입니다. ✨'; _isFollowing = widget.initialPost.isFollowing; }
+    // 🏛️ 정석 데이터 초기화!
+    if (isMe) {
+      _dName = gNameText;
+      _dImg = gProfileImage;
+      _dBio = gBioText;
+    } else {
+      _dName = widget.initialPost.uploaderName; // 진짜 이름을 이름 자리에!
+      _dImg = widget.initialPost.uploaderImage;
+      _dBio = '안녕하세요! ${widget.initialPost.uploaderName}의 픽겟 공간입니다. ✨';
+      _isFollowing = widget.initialPost.isFollowing;
+    }
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabSelection);
     _loadPosts();
+
+    // 🏛️ 정석 강제 새로고침: 혹시 모를 인식 지연을 방지하기 위해 0.1초 뒤 다시 확인!
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) setState(() {});
+    });
   }
 
   void _loadPosts() {
@@ -60,9 +81,15 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
 
     setState(() {
       _channelPosts = widget.allPosts.where((p) {
-        String postUploaderId = normalized(p.uploaderId);
-        bool isUploader = postUploaderId == currentChannelId || (isMe && postUploaderId == myId);
-        return isMe ? isUploader : (isUploader && !p.isHidden);
+        // 🆔 주민번호(UUID) 기반 정석 필터링!
+        if (isMe) {
+          // 내 채널일 때: 내 주민번호와 일치하는 것만!
+          return p.uploaderInternalId == gUserInternalId;
+        } else {
+          // 타인 페이지일 경우: 그 사람의 주민번호와 일치하는 것만!
+          bool isSameOwner = (p.uploaderInternalId != null && p.uploaderInternalId == widget.initialPost.uploaderInternalId);
+          return isSameOwner && !p.isHidden;
+        }
       }).toList();
     });
   }
@@ -421,8 +448,6 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    String normalizedId(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
-    bool isMe = normalizedId(widget.uploaderId) == normalizedId('나의픽겟');
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -456,9 +481,9 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                     children: [
                       CircleAvatar(
                         radius: 42,
-                        backgroundImage: _dImg.trim().startsWith('http')
-                          ? NetworkImage(_dImg.trim())
-                          : AssetImage(_dImg.trim()) as ImageProvider,
+                        backgroundImage: (isMe ? gProfileImage : _dImg).trim().startsWith('http')
+                          ? NetworkImage((isMe ? gProfileImage : _dImg).trim())
+                          : AssetImage((isMe ? gProfileImage : _dImg).trim()) as ImageProvider,
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -468,7 +493,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                             Row(
                               children: [
                                 Text(
-                                  _dName,
+                                  isMe ? gNameText : _dName, // 🏛️ 주인님이면 최신 이름을, 아니면 소환된 이름을!
                                   style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
                                 ),
                                 if (isMe) ...[
@@ -496,6 +521,8 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                                             _dBio = gBioText;
                                             _dImg = gProfileImage;
                                           });
+                                          // Global Feed Refresh!
+                                          gRefreshFeed?.call();
                                         }
                                       });
                                     },
@@ -506,7 +533,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              "@${_dName.toLowerCase().replaceAll(' ', '_')}",
+                              "@${isMe ? gIdText : widget.uploaderId}", // 🆔 진짜 아이디 (@...)
                               style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
                             ),
                             const SizedBox(height: 4),
@@ -528,7 +555,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                       children: [
                         Expanded(
                           child: Text(
-                            _dBio,
+                            isMe ? gBioText : _dBio,
                             style: const TextStyle(color: Colors.white70, fontSize: 14),
                             maxLines: _isBioExpanded ? 10 : 1,
                             overflow: TextOverflow.ellipsis,
