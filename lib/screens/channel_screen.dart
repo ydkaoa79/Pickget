@@ -548,20 +548,40 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                       Expanded(
                         flex: 3,
                         child: ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
                             if (isMe) {
                               Navigator.push(context, MaterialPageRoute(builder: (context) => ActivityAnalysisScreen(userPosts: _channelPosts)));
                             } else {
+                              if (!gIsLoggedIn) {
+                                gShowLoginPopup?.call();
+                                return;
+                              }
+                              final bool nowFollowing = !_isFollowing;
                               setState(() {
-                                _isFollowing = !_isFollowing;
+                                _isFollowing = nowFollowing;
                                 // 동일 업로더의 모든 포스트 팔로우 상태 동기화
                                 for (var p in widget.allPosts) {
                                   if (p.uploaderId == widget.uploaderId) {
-                                    p.isFollowing = _isFollowing;
+                                    p.isFollowing = nowFollowing;
                                   }
                                 }
                               });
                               HapticFeedback.mediumImpact();
+
+                              try {
+                                if (nowFollowing) {
+                                  await SupabaseService.client
+                                    .from('follows')
+                                    .insert({'follower_id': gIdText, 'following_id': widget.uploaderId});
+                                } else {
+                                  await SupabaseService.client
+                                    .from('follows')
+                                    .delete()
+                                    .match({'follower_id': gIdText, 'following_id': widget.uploaderId});
+                                }
+                              } catch (e) {
+                                debugPrint('팔로우 서버 동기화 에러: $e');
+                              }
                             }
                           },
                           style: ElevatedButton.styleFrom(

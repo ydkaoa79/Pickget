@@ -52,6 +52,15 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   bool get wantKeepAlive => true;
 
   @override
+  void didUpdateWidget(PostView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If the post data reference changed or follows were updated, we need to refresh
+    if (oldWidget.post.isFollowing != widget.post.isFollowing || oldWidget.post.id != widget.post.id) {
+      setState(() {});
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
     print('DEBUG: PostView State initialized for post_id: ${widget.post.id} (Ver. 1.0)');

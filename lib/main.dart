@@ -85,6 +85,7 @@ class _MainScreenState extends State<MainScreen> {
       // 1. Fetch user-specific data ONLY if logged in
       Set<String> likedPostIds = {};
       Set<String> bookmarkedPostIds = {};
+      Set<String> followedUserIds = {};
       
       if (gIsLoggedIn) {
         try {
@@ -99,6 +100,12 @@ class _MainScreenState extends State<MainScreen> {
               .select('post_id')
               .eq('user_id', gIdText);
           bookmarkedPostIds = userBookmarks.map((b) => b['post_id'].toString()).toSet();
+
+          final List<dynamic> userFollows = await SupabaseService.client
+              .from('follows')
+              .select('following_id')
+              .eq('follower_id', gIdText);
+          followedUserIds = userFollows.map((f) => f['following_id'].toString()).toSet();
 
           final List<dynamic> notifs = await SupabaseService.client
               .from('notifications')
@@ -146,7 +153,10 @@ class _MainScreenState extends State<MainScreen> {
           percentA: '50%', // Placeholder
           percentB: '50%', // Placeholder
           isLiked: gIsLoggedIn && likedPostIds.contains(json['id'].toString()),
-          isBookmarked: gIsLoggedIn && bookmarkedPostIds.contains(json['id'].toString()), // Apply bookmark state!
+          isBookmarked: gIsLoggedIn && bookmarkedPostIds.contains(json['id'].toString()),
+          isFollowing: gIsLoggedIn && followedUserIds.any((fid) => 
+            fid.replaceAll(' ', '').trim() == (json['uploader_id'] ?? '').toString().replaceAll(' ', '').trim()
+          ), // Robust normalization!
           tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
           isExpired: () {
             bool exp = json['is_expired'] ?? false;
@@ -490,24 +500,42 @@ class _MainScreenState extends State<MainScreen> {
                     setState(() {
                       post.likesCount = realCount;
                     });
-                    print('DEBUG [LIKE]: Real likes count synced: $realCount');
                   } catch (e) {
                     print('좋아요 서버 동기화 에러 상세: $e');
                   }
                 },
-                onFollow: () { 
+                onFollow: () async { 
                   if (!gIsLoggedIn) {
                     _showLoginPopup();
                     return;
                   }
+                  final bool nowFollowing = !post.isFollowing;
+                  String normalized(String s) => s.replaceAll(' ', '').trim();
+                  final String targetUploader = normalized(post.uploaderId);
+                  
                   setState(() { 
                     for (var p in _posts) {
-                      if (p.uploaderId == post.uploaderId) {
-                        p.isFollowing = !post.isFollowing;
+                      if (normalized(p.uploaderId) == targetUploader) {
+                        p.isFollowing = nowFollowing;
                       }
                     }
                     HapticFeedback.mediumImpact();
                   }); 
+
+                  try {
+                    if (nowFollowing) {
+                      await SupabaseService.client
+                        .from('follows')
+                        .insert({'follower_id': gIdText, 'following_id': post.uploaderId});
+                    } else {
+                      await SupabaseService.client
+                        .from('follows')
+                        .delete()
+                        .match({'follower_id': gIdText, 'following_id': post.uploaderId});
+                    }
+                  } catch (e) {
+                    print('팔로우 서버 동기화 에러: $e');
+                  }
                 },
                 onBookmark: () async { 
                   if (!gIsLoggedIn) {
@@ -531,7 +559,6 @@ class _MainScreenState extends State<MainScreen> {
                         .delete()
                         .match({'user_id': gIdText, 'post_id': post.id});
                     }
-                    print('DEBUG [BOOKMARK]: Sync SUCCESS for post: ${post.id}');
                   } catch (e) {
                     print('즐겨찾기 동기화 에러: $e');
                   }
