@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/post_data.dart';
 import 'channel_screen.dart';
 import 'channel_feed_screen.dart';
+import '../services/supabase_service.dart';
+import '../core/app_state.dart';
 
 class SearchScreen extends StatefulWidget {
   final List<PostData> allPosts;
@@ -16,20 +18,48 @@ class _SearchScreenState extends State<SearchScreen> {
   List<PostData> _searchResults = [];
   bool _isSearching = false;
 
-  final List<String> _searchHistory = ['패션', '데이트', '홍대맛집', '출근룩'];
-  
-  final List<Map<String, dynamic>> _popularSearches = [
-    {'term': '오늘의 코디', 'status': 'UP', 'change': 2},
-    {'term': '벚꽃 명소', 'status': 'NEW', 'change': 0},
-    {'term': '한강 피크닉', 'status': 'SAME', 'change': 0},
-    {'term': '반팔 티셔츠 추천', 'status': 'DOWN', 'change': 1},
-    {'term': '홍대 조용한 카페', 'status': 'UP', 'change': 5},
-    {'term': '아이폰16 루머', 'status': 'NEW', 'change': 0},
-    {'term': '성수동 팝업스토어', 'status': 'SAME', 'change': 0},
-    {'term': '운동복 브랜드', 'status': 'DOWN', 'change': 3},
-    {'term': '자격증 시험일정', 'status': 'UP', 'change': 1},
-    {'term': '여름 휴가 해외추천', 'status': 'NEW', 'change': 0},
-  ];
+  List<String> _searchHistory = [];
+  final List<Map<String, dynamic>> _popularSearches = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    if (!gIsLoggedIn) return;
+    try {
+      final List<dynamic> data = await SupabaseService.client
+          .from('search_history')
+          .select('keyword')
+          .eq('user_id', gIdText)
+          .order('created_at', ascending: false)
+          .limit(10);
+      
+      setState(() {
+        _searchHistory = data.map((item) => item['keyword'].toString()).toList();
+      });
+    } catch (e) {
+      print('검색 기록 불러오기 실패: $e');
+    }
+  }
+
+  Future<void> _saveKeyword(String query) async {
+    if (!gIsLoggedIn) return;
+    try {
+      // 중복 체크 및 업데이트 (Upsert 느낌으로)
+      await SupabaseService.client
+          .from('search_history')
+          .upsert({
+            'user_id': gIdText, 
+            'keyword': query,
+            'created_at': DateTime.now().toIso8601String(),
+          }, onConflict: 'user_id,keyword');
+    } catch (e) {
+      print('검색어 저장 실패: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -37,39 +67,67 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  void _performSearch(String query) {
+  void _filterResults(String query) {
     if (query.isEmpty) {
       setState(() { _searchResults = []; _isSearching = false; });
       return;
     }
-    
-    if (!_searchHistory.contains(query)) {
-      setState(() {
-        _searchHistory.insert(0, query);
-        if (_searchHistory.length > 10) _searchHistory.removeLast();
-      });
-    }
-
     setState(() {
       _isSearching = true;
       _searchResults = widget.allPosts.where((p) => 
-        p.title.contains(query) || 
-        p.uploaderId.contains(query) || 
-        (p.tags?.any((t) => t.contains(query)) == true)
+        p.title.toLowerCase().contains(query.toLowerCase()) || 
+        p.uploaderId.toLowerCase().contains(query.toLowerCase()) || 
+        (p.tags?.any((t) => t.toLowerCase().contains(query.toLowerCase())) == true)
       ).toList();
     });
+  }
+
+  void _performSearch(String query) {
+    if (query.isEmpty) return;
+    
+    // 로컬 상태 업데이트 (중복 방지 및 최신화)
+    setState(() {
+      _searchHistory.remove(query);
+      _searchHistory.insert(0, query);
+      if (_searchHistory.length > 10) _searchHistory.removeLast();
+      _isSearching = true;
+    });
+    
+    // 실시간 필터링도 같이 수행
+    _filterResults(query);
+    
+    // 서버에 저장
+    _saveKeyword(query);
   }
 
   void _deleteHistoryItem(String item) {
     setState(() {
       _searchHistory.remove(item);
     });
+    // 서버에서 삭제
+    if (gIsLoggedIn) {
+      SupabaseService.client
+          .from('search_history')
+          .delete()
+          .match({'user_id': gIdText, 'keyword': item})
+          .then((_) => print('검색어 서버 삭제 완료'))
+          .catchError((e) => print('검색어 서버 삭제 실패: $e'));
+    }
   }
 
   void _clearAllHistory() {
     setState(() {
       _searchHistory.clear();
     });
+    // 서버에서 전체 삭제
+    if (gIsLoggedIn) {
+      SupabaseService.client
+          .from('search_history')
+          .delete()
+          .eq('user_id', gIdText)
+          .then((_) => print('전체 검색 기록 서버 삭제 완료'))
+          .catchError((e) => print('전체 검색 기록 서버 삭제 실패: $e'));
+    }
   }
 
   @override
@@ -100,7 +158,14 @@ class _SearchScreenState extends State<SearchScreen> {
                           controller: _searchController,
                           autofocus: true,
                           style: const TextStyle(color: Colors.white),
-                          onChanged: _performSearch,
+                          onChanged: (val) {
+                            // 타자 칠 때는 검색 결과만 필터링 (서버 저장 X)
+                            _filterResults(val);
+                          },
+                          onSubmitted: (val) {
+                            // 엔터 눌렀을 때만 진짜 검색으로 인정하고 저장!
+                            _performSearch(val);
+                          },
                           decoration: const InputDecoration(
                             hintText: '질문 제목, 채널명, 태그 검색',
                             hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
@@ -195,10 +260,10 @@ class _SearchScreenState extends State<SearchScreen> {
         const SizedBox(height: 40),
         const Text('추천 카테고리', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        _categoryTile(Icons.shopping_bag_outlined, '패션 & 스타일', '3,452개의 질문'),
-        _categoryTile(Icons.restaurant_outlined, '맛집 & 카페', '1,245개의 질문'),
-        _categoryTile(Icons.favorite_border, '연애 & 고민', '2,890개의 질문'),
-        _categoryTile(Icons.flight_takeoff, '여행 & 라이프', '980개의 질문'),
+        _categoryTile(Icons.shopping_bag_outlined, '패션 & 스타일', '실시간 트렌드 확인'),
+        _categoryTile(Icons.restaurant_outlined, '맛집 & 카페', '주변 핫플레이스'),
+        _categoryTile(Icons.favorite_border, '연애 & 고민', '익명 고민 상담'),
+        _categoryTile(Icons.flight_takeoff, '여행 & 라이프', '여행 꿀팁 공유'),
       ],
     );
   }

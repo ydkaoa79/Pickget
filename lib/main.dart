@@ -76,7 +76,17 @@ class _MainScreenState extends State<MainScreen> {
     _fetchPostsFromSupabase();
     
     gShowLoginPopup = _showLoginPopup;
-    gOnLogout = _fetchPostsFromSupabase; // Register logout callback!
+    gOnLogout = () {
+      print('DEBUG [LOGOUT]: Logout triggered, clearing points and notifications...');
+      if (mounted) {
+        setState(() {
+          gUserPoints = 0;
+          _hasNewNotifications = false;
+          _notifications = [];
+        });
+      }
+      _fetchPostsFromSupabase();
+    };
     _startLoginTimer();
   }
 
@@ -86,6 +96,7 @@ class _MainScreenState extends State<MainScreen> {
       Set<String> likedPostIds = {};
       Set<String> bookmarkedPostIds = {};
       Set<String> followedUserIds = {};
+      
       
       if (gIsLoggedIn) {
         try {
@@ -107,6 +118,34 @@ class _MainScreenState extends State<MainScreen> {
               .eq('follower_id', gIdText);
           followedUserIds = userFollows.map((f) => f['following_id'].toString()).toSet();
 
+          // 1-2. 유저 포인트 잔액 가져오기
+          final profileData = await SupabaseService.client
+              .from('user_profiles')
+              .select('points')
+              .eq('user_id', gIdText)
+              .maybeSingle();
+          
+          if (profileData != null) {
+            setState(() {
+              gUserPoints = profileData['points'] ?? 0;
+            });
+            print('DEBUG [FETCH]: Points balance found: $gUserPoints');
+          } else {
+            // 지갑이 없으면 즉시 생성 (5,000 포인트 선물!)
+            print('DEBUG [FETCH]: No profile found. Creating one...');
+            await SupabaseService.client
+                .from('user_profiles')
+                .insert({'user_id': gIdText, 'points': 5000});
+            
+            await SupabaseService.client
+                .from('points_history')
+                .insert({'user_id': gIdText, 'amount': 5000, 'description': '신규 가입 축하 포인트 🎁'});
+            
+            setState(() {
+              gUserPoints = 5000;
+            });
+          }
+
           final List<dynamic> notifs = await SupabaseService.client
               .from('notifications')
               .select()
@@ -125,6 +164,7 @@ class _MainScreenState extends State<MainScreen> {
         setState(() {
           _notifications = [];
           _hasNewNotifications = false;
+          gUserPoints = 0; // 포인트도 0으로 초기화!
         });
       }
 
@@ -700,10 +740,10 @@ class _MainScreenState extends State<MainScreen> {
                               return;
                             }
                             HapticFeedback.lightImpact();
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => PointScreen(currentPoints: _userPoints)),
-                            );
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => PointScreen(currentPoints: gUserPoints)),
+                              );
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -712,7 +752,7 @@ class _MainScreenState extends State<MainScreen> {
                               children: [
                                 const Text('P ', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.w900, fontSize: 14)),
                                 Text(
-                                  _userPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"),
+                                  gUserPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"),
                                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
                                 ),
                               ],
@@ -861,7 +901,15 @@ class _MainScreenState extends State<MainScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const UploadScreen()),
-                );
+                ).then((_) async {
+                  // 1. 서버에서 최신 데이터 가져오기
+                  await _fetchPostsFromSupabase();
+                  
+                  // 2. 자동으로 첫 번째 페이지(새 글)로 이동!
+                  if (_pageController.hasClients) {
+                    _pageController.animateToPage(0, duration: const Duration(milliseconds: 600), curve: Curves.easeOutCubic);
+                  }
+                });
               },
               child: Container(
                 width: 36, height: 36, 

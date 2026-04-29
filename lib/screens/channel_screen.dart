@@ -261,8 +261,9 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
               Navigator.pop(context);
               setState(() {
                 gIsLoggedIn = false;
+                gUserPoints = 0; // 지갑 즉시 압수!
               });
-              gOnLogout?.call(); // Trigger the refresh on MainScreen!
+              gOnLogout?.call(); // 메인 화면에도 알림!
               Navigator.of(context).popUntil((route) => route.isFirst);
             },
             child: const Text('로그아웃', style: TextStyle(color: Colors.redAccent)),

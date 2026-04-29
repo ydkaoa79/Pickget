@@ -544,7 +544,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                                     Flexible(
                                       child: Text(
                                         widget.post.uploaderId, 
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, shadows: [Shadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 8, offset: const Offset(0, 1))]),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -556,7 +556,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                                   ],
                                 ),
                                 const SizedBox(height: 4),
-                                Text(widget.post.timeLocation, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                                Text(widget.post.timeLocation, style: TextStyle(color: Colors.white54, fontSize: 11, shadows: [Shadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 8, offset: const Offset(0, 1))])),
                               ],
                             ),
                           ),
@@ -568,14 +568,14 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                       children: [
                         const SizedBox(width: 15),
                         _statIcon(
-                          widget.post.isLiked ? Icons.favorite : Icons.favorite_border, 
+                          Icons.favorite, 
                           formatCount(widget.post.likesCount),
                           color: widget.post.isLiked ? Colors.redAccent : Colors.white,
                           onTap: widget.onLike,
                         ),
                         const SizedBox(width: 20),
                         _statIcon(
-                          Icons.chat_bubble_outline, 
+                          Icons.chat_bubble, 
                           formatCount(widget.post.commentsCount),
                           onTap: () {
                             print('DEBUG: Comment icon tapped for post_id: ${widget.post.id}');
@@ -588,7 +588,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         ),
                         const SizedBox(width: 20),
                         _statIcon(
-                          widget.post.isBookmarked ? Icons.bookmark : Icons.bookmark_border, 
+                          Icons.bookmark, 
                           '',
                           color: widget.post.isBookmarked ? Colors.amberAccent : Colors.white,
                           onTap: widget.onBookmark,
@@ -1123,7 +1123,10 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
         children: [
           Icon(isFollowing ? Icons.check : Icons.add, color: isFollowing ? Colors.white70 : Colors.white, size: 12),
           const SizedBox(width: 4),
-          Text(isFollowing ? '팔로잉' : '팔로우', style: TextStyle(color: isFollowing ? Colors.white70 : Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Text(isFollowing ? '팔로잉' : '팔로우', style: TextStyle(color: isFollowing ? Colors.white70 : Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );
@@ -1187,9 +1190,9 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 30), 
+          Icon(icon, color: color, size: 30, shadows: [Shadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 8, offset: const Offset(0, 1))]), 
           const SizedBox(height: 5), 
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900)),
+          Text(value, style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, shadows: [Shadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 8, offset: const Offset(0, 1))])),
         ],
       ),
     );

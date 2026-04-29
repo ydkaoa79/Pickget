@@ -9,6 +9,9 @@ bool gIsLoggedIn = false;
 VoidCallback? gShowLoginPopup;
 VoidCallback? gOnLogout;
 
+// 유저 포인트 전역 상태
+int gUserPoints = 0;
+
 // Utils
 String formatCount(int count) {
   if (count >= 1000000) {

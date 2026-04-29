@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'store_screen.dart';
+import '../services/supabase_service.dart';
+import '../core/app_state.dart';
 
 class PointHistoryItem {
   final String title;
@@ -24,24 +26,9 @@ class PointScreen extends StatefulWidget {
 }
 
 class _PointScreenState extends State<PointScreen> {
-  late int _userPoints;
   final ScrollController _scrollController = ScrollController();
-  final List<PointHistoryItem> _history = [
-    PointHistoryItem(title: '친구 초대 보상', amount: 500, date: '2026.04.27', isEarned: true),
-    PointHistoryItem(title: '출석 체크 보상', amount: 100, date: '2026.04.27', isEarned: true),
-    PointHistoryItem(title: '게시물 좋아요 보상', amount: 50, date: '2026.04.26', isEarned: true),
-    PointHistoryItem(title: '현금 인출 신청', amount: 10000, date: '2026.04.25', isEarned: false),
-    PointHistoryItem(title: '상품권 교환', amount: 5000, date: '2026.04.24', isEarned: false),
-    PointHistoryItem(title: '선택 참여 보상', amount: 10, date: '2026.04.23', isEarned: true),
-    PointHistoryItem(title: '이벤트 당첨 보너스', amount: 2000, date: '2026.04.20', isEarned: true),
-    PointHistoryItem(title: '친구 초대 보상', amount: 500, date: '2026.04.18', isEarned: true),
-    PointHistoryItem(title: '베스트 코디 선정', amount: 1000, date: '2026.04.15', isEarned: true),
-    PointHistoryItem(title: '광고 시청 보상', amount: 50, date: '2026.04.10', isEarned: true),
-    PointHistoryItem(title: '출석 체크 보상', amount: 100, date: '2026.04.05', isEarned: true),
-    PointHistoryItem(title: '상품권 교환', amount: 3000, date: '2026.04.01', isEarned: false),
-    PointHistoryItem(title: '게시물 좋아요 보상', amount: 50, date: '2026.03.25', isEarned: true),
-    PointHistoryItem(title: '친구 초대 보상', amount: 500, date: '2026.03.20', isEarned: true),
-  ];
+  List<PointHistoryItem> _history = [];
+  bool _isLoading = true;
 
   @override
   void dispose() {
@@ -60,7 +47,35 @@ class _PointScreenState extends State<PointScreen> {
   @override
   void initState() {
     super.initState();
-    _userPoints = widget.currentPoints;
+    _fetchHistory();
+  }
+
+  Future<void> _fetchHistory() async {
+    try {
+      final List<dynamic> data = await SupabaseService.client
+          .from('points_history')
+          .select()
+          .eq('user_id', gIdText)
+          .order('created_at', ascending: false);
+      
+      setState(() {
+        _history = data.map((item) {
+          final createdAt = DateTime.parse(item['created_at']);
+          final dateStr = "${createdAt.year}.${createdAt.month.toString().padLeft(2,'0')}.${createdAt.day.toString().padLeft(2,'0')}";
+          final amount = item['amount'] as int;
+          return PointHistoryItem(
+            title: item['description'] ?? '포인트 변동',
+            amount: amount.abs(),
+            date: dateStr,
+            isEarned: amount > 0,
+          );
+        }).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('포인트 내역 가져오기 실패: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -134,14 +149,14 @@ class _PointScreenState extends State<PointScreen> {
                         children: [
                           const Text('P', style: TextStyle(color: Colors.cyanAccent, fontSize: 24, fontWeight: FontWeight.w900)),
                           const SizedBox(width: 12),
-                          Text(
-                            _userPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"),
+                             Text(
+                            gUserPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"),
                             style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: -1),
                           ),
                         ],
                       ),
                       GestureDetector(
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => StoreScreen(userPoints: _userPoints))),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => StoreScreen(userPoints: gUserPoints))),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                           decoration: BoxDecoration(
@@ -177,7 +192,7 @@ class _PointScreenState extends State<PointScreen> {
                             Text('30일 이내 소멸 예정', style: TextStyle(color: Colors.white38, fontSize: 13, fontWeight: FontWeight.w500)),
                           ],
                         ),
-                        Text('150 P', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w800)),
+                        Text('0 P', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w800)),
                       ],
                     ),
                   ),

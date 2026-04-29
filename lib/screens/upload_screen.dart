@@ -3,9 +3,11 @@ import '../models/post_data.dart';
 import '../core/app_state.dart';
 import 'channel_screen.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import '../services/cloudflare_service.dart';
 import '../services/supabase_service.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart'; // kIsWeb 사용을 위해 추가
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -259,6 +261,30 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
+  Future<String?> _cropImage(String path) async {
+    final croppedFile = await ImageCropper().cropImage(
+      sourcePath: path,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1), // 1:1 비율 권장
+      compressFormat: ImageCompressFormat.jpg,
+      compressQuality: 70, // 편집 단계에서도 압축 적용!
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: '이미지 편집',
+          toolbarColor: Colors.black,
+          toolbarWidgetColor: Colors.cyanAccent,
+          initAspectRatio: CropAspectRatioPreset.square,
+          lockAspectRatio: false, // 자유 비율도 가능하게
+          activeControlsWidgetColor: Colors.cyanAccent,
+        ),
+        IOSUiSettings(
+          title: '이미지 편집',
+          aspectRatioLockEnabled: false,
+        ),
+      ],
+    );
+    return croppedFile?.path;
+  }
+
   Widget _sectionTitle(String title) {
     return Text(
       title, 
@@ -289,9 +315,18 @@ class _UploadScreenState extends State<UploadScreen> {
   Widget _abUploadCard(String label, String? path, Function(String) onPick) {
     return GestureDetector(
       onTap: () async {
-        final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+        // 1. 사진 고르기 (압축 적용)
+        final XFile? image = await _picker.pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 70, // 1차 압축!
+        );
+        
         if (image != null) {
-          onPick(image.path);
+          // 2. 편집하기 (자르기/회전)
+          final String? croppedPath = await _cropImage(image.path);
+          if (croppedPath != null) {
+            onPick(croppedPath);
+          }
         }
       },
       child: AspectRatio(
