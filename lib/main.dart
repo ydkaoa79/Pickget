@@ -988,7 +988,11 @@ class _MainScreenState extends State<MainScreen> {
                     )
                   ))
                 ).then((_) {
-                  if (mounted) setState(() {});
+                  if (mounted) {
+                    setState(() {
+                      _refreshRecommended();
+                    });
+                  }
                 });
               }, 
               child: gIsLoggedIn 

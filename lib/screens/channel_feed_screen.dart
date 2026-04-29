@@ -137,7 +137,9 @@ class _ChannelFeedScreenState extends State<ChannelFeedScreen> {
                         initialPost: post,
                       ),
                     ),
-                  );
+                  ).then((_) {
+                    if (mounted) setState(() {});
+                  });
                 },
               );
             },

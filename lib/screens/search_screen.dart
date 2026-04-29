@@ -504,7 +504,9 @@ class _SearchScreenState extends State<SearchScreen> {
                                           initialPost: post,
                                         ),
                                       ),
-                                    );
+                                    ).then((_) {
+                                      if (mounted) setState(() {});
+                                    });
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
