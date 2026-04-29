@@ -1073,8 +1073,15 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                             'user_image': gProfileImage,
                             'side': _votedSide,
                           });
+
+                          // ★ [제미나이 프로 X 정석 로봇] 게시물 테이블의 댓글 숫자도 실시간 업데이트!
+                          await SupabaseService.client
+                            .from('posts')
+                            .update({'comments_count': widget.post.commentsCount})
+                            .eq('id', widget.post.id);
+
                         } catch (e) {
-                          print('댓글 저장 실패: $e');
+                          print('댓글 저장 및 숫자 업데이트 실패: $e');
                         }
                       }
                       FocusManager.instance.primaryFocus?.unfocus();
@@ -1141,8 +1148,15 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         'user_image': gProfileImage,
                         'side': _votedSide,
                       });
+
+                      // ★ [제미나이 프로 X 정석 로봇] 게시물 테이블의 댓글 숫자도 실시간 업데이트!
+                      await SupabaseService.client
+                        .from('posts')
+                        .update({'comments_count': widget.post.commentsCount})
+                        .eq('id', widget.post.id);
+
                     } catch (e) {
-                      print('댓글 저장 실패: $e');
+                      print('댓글 저장 및 숫자 업데이트 실패: $e');
                     }
                   }
                   FocusManager.instance.primaryFocus?.unfocus();

@@ -100,32 +100,72 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> fetchPosts() async {
     try {
-      // 1. Fetch user-specific data ONLY if logged in
       Set<String> likedPostIds = {};
       Set<String> bookmarkedPostIds = {};
       Set<String> followedUserIds = {};
       
-      
       if (gIsLoggedIn) {
         try {
-          // 🏛️ '테스트용' 시리즈 정석 통합 작전!
+          // (참고: 테스트용 계정 처리 로직)
           if (gIdText.startsWith('테스트용')) {
-            // 1. 모든 '테스트용' 계열 글/댓글 주민번호를 진짜로 통일!
             await SupabaseService.client.from('posts').update({'uploader_internal_id': '3ee25993-1578-4283-a99b-109a51fe5f78'}).ilike('uploader_id', '테스트용%'); 
             await SupabaseService.client.from('comments').update({'user_internal_id': '3ee25993-1578-4283-a99b-109a51fe5f78'}).ilike('user_id', '테스트용%');
-
-            // 2. 가짜 신분증(중복 프로필) 삭제
             await SupabaseService.client.from('user_profiles').delete().eq('user_id', gIdText).neq('id', '3ee25993-1578-4283-a99b-109a51fe5f78');
-
-            // 3. 진짜 신분증의 이름표를 현재 아이디로 업데이트!
             await SupabaseService.client.from('user_profiles').update({'user_id': gIdText}).eq('id', '3ee25993-1578-4283-a99b-109a51fe5f78');
           }
+
+          // 1. 프로필 정보부터 확정
+          Map<String, dynamic>? profileData;
+          if (gUserInternalId != null) {
+            profileData = await SupabaseService.client
+                .from('user_profiles')
+                .select('id, points, user_id, nickname, profile_image, bio')
+                .eq('id', gUserInternalId!)
+                .maybeSingle();
+          }
           
-          final List<dynamic> userLikes = await SupabaseService.client
-              .from('likes')
-              .select('post_id')
-              .eq('user_id', gIdText);
-          likedPostIds = userLikes.map((l) => l['post_id'].toString()).toSet();
+          if (profileData == null) {
+            profileData = await SupabaseService.client
+                .from('user_profiles')
+                .select('id, points, user_id, nickname, profile_image, bio')
+                .eq('user_id', gIdText)
+                .maybeSingle();
+          }
+          
+          if (profileData != null) {
+            setState(() {
+              gUserInternalId = profileData!['id'].toString();
+              gUserPoints = profileData['points'] ?? 0;
+              gIdText = profileData['user_id'] ?? gIdText;
+              gNameText = profileData['nickname'] ?? gNameText;
+              gProfileImage = profileData['profile_image'] ?? gProfileImage;
+              gBioText = profileData['bio'] ?? gBioText;
+            });
+          } else {
+            final newProfile = await SupabaseService.client
+                .from('user_profiles')
+                .insert({
+                  'user_id': gIdText, 
+                  'points': 5000,
+                  'nickname': gNameText,
+                  'profile_image': gProfileImage,
+                })
+                .select()
+                .single();
+            setState(() {
+              gUserPoints = 5000;
+              gUserInternalId = newProfile['id'].toString();
+            });
+          }
+
+          // 2. ID가 완벽히 준비된 지금, 하트/즐겨찾기/팔로우 소환
+          if (gUserInternalId != null) {
+            final List<dynamic> userLikes = await SupabaseService.client
+                .from('likes')
+                .select('post_id')
+                .eq('user_internal_id', gUserInternalId!); 
+            likedPostIds = userLikes.map((l) => l['post_id'].toString()).toSet();
+          }
 
           final List<dynamic> userBookmarks = await SupabaseService.client
               .from('bookmarks')
@@ -139,77 +179,26 @@ class _MainScreenState extends State<MainScreen> {
               .eq('follower_id', gIdText);
           followedUserIds = userFollows.map((f) => f['following_id'].toString()).toSet();
 
-          print('DEBUG [PROFILE]: Initializing for User ID: $gUserInternalId (Handle: $gIdText)');
-          
-          Map<String, dynamic>? profileData;
-          
-          // 1. 주민번호(Internal ID)가 있다면 그것으로 주인님을 먼저 찾습니다. (정석!)
-          if (gUserInternalId != null) {
-            profileData = await SupabaseService.client
-                .from('user_profiles')
-                .select('id, points, user_id, nickname, profile_image, bio')
-                .eq('id', gUserInternalId!)
-                .maybeSingle();
-          }
-          
-          // 2. 주민번호로 못 찾았거나 처음인 경우만 아이디(핸들)로 찾습니다.
-          if (profileData == null) {
-            profileData = await SupabaseService.client
-                .from('user_profiles')
-                .select('id, points, user_id, nickname, profile_image, bio')
-                .eq('user_id', gIdText)
-                .maybeSingle();
-          }
-          
-          if (profileData != null) {
-            print('DEBUG [PROFILE]: SUCCESS! Data: $profileData');
-            setState(() {
-              gUserInternalId = profileData!['id'].toString();
-              gUserPoints = profileData['points'] ?? 0;
-              gIdText = profileData['user_id'] ?? gIdText;
-              gNameText = profileData['nickname'] ?? gNameText;
-              gProfileImage = profileData['profile_image'] ?? gProfileImage;
-              gBioText = profileData['bio'] ?? gBioText;
-            });
-          } else {
-            print('DEBUG [PROFILE]: NOT FOUND! Creating new profile...');
-            // ... (생성 로직 동일)
-            final newProfile = await SupabaseService.client
-                .from('user_profiles')
-                .insert({
-                  'user_id': gIdText, 
-                  'points': 5000,
-                  'nickname': gNameText,
-                  'profile_image': gProfileImage,
-                })
-                .select()
-                .single();
-            print('DEBUG [PROFILE]: CREATED! New ID: ${newProfile['id']}');
-            setState(() {
-              gUserPoints = 5000;
-              gUserInternalId = newProfile['id'].toString();
-            });
-          }
-
+          // 3. 알림 내역 가져오기
           final List<dynamic> notifs = await SupabaseService.client
               .from('notifications')
               .select()
               .eq('user_id', gIdText)
               .order('created_at', ascending: false);
-          
+              
           setState(() {
             _notifications = List<Map<String, dynamic>>.from(notifs);
             _hasNewNotifications = _notifications.any((n) => n['is_read'] == false);
           });
+
         } catch (e) {
           print('개인 데이터 가져오기 실패: $e');
         }
       } else {
-        // Clear all personal data on logout!
         setState(() {
           _notifications = [];
           _hasNewNotifications = false;
-          gUserPoints = 0; // 포인트도 0으로 초기화!
+          gUserPoints = 0; 
         });
       }
 
