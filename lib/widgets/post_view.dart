@@ -17,6 +17,7 @@ class PostView extends StatefulWidget {
   final VoidCallback onDontRecommendChannel;
   final Function(String reason) onReport;
   final Function(int side) onVote;
+  final Function(String postId) onDelete;
   final VoidCallback? onProfileTap;
 
   const PostView({
@@ -29,6 +30,7 @@ class PostView extends StatefulWidget {
     required this.onDontRecommendChannel, 
     required this.onReport, 
     required this.onVote, 
+    required this.onDelete,
     this.onProfileTap
   });
   @override
@@ -94,6 +96,48 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   void dispose() {
     _countdownTimer?.cancel();
     super.dispose();
+  }
+
+  bool get isMe {
+    String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
+    String myId = normalized('나의 픽겟');
+    String uploaderId = normalized(widget.post.uploaderId);
+    return uploaderId == myId || widget.post.uploaderId == 'me' || uploaderId == normalized(gIdText);
+  }
+
+  Future<void> _deletePost() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1C),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text('게시물 삭제', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text('이 게시물을 정말 삭제하시겠습니까? 삭제 후에는 복구할 수 없습니다.', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소', style: TextStyle(color: Colors.white38))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true), 
+            child: const Text('삭제', style: TextStyle(color: Colors.redAccent))
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        final dynamic targetId = int.tryParse(widget.post.id) ?? widget.post.id;
+        await SupabaseService.client.from('posts').delete().eq('id', targetId);
+        widget.onDelete(widget.post.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('게시물이 삭제되었습니다.')));
+        }
+      } catch (e) {
+        debugPrint('Delete error: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('삭제 중 오류가 발생했습니다.')));
+        }
+      }
+    }
   }
 
   void _triggerPointToast() {
@@ -249,116 +293,91 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
             children: [
               Row(
                 children: [
+                  // 왼쪽 A 구역 (창문 역할)
                   AnimatedContainer(
                     duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
                     curve: Curves.easeOutCubic, 
                     width: currentWidthA, 
-                    height: sh, 
+                    height: sh,
+                    clipBehavior: Clip.hardEdge, // 창문 밖으로 나가는 건 자름
+                    decoration: const BoxDecoration(color: Colors.black),
                     child: Stack(
                       children: [
+                        // 배경 블러 (창문 뒤에 꽉 참)
                         Positioned.fill(
                           child: ImageFiltered(
-                            imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                            imageFilter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
                             child: widget.post.imageA.trim().contains('http')
                               ? Image.network(widget.post.imageA.trim(), fit: BoxFit.cover)
                               : Image.asset(widget.post.imageA.trim(), fit: BoxFit.cover),
                           ),
                         ),
-                        Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.4))),
+                        Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.3))),
+                        // 전경 이미지 (창문 너비에 상관없이 80% 크기로 고정되어 있음)
+                        Center(
+                          child: OverflowBox(
+                            maxWidth: sw * 0.8, // 이미지는 항상 화면의 80% 크기!
+                            minWidth: sw * 0.8,
+                            child: widget.post.imageA.trim().contains('http')
+                              ? Image.network(widget.post.imageA.trim(), fit: BoxFit.cover)
+                              : Image.asset(widget.post.imageA.trim(), fit: BoxFit.cover),
+                          ),
+                        ),
                       ],
                     ),
                   ),
+                  // 오른쪽 B 구역 (창문 역할)
                   AnimatedContainer(
                     duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
                     curve: Curves.easeOutCubic, 
                     width: (sw - currentWidthA).clamp(0.0, sw), 
-                    height: sh, 
+                    height: sh,
+                    clipBehavior: Clip.hardEdge, // 창문 밖으로 나가는 건 자름
+                    decoration: const BoxDecoration(color: Colors.black),
                     child: Stack(
                       children: [
+                        // 배경 블러
                         Positioned.fill(
                           child: ImageFiltered(
-                            imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                            imageFilter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
                             child: widget.post.imageB.trim().contains('http')
                               ? Image.network(widget.post.imageB.trim(), fit: BoxFit.cover)
                               : Image.asset(widget.post.imageB.trim(), fit: BoxFit.cover),
                           ),
                         ),
-                        Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.4))),
+                        Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.3))),
+                        // 전경 이미지 (80% 크기로 고정)
+                        Center(
+                          child: OverflowBox(
+                            maxWidth: sw * 0.8, // 이미지는 항상 화면의 80% 크기!
+                            minWidth: sw * 0.8,
+                            child: widget.post.imageB.trim().contains('http')
+                              ? Image.network(widget.post.imageB.trim(), fit: BoxFit.cover)
+                              : Image.asset(widget.post.imageB.trim(), fit: BoxFit.cover),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
-              Positioned.fill(
-                child: Transform.translate(
-                  offset: const Offset(0, -25),
-                  child: Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      ConstrainedBox(
-                        constraints: BoxConstraints(maxHeight: sh * 0.7), 
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start, 
-                          children: [
-                            AnimatedContainer(
-                              duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
-                              curve: Curves.easeOutCubic, 
-                              width: currentWidthA, 
-                              child: ClipRect(
-                                child: UnconstrainedBox(
-                                  clipBehavior: Clip.hardEdge,
-                                  alignment: Alignment.topCenter,
-                                  child: SizedBox(
-                                    width: sw * 0.8,
-                                    child: widget.post.imageA.trim().contains('http')
-                                      ? Image.network(widget.post.imageA.trim(), fit: BoxFit.fitWidth, alignment: Alignment.topCenter)
-                                      : Image.asset(widget.post.imageA.trim(), fit: BoxFit.fitWidth, alignment: Alignment.topCenter),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            AnimatedContainer(
-                              duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
-                              curve: Curves.easeOutCubic, 
-                              width: (sw - currentWidthA).clamp(0.0, sw), 
-                              child: ClipRect(
-                                child: UnconstrainedBox(
-                                  clipBehavior: Clip.hardEdge,
-                                  alignment: Alignment.topCenter,
-                                  child: SizedBox(
-                                    width: sw * 0.8,
-                                    child: widget.post.imageB.trim().contains('http')
-                                      ? Image.network(widget.post.imageB.trim(), fit: BoxFit.fitWidth, alignment: Alignment.topCenter)
-                                      : Image.asset(widget.post.imageB.trim(), fit: BoxFit.fitWidth, alignment: Alignment.topCenter),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+              // 2. 중앙 VS 아이콘
+              AnimatedPositioned(
+                duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
+                curve: Curves.easeOutCubic, 
+                left: (currentWidthA - 24).clamp(-24.0, sw - 24.0), 
+                top: sh / 2 - 24,
+                child: IgnorePointer(
+                  child: Container(
+                    width: 48, height: 48, 
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.18)), 
+                    child: ClipOval(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12), 
+                        child: const Center(child: Text('VS', style: TextStyle(color: Colors.cyanAccent, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -1))),
                       ),
-                      AnimatedPositioned(
-                        duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
-                        curve: Curves.easeOutCubic, 
-                        left: (currentWidthA - 24).clamp(-24.0, sw - 24.0), 
-                        child: IgnorePointer(
-                          child: Container(
-                            width: 48, height: 48, 
-                            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.18)), 
-                            child: ClipOval(
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12), 
-                                child: const Center(child: Text('VS', style: TextStyle(color: Colors.cyanAccent, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -1))),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
                 ),
               ),
               IgnorePointer(child: Container(color: Colors.black.withValues(alpha: 0.15))),
@@ -413,6 +432,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                                 widget.onDontRecommendChannel();
                               } else if (value == '신고') {
                                 _showReportSheet(context);
+                              } else if (value == '삭제') {
+                                _deletePost();
                               }
                             },
                             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[

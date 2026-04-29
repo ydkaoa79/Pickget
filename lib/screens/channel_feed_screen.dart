@@ -114,6 +114,15 @@ class _ChannelFeedScreenState extends State<ChannelFeedScreen> {
                     post.userVotedSide = side;
                   });
                 },
+                onDelete: (postId) {
+                  setState(() {
+                    widget.channelPosts.removeWhere((p) => p.id == postId);
+                    widget.allPosts.removeWhere((p) => p.id == postId);
+                    if (widget.channelPosts.isEmpty) {
+                      Navigator.pop(context);
+                    }
+                  });
+                },
                 onProfileTap: () {
                   if (!gIsLoggedIn) {
                     gShowLoginPopup?.call();

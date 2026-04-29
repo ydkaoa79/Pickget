@@ -634,6 +634,12 @@ class _MainScreenState extends State<MainScreen> {
                     post.userVotedSide = side;
                   });
                 },
+                onDelete: (postId) {
+                  setState(() {
+                    _posts.removeWhere((p) => p.id == postId);
+                    _refreshRecommended();
+                  });
+                },
                 onProfileTap: () {
                   if (!gIsLoggedIn) {
                     _showLoginPopup();
@@ -649,7 +655,12 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     ),
                   ).then((_) {
-                    if (mounted) setState(() {});
+                    if (mounted) {
+                      setState(() {
+                        // 채널 화면에서 게시물이 삭제되었을 수 있으므로 추천 목록 등을 동기화
+                        _refreshRecommended();
+                      });
+                    }
                   });
                 },
               );

@@ -264,16 +264,13 @@ class _UploadScreenState extends State<UploadScreen> {
   Future<String?> _cropImage(String path) async {
     final croppedFile = await ImageCropper().cropImage(
       sourcePath: path,
-      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1), // 1:1 비율 권장
-      compressFormat: ImageCompressFormat.jpg,
-      compressQuality: 70, // 편집 단계에서도 압축 적용!
       uiSettings: [
         AndroidUiSettings(
           toolbarTitle: '이미지 편집',
           toolbarColor: Colors.black,
           toolbarWidgetColor: Colors.cyanAccent,
-          initAspectRatio: CropAspectRatioPreset.square,
-          lockAspectRatio: false, // 자유 비율도 가능하게
+          initAspectRatio: CropAspectRatioPreset.original,
+          lockAspectRatio: false, 
           activeControlsWidgetColor: Colors.cyanAccent,
         ),
         IOSUiSettings(
