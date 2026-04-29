@@ -18,6 +18,7 @@ import 'services/supabase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  print('DEBUG: App starting with latest comment system code! (Ver. 1.0)');
   await SupabaseService.initialize();
   runApp(const PickGetApp());
 }
@@ -66,6 +67,7 @@ class _MainScreenState extends State<MainScreen> {
   int _userPoints = 0;
   int _selectedTopTabIndex = 0;
   bool _hasNewNotifications = true;
+  List<Map<String, dynamic>> _notifications = []; // Add this list!
 
   @override
   void initState() {
@@ -74,44 +76,127 @@ class _MainScreenState extends State<MainScreen> {
     _fetchPostsFromSupabase();
     
     gShowLoginPopup = _showLoginPopup;
+    gOnLogout = _fetchPostsFromSupabase; // Register logout callback!
     _startLoginTimer();
   }
 
   Future<void> _fetchPostsFromSupabase() async {
     try {
+      // 1. Fetch user-specific data ONLY if logged in
+      Set<String> likedPostIds = {};
+      Set<String> bookmarkedPostIds = {};
+      
+      if (gIsLoggedIn) {
+        try {
+          final List<dynamic> userLikes = await SupabaseService.client
+              .from('likes')
+              .select('post_id')
+              .eq('user_id', gIdText);
+          likedPostIds = userLikes.map((l) => l['post_id'].toString()).toSet();
+
+          final List<dynamic> userBookmarks = await SupabaseService.client
+              .from('bookmarks')
+              .select('post_id')
+              .eq('user_id', gIdText);
+          bookmarkedPostIds = userBookmarks.map((b) => b['post_id'].toString()).toSet();
+
+          final List<dynamic> notifs = await SupabaseService.client
+              .from('notifications')
+              .select()
+              .eq('user_id', gIdText)
+              .order('created_at', ascending: false);
+          
+          setState(() {
+            _notifications = List<Map<String, dynamic>>.from(notifs);
+            _hasNewNotifications = _notifications.any((n) => n['is_read'] == false);
+          });
+        } catch (e) {
+          print('개인 데이터 가져오기 실패: $e');
+        }
+      } else {
+        // Clear all personal data on logout!
+        setState(() {
+          _notifications = [];
+          _hasNewNotifications = false;
+        });
+      }
+
+      // 2. Fetch all posts (always)
       final List<dynamic> data = await SupabaseService.client
           .from('posts')
           .select()
           .order('created_at', ascending: false);
       
-      final loadedPosts = data.map((json) => PostData(
-        id: json['id'].toString(),
-        title: json['title'] ?? '제목 없음',
-        uploaderId: json['uploader_id'] ?? '익명',
-        uploaderImage: json['uploader_image'] ?? 'assets/profiles/profile_11.jpg',
-        timeLocation: '방금 전',
-        imageA: json['image_a'] ?? '',
-        imageB: json['image_b'] ?? '',
-        descriptionA: json['description_a'] ?? '선택지 A',
-        descriptionB: json['description_b'] ?? '선택지 B',
-        fullDescription: json['full_description'] ?? '',
-        likesCount: json['likes_count'] ?? 0,
-        commentsCount: json['comments_count'] ?? 0,
-        voteCountA: (json['vote_count_a'] ?? 0).toString(),
-        voteCountB: (json['vote_count_b'] ?? 0).toString(),
-        percentA: '50%', // Placeholder, should be calculated
-        percentB: '50%', // Placeholder, should be calculated
-        tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
-        isExpired: json['is_expired'] ?? false,
-      )).toList();
+      final loadedPosts = data.map((json) {
+        final post = PostData(
+          id: json['id'].toString(),
+          title: json['title'] ?? '제목 없음',
+          uploaderId: json['uploader_id'] ?? '익명',
+          uploaderImage: json['uploader_image'] ?? 'assets/profiles/profile_11.jpg',
+          timeLocation: '방금 전',
+          imageA: json['image_a'] ?? '',
+          imageB: json['image_b'] ?? '',
+          descriptionA: json['description_a'] ?? '선택지 A',
+          descriptionB: json['description_b'] ?? '선택지 B',
+          fullDescription: json['full_description'] ?? '',
+          likesCount: json['likes_count'] ?? 0,
+          commentsCount: json['comments_count'] ?? 0,
+          voteCountA: (json['vote_count_a'] ?? 0).toString(),
+          voteCountB: (json['vote_count_b'] ?? 0).toString(),
+          percentA: '50%', // Placeholder
+          percentB: '50%', // Placeholder
+          isLiked: gIsLoggedIn && likedPostIds.contains(json['id'].toString()),
+          isBookmarked: gIsLoggedIn && bookmarkedPostIds.contains(json['id'].toString()), // Apply bookmark state!
+          tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+          isExpired: () {
+            bool exp = json['is_expired'] ?? false;
+            if (exp) return true;
+            final tags = (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            final createdAtStr = json['created_at'];
+            if (createdAtStr != null) {
+              final createdAt = DateTime.tryParse(createdAtStr);
+              if (createdAt != null) {
+                for (var tag in tags) {
+                  if (tag.startsWith('duration:')) {
+                    final mins = int.tryParse(tag.split(':')[1]);
+                    if (mins != null && DateTime.now().isAfter(createdAt.add(Duration(minutes: mins)))) {
+                      return true;
+                    }
+                  }
+                }
+              }
+            }
+            return false;
+          }(),
+          durationMinutes: () {
+            int? dm = json['duration_minutes'];
+            if (dm != null) return dm;
+            final tags = (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [];
+            for (var tag in tags) {
+              if (tag.startsWith('duration:')) return int.tryParse(tag.split(':')[1]);
+            }
+            return null;
+          }(),
+          createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
+          isHidden: (json['tags'] as List?)?.contains('#hidden#') ?? false,
+        );
+        
+        if (post.id == '5ffdae62-7072-4ee9-9476-c18aa8afc733') {
+          print('DEBUG [MAIN]: Post 5ffdae62 comments_count: ${post.commentsCount}, isLiked: ${post.isLiked}');
+        }
+        return post;
+      }).toList();
 
       setState(() {
-        _posts = loadedPosts;
+        _posts = loadedPosts.where((p) {
+          String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
+          bool isMine = normalized(p.uploaderId) == normalized('나의 픽겟') || p.uploaderId == 'me';
+          return isMine || !p.isHidden;
+        }).toList();
         _refreshRecommended();
       });
     } catch (e) {
       print('Error fetching posts: $e');
-      // If fail, maybe keep empty or show error
     }
   }
 
@@ -248,6 +333,7 @@ class _MainScreenState extends State<MainScreen> {
                     iconSize: 28, 
                     onTap: () async {
                       setState(() { gIsLoggedIn = true; });
+                      _fetchPostsFromSupabase();
                       Navigator.pop(context);
                       
                       // Show Profile Setup after login
@@ -272,6 +358,7 @@ class _MainScreenState extends State<MainScreen> {
                     fontWeight: FontWeight.bold,
                     onTap: () async {
                       setState(() { gIsLoggedIn = true; });
+                      _fetchPostsFromSupabase();
                       Navigator.pop(context);
                       
                       final result = await Navigator.push(
@@ -296,6 +383,7 @@ class _MainScreenState extends State<MainScreen> {
                     letterSpacing: 0.5,
                     onTap: () async {
                       setState(() { gIsLoggedIn = true; });
+                      _fetchPostsFromSupabase();
                       Navigator.pop(context);
                       
                       final result = await Navigator.push(
@@ -354,22 +442,58 @@ class _MainScreenState extends State<MainScreen> {
             itemBuilder: (context, index) {
               final post = filteredList[index];
               return PostView(
-                key: ValueKey(post.id),
+                key: ValueKey('${post.id}_$gIsLoggedIn'), // Force rebuild on login/logout!
                 post: post,
-                onLike: () { 
+                onLike: () async { 
                   if (!gIsLoggedIn) {
                     _showLoginPopup();
                     return;
                   }
+                  final bool nowLiked = !post.isLiked;
                   setState(() { 
-                    post.isLiked = !post.isLiked; 
-                    if (post.isLiked) {
+                    post.isLiked = nowLiked; 
+                    if (nowLiked) {
                       post.likesCount++;
                     } else {
                       post.likesCount--;
                     }
                     HapticFeedback.lightImpact();
                   }); 
+
+                  try {
+                    // 1. Insert or Delete from likes table FIRST
+                    if (nowLiked) {
+                      await SupabaseService.client
+                        .from('likes')
+                        .insert({'user_id': gIdText, 'post_id': post.id});
+                    } else {
+                      await SupabaseService.client
+                        .from('likes')
+                        .delete()
+                        .match({'user_id': gIdText, 'post_id': post.id});
+                    }
+
+                    // 2. Fetch the REAL count from the likes table
+                    final likesResponse = await SupabaseService.client
+                      .from('likes')
+                      .select('*')
+                      .eq('post_id', post.id);
+                    
+                    final int realCount = (likesResponse as List).length;
+
+                    // 3. Update the posts table with the real count
+                    await SupabaseService.client
+                      .from('posts')
+                      .update({'likes_count': realCount})
+                      .eq('id', post.id);
+                    
+                    setState(() {
+                      post.likesCount = realCount;
+                    });
+                    print('DEBUG [LIKE]: Real likes count synced: $realCount');
+                  } catch (e) {
+                    print('좋아요 서버 동기화 에러 상세: $e');
+                  }
                 },
                 onFollow: () { 
                   if (!gIsLoggedIn) {
@@ -377,7 +501,6 @@ class _MainScreenState extends State<MainScreen> {
                     return;
                   }
                   setState(() { 
-                    // 동일한 업로더의 모든 포스트 팔로우 상태 업데이트
                     for (var p in _posts) {
                       if (p.uploaderId == post.uploaderId) {
                         p.isFollowing = !post.isFollowing;
@@ -386,15 +509,32 @@ class _MainScreenState extends State<MainScreen> {
                     HapticFeedback.mediumImpact();
                   }); 
                 },
-                onBookmark: () { 
+                onBookmark: () async { 
                   if (!gIsLoggedIn) {
                     _showLoginPopup();
                     return;
                   }
+                  final bool nowBookmarked = !post.isBookmarked;
                   setState(() { 
-                    post.isBookmarked = !post.isBookmarked; 
+                    post.isBookmarked = nowBookmarked; 
                     HapticFeedback.selectionClick();
-                  }); 
+                  });
+
+                  try {
+                    if (nowBookmarked) {
+                      await SupabaseService.client
+                        .from('bookmarks')
+                        .insert({'user_id': gIdText, 'post_id': post.id});
+                    } else {
+                      await SupabaseService.client
+                        .from('bookmarks')
+                        .delete()
+                        .match({'user_id': gIdText, 'post_id': post.id});
+                    }
+                    print('DEBUG [BOOKMARK]: Sync SUCCESS for post: ${post.id}');
+                  } catch (e) {
+                    print('즐겨찾기 동기화 에러: $e');
+                  }
                 },
                 onNotInterested: () {
                   setState(() {
@@ -733,9 +873,34 @@ class _MainScreenState extends State<MainScreen> {
                   _showLoginPopup();
                   return;
                 }
+                // 게시물이 없을 경우를 대비한 안전한 이동 로직
+                PostData? firstPost = _posts.isNotEmpty ? _posts.first : null;
+                
                 Navigator.push(
                   context, 
-                  MaterialPageRoute(builder: (context) => ChannelScreen(uploaderId: '나의 픽겟', allPosts: _posts, initialPost: _posts.first))
+                  MaterialPageRoute(builder: (context) => ChannelScreen(
+                    uploaderId: '나의픽겟', 
+                    allPosts: _posts, 
+                    initialPost: firstPost ?? PostData(
+                      id: 'dummy', 
+                      uploaderId: '나의픽겟', 
+                      uploaderImage: gProfileImage,
+                      title: '첫 포스트를 올려보세요!',
+                      timeLocation: '방금 전',
+                      imageA: 'assets/images/placeholder.png',
+                      imageB: 'assets/images/placeholder.png',
+                      descriptionA: '',
+                      descriptionB: '',
+                      likesCount: 0,
+                      commentsCount: 0,
+                      voteCountA: '0',
+                      voteCountB: '0',
+                      percentA: '50%',
+                      percentB: '50%',
+                      fullDescription: '',
+                      comments: [],
+                    )
+                  ))
                 ).then((_) {
                   if (mounted) setState(() {});
                 });
@@ -770,17 +935,31 @@ class _MainScreenState extends State<MainScreen> {
               const Text('알림', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
               const Divider(color: Colors.white10, height: 30),
               Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    _notificationItem(Icons.campaign, Colors.cyanAccent, '[공지] PickGet 베타 서비스 오픈! 환영합니다. ✨', '방금 전'),
-                    _notificationItem(Icons.check_circle, Colors.amberAccent, '선택 종료: "휴양지 패션 추천좀!" 결과가 나왔습니다! 🏆', '10분 전'),
-                    _notificationItem(Icons.chat_bubble, Colors.blueAccent, '내 댓글에 답글이 달렸습니다: "진짜 공감되네요!"', '1시간 전'),
-                    _notificationItem(Icons.check_circle, Colors.amberAccent, '선택 종료: "운동복 뭐가 나을까?" 결과를 확인해보세요.', '2시간 전'),
-                    _notificationItem(Icons.savings, Colors.greenAccent, '데일리 Pick 보너스 10P가 적립되었습니다. 💰', '3시간 전'),
-                    _notificationItem(Icons.favorite, Colors.redAccent, '내 게시물 "오늘 저녁 뭐 먹지?"에 좋아요 100개 돌파!', '5시간 전'),
-                  ],
-                ),
+                child: _notifications.isEmpty 
+                  ? const Center(child: Text('새로운 알림이 없습니다.', style: TextStyle(color: Colors.white38)))
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _notifications.length,
+                      itemBuilder: (context, index) {
+                        final n = _notifications[index];
+                        IconData icon;
+                        Color color;
+                        switch (n['type']) {
+                          case 'info': icon = Icons.campaign; color = Colors.cyanAccent; break;
+                          case 'win': icon = Icons.check_circle; color = Colors.amberAccent; break;
+                          case 'comment': icon = Icons.chat_bubble; color = Colors.blueAccent; break;
+                          case 'like': icon = Icons.favorite; color = Colors.redAccent; break;
+                          default: icon = Icons.notifications; color = Colors.white54;
+                        }
+                        
+                        return _notificationItem(
+                          icon, 
+                          color, 
+                          n['message'] ?? n['title'] ?? '', 
+                          '방금 전' // In real app, format n['created_at']
+                        );
+                      },
+                    ),
               ),
             ],
           ),

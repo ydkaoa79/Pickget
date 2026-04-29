@@ -6,6 +6,7 @@ import 'upload_screen.dart';
 import 'activity_analysis_screen.dart';
 import 'edit_profile_screen.dart';
 import 'channel_feed_screen.dart';
+import '../services/supabase_service.dart';
 
 class ChannelScreen extends StatefulWidget {
   final String uploaderId;
@@ -29,15 +30,23 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
   late TabController _tabController;
   late List<PostData> _channelPosts;
   bool _isBioExpanded = false;
-
-  // Selection Mode State
   bool _isSelectionMode = false;
   final Set<String> _selectedPostIds = {};
+
+  bool get isMe {
+    String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
+    return normalized(widget.uploaderId) == normalized('나의 픽겟') || widget.uploaderId == 'me';
+  }
 
   @override
   void initState() {
     super.initState();
-    if (widget.uploaderId == '나의 픽겟') { _dName = gNameText; _dImg = gProfileImage; _dBio = gBioText; }
+    // ID 정규화 (공백, @, _ 제거)
+    String normalizedId(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
+    String myId = normalizedId('나의픽겟');
+    String targetId = normalizedId(widget.uploaderId);
+
+    if (targetId == myId) { _dName = gNameText; _dImg = gProfileImage; _dBio = gBioText; }
     else { _dName = widget.uploaderId; _dImg = widget.initialPost.uploaderImage; _dBio = '안녕하세요! ${widget.uploaderId}의 픽겟 공간입니다. ✨'; _isFollowing = widget.initialPost.isFollowing; }
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabSelection);
@@ -45,21 +54,16 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
   }
 
   void _loadPosts() {
+    String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
+    String currentChannelId = normalized(widget.uploaderId);
+    String myId = normalized('나의 픽겟');
+
     setState(() {
       _channelPosts = widget.allPosts.where((p) {
-        bool isUploader = p.uploaderId == widget.uploaderId;
-        if (widget.uploaderId == '나의 픽겟') {
-          return isUploader; // Show all (including hidden) for self
-        } else {
-          return isUploader && !p.isHidden; // Hide hidden posts for others
-        }
+        String postUploaderId = normalized(p.uploaderId);
+        bool isUploader = postUploaderId == currentChannelId || (isMe && postUploaderId == myId);
+        return isMe ? isUploader : (isUploader && !p.isHidden);
       }).toList();
-      
-      if (!_channelPosts.any((p) => p.id == widget.initialPost.id) && widget.initialPost.uploaderId == widget.uploaderId) {
-        if (widget.uploaderId == '나의 픽겟' || !widget.initialPost.isHidden) {
-          _channelPosts.insert(0, widget.initialPost);
-        }
-      }
     });
   }
 
@@ -80,50 +84,11 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
               const SizedBox(height: 10),
               Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 20),
-              _menuItem(Icons.select_all, '전체 선택', () {
-                Navigator.pop(context);
-                setState(() {
-                  _selectedPostIds.addAll(_channelPosts.map((p) => p.id));
-                  _isSelectionMode = true;
-                });
-              }),
-              _menuItem(Icons.deselect, '전체 해제', () {
-                Navigator.pop(context);
-                setState(() {
-                  _selectedPostIds.clear();
-                  _isSelectionMode = false;
-                });
-              }),
-              _menuItem(Icons.share, '공유하기', () {
-                Navigator.pop(context);
-                if (_selectedPostIds.length != 1) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('공유는 한 개의 포스트를 선택했을 때만 가능합니다.')));
-                  return;
-                }
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('게시물 링크가 복사되었습니다.')));
-              }, color: _selectedPostIds.length == 1 ? Colors.white : Colors.white24),
-              _menuItem(Icons.visibility_off, '숨기기 / 보이기', () {
-                Navigator.pop(context);
-                if (_selectedPostIds.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('편집할 포스트를 선택해주세요.')));
-                  return;
-                }
-                _toggleHide();
-              }, color: _selectedPostIds.isNotEmpty ? Colors.white : Colors.white24),
-              _menuItem(Icons.delete_outline, '삭제하기', () {
-                Navigator.pop(context);
-                if (_selectedPostIds.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('삭제할 포스트를 선택해주세요.')));
-                  return;
-                }
-                _confirmDelete();
-              }, color: _selectedPostIds.isNotEmpty ? Colors.redAccent : Colors.redAccent.withValues(alpha: 0.3)),
-              const Divider(color: Colors.white10),
               _menuItem(Icons.logout, '로그아웃', () {
                 Navigator.pop(context);
                 _showLogoutDialog();
               }, color: Colors.redAccent),
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
             ],
           ),
         );
@@ -131,12 +96,155 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
     );
   }
 
-  Widget _menuItem(IconData icon, String label, VoidCallback onTap, {Color color = Colors.white}) {
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-      onTap: onTap,
+  void _showPostManagementMenu() {
+    if (!isMe) return;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1C1C1C),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: 15),
+                Text(
+                  _selectedPostIds.isEmpty ? '게시물 관리' : '${_selectedPostIds.length}개 선택됨',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                const Divider(color: Colors.white12),
+                _menuItem(Icons.check_box_outlined, _isSelectionMode ? '선택 모드 종료' : '선택 모드 시작', () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _isSelectionMode = !_isSelectionMode;
+                    if (!_isSelectionMode) _selectedPostIds.clear();
+                  });
+                }),
+                _menuItem(Icons.select_all, '전체 선택', () {
+                  setState(() {
+                    _isSelectionMode = true;
+                    _selectedPostIds.addAll(_channelPosts.map((p) => p.id));
+                  });
+                  setModalState(() {});
+                }),
+                _menuItem(Icons.deselect, '전체 해제', () {
+                  setState(() {
+                    _selectedPostIds.clear();
+                  });
+                  setModalState(() {});
+                }),
+                _menuItem(Icons.visibility_off, '숨기기 / 보이기', () {
+                  if (_selectedPostIds.isEmpty) return;
+                  Navigator.pop(context);
+                  _toggleHide();
+                }),
+                _menuItem(Icons.delete_outline, '선택 삭제', () {
+                  if (_selectedPostIds.isEmpty) return;
+                  Navigator.pop(context);
+                  _deletePosts();
+                }, color: Colors.redAccent),
+                const SizedBox(height: 30),
+              ],
+            ),
+          ),
+        );
+      },
     );
+  }
+
+  void _deletePosts() {
+    if (_selectedPostIds.isEmpty) return;
+    
+    // Create a copy to avoid modification issues during async loop
+    final idsToDelete = _selectedPostIds.toList();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1C),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: Text('${idsToDelete.length}개의 게시물을 삭제하시겠습니까?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text('삭제된 게시물은 복구할 수 없습니다.', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소', style: TextStyle(color: Colors.white38))),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              int deletedCount = 0;
+              for (var id in idsToDelete) {
+                try {
+                  // Try numeric ID first, then fallback to string
+                  final dynamic targetId = int.tryParse(id) ?? id;
+                  await SupabaseService.client.from('posts').delete().eq('id', targetId);
+                  deletedCount++;
+                } catch (e) {
+                  debugPrint('Delete error for $id: $e');
+                }
+              }
+              
+              setState(() {
+                widget.allPosts.removeWhere((p) => idsToDelete.contains(p.id));
+                _loadPosts();
+                _selectedPostIds.clear();
+                _isSelectionMode = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$deletedCount개의 게시물이 삭제되었습니다.')));
+            },
+            child: const Text('삭제', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _toggleHide() async {
+    if (_selectedPostIds.isEmpty) return;
+    final idsToToggle = _selectedPostIds.toList();
+    int count = 0;
+    
+    for (var id in idsToToggle) {
+      try {
+        final post = widget.allPosts.firstWhere((p) => p.id == id);
+        final dynamic targetId = int.tryParse(id) ?? id;
+        
+        // Use tags to store hidden state since is_hidden column is missing
+        List<String> currentTags = List<String>.from(post.tags ?? []);
+        bool currentlyHidden = currentTags.contains('#hidden#');
+        
+        if (currentlyHidden) {
+          currentTags.remove('#hidden#');
+        } else {
+          currentTags.add('#hidden#');
+        }
+        
+        await SupabaseService.client.from('posts').update({'tags': currentTags}).eq('id', targetId);
+        
+        setState(() {
+          post.isHidden = !currentlyHidden;
+          // Also update the tags in the object to stay in sync
+          final index = widget.allPosts.indexWhere((p) => p.id == id);
+          if (index != -1) {
+            final List<String> updatedTags = List<String>.from(widget.allPosts[index].tags ?? []);
+            if (currentlyHidden) updatedTags.remove('#hidden#'); else updatedTags.add('#hidden#');
+            // We need a way to update tags in PostData, but for now let's use isHidden property
+          }
+        });
+        count++;
+      } catch (e) {
+        debugPrint('Update error for $id: $e');
+      }
+    }
+    
+    setState(() {
+      _loadPosts();
+      _selectedPostIds.clear();
+      _isSelectionMode = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$count개의 게시물 상태가 변경되었습니다.')));
   }
 
   void _showLogoutDialog() {
@@ -147,71 +255,29 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: const Text('로그아웃 하시겠습니까?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소', style: TextStyle(color: Colors.white38)),
-          ),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                gIsLoggedIn = false;
-              });
-              Navigator.pop(context); // close dialog
-              Navigator.pop(context); // return to MainScreen
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('로그아웃 되었습니다.'), duration: Duration(seconds: 1)),
-              );
-            },
-            child: const Text('로그아웃', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _toggleHide() {
-    if (_selectedPostIds.isEmpty) return;
-    setState(() {
-      for (var p in widget.allPosts) {
-        if (_selectedPostIds.contains(p.id)) {
-          p.isHidden = !p.isHidden;
-        }
-      }
-      _isSelectionMode = false;
-      _selectedPostIds.clear();
-      _loadPosts(); // Refresh view
-    });
-  }
-
-  void _confirmDelete() {
-    if (_selectedPostIds.isEmpty) return;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1C),
-        title: const Text('삭제하시겠습니까?', style: TextStyle(color: Colors.white)),
-        content: const Text('삭제된 포스트는 복구할 수 없습니다.', style: TextStyle(color: Colors.white70)),
-        actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소', style: TextStyle(color: Colors.white38))),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              _deleteSelected();
+              setState(() {
+                gIsLoggedIn = false;
+              });
+              gOnLogout?.call(); // Trigger the refresh on MainScreen!
+              Navigator.of(context).popUntil((route) => route.isFirst);
             },
-            child: const Text('삭제', style: TextStyle(color: Colors.redAccent)),
+            child: const Text('로그아웃', style: TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
     );
   }
 
-  void _deleteSelected() {
-    setState(() {
-      widget.allPosts.removeWhere((p) => _selectedPostIds.contains(p.id));
-      _isSelectionMode = false;
-      _selectedPostIds.clear();
-      _loadPosts(); // Refresh view
-    });
+  Widget _menuItem(IconData icon, String label, VoidCallback onTap, {Color color = Colors.white}) {
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+      onTap: onTap,
+    );
   }
 
   Widget _uploadButton() {
@@ -235,7 +301,17 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
         child: InkWell(
           onTap: () {
             HapticFeedback.mediumImpact();
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const UploadScreen()));
+            Navigator.push(
+              context, 
+              MaterialPageRoute(builder: (context) => const UploadScreen())
+            ).then((newPost) {
+              if (newPost != null && newPost is PostData) {
+                setState(() {
+                  widget.allPosts.insert(0, newPost);
+                  _loadPosts();
+                });
+              }
+            });
           },
           borderRadius: BorderRadius.circular(35),
           child: Center(
@@ -344,6 +420,9 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    String normalizedId(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
+    bool isMe = normalizedId(widget.uploaderId) == normalizedId('나의픽겟');
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: NestedScrollView(
@@ -358,9 +437,9 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
-              if (widget.uploaderId == '나의 픽겟')
+              if (isMe)
                 IconButton(icon: const Icon(Icons.settings_outlined, color: Colors.white), onPressed: _showSettingsMenu),
-              if (widget.uploaderId != '나의 픽겟')
+              if (!isMe)
                 IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: _showMoreMenu),
             ],
           ),
@@ -391,7 +470,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                                   _dName,
                                   style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
                                 ),
-                                if (widget.uploaderId == '나의 픽겟') ...[
+                                if (isMe) ...[
                                   const SizedBox(width: 8),
                                   GestureDetector(
                                     onTap: () {
@@ -470,8 +549,8 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                         flex: 3,
                         child: ElevatedButton(
                           onPressed: () {
-                            if (widget.uploaderId == '나의 픽겟') {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => const ActivityAnalysisScreen()));
+                            if (isMe) {
+                              Navigator.push(context, MaterialPageRoute(builder: (context) => ActivityAnalysisScreen(userPosts: _channelPosts)));
                             } else {
                               setState(() {
                                 _isFollowing = !_isFollowing;
@@ -486,10 +565,10 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                             }
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: (widget.uploaderId != '나의 픽겟' && _isFollowing) 
+                            backgroundColor: (!isMe && _isFollowing) 
                               ? const Color(0xFF272727) 
                               : Colors.white,
-                            foregroundColor: (widget.uploaderId != '나의 픽겟' && _isFollowing) 
+                            foregroundColor: (!isMe && _isFollowing) 
                               ? Colors.white70 
                               : Colors.black,
                             elevation: 0,
@@ -499,12 +578,12 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (widget.uploaderId != '나의 픽겟' && _isFollowing) ...[
+                              if (!isMe && _isFollowing) ...[
                                 const Icon(Icons.check, size: 18),
                                 const SizedBox(width: 6),
                               ],
                               Text(
-                                widget.uploaderId == '나의 픽겟' 
+                                isMe 
                                   ? '활동분석' 
                                   : (_isFollowing ? '팔로잉' : '팔로우'),
                                 style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
@@ -523,14 +602,23 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.2)),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.auto_awesome, color: Colors.cyanAccent, size: 16),
-                              SizedBox(width: 6),
+                              const Icon(Icons.auto_awesome, color: Colors.cyanAccent, size: 16),
+                              const SizedBox(width: 6),
                               Text(
-                                '공감도 82%',
-                                style: TextStyle(
+                                '공감도 ${() {
+                                  int picks = 0;
+                                  int likes = 0;
+                                  for (var p in _channelPosts) {
+                                    picks += _parseTotalVotes(p);
+                                    likes += p.likesCount;
+                                  }
+                                  if (picks == 0) return "0";
+                                  return ((likes / picks) * 200 + 70).toInt().clamp(70, 99).toString();
+                                }()}%',
+                                style: const TextStyle(
                                   color: Colors.cyanAccent, 
                                   fontWeight: FontWeight.w900, 
                                   fontSize: 15,
@@ -570,12 +658,12 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                               _profileTab('시간순', 2),
                             ],
                           ),
-                          if (widget.uploaderId == '나의 픽겟')
+                          if (isMe)
                             Positioned(
                               right: 0,
                               child: IconButton(
                                 icon: const Icon(Icons.menu, color: Colors.white, size: 22),
-                                onPressed: _showSettingsMenu,
+                                onPressed: _showPostManagementMenu,
                               ),
                             ),
                         ],
@@ -596,7 +684,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
           ],
         ),
       ),
-      floatingActionButton: widget.uploaderId == '나의 픽겟' ? _uploadButton() : null,
+      floatingActionButton: isMe ? _uploadButton() : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
@@ -661,9 +749,25 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
         final post = _channelPosts[index];
         final totalVotes = _parseTotalVotes(post);
         bool isSelected = _selectedPostIds.contains(post.id);
+
+        // Calculate expired status
+        bool isExpired = post.isExpired;
+        if (!isExpired && post.tags != null) {
+          final now = DateTime.now();
+          for (var tag in post.tags!) {
+            if (tag.startsWith('duration:')) {
+              final mins = int.tryParse(tag.split(':')[1]);
+              if (mins != null && now.isAfter(post.createdAt.add(Duration(minutes: mins)))) {
+                isExpired = true;
+              }
+              break;
+            }
+          }
+        }
+
         return GestureDetector(
           onLongPress: () {
-            if (widget.uploaderId == '나의 픽겟') {
+            if (isMe) {
               setState(() {
                 _isSelectionMode = true;
                 _selectedPostIds.add(post.id);
@@ -674,7 +778,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
           onTap: () {
             if (_isSelectionMode) {
               setState(() {
-                if (isSelected) {
+                if (_selectedPostIds.contains(post.id)) {
                   _selectedPostIds.remove(post.id);
                   if (_selectedPostIds.isEmpty) _isSelectionMode = false;
                 } else {
@@ -695,6 +799,27 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
               post.imageA.trim().contains('http')
                 ? Image.network(post.imageA.trim(), fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null)
                 : Image.asset(post.imageA.trim(), fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null),
+              
+              // Status Badge (Top Left)
+              Positioned(
+                top: 6, left: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isExpired ? Colors.black.withValues(alpha: 0.6) : Colors.cyanAccent,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    isExpired ? '선택종료' : '선택중',
+                    style: TextStyle(
+                      color: isExpired ? Colors.white70 : Colors.black,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+
               if (post.isHidden)
                 const Center(child: Icon(Icons.visibility_off, color: Colors.white54, size: 30)),
               Positioned(
@@ -740,7 +865,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
               if (_isSelectionMode)
                 Positioned(
                   top: 8,
-                  left: 8,
+                  right: 8, // Moved to right to avoid overlap with status badge
                   child: Container(
                     padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(

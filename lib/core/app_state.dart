@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 // Global Profile State
 String gProfileImage = 'assets/profiles/profile_11.jpg';
 String gNameText = '나의 픽겟';
-String gIdText = '@나의_픽겟';
+String gIdText = '나의픽겟'; // 고정된 고유 아이디 (내부 식별용)
 String gBioText = '세상의 모든 선택지를 픽겟하다. 하고 싶은 거 다 해요 ✨ 매일 새로운 선택지로 여러분의 참여를 기다립니다!';
 bool gIsLoggedIn = false;
 VoidCallback? gShowLoginPopup;
+VoidCallback? gOnLogout;
 
 // Utils
 String formatCount(int count) {

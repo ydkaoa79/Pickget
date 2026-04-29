@@ -1,8 +1,88 @@
 import 'package:flutter/material.dart';
+import '../models/post_data.dart';
+import '../core/app_state.dart';
 import 'point_screen.dart';
 
-class ActivityAnalysisScreen extends StatelessWidget {
-  const ActivityAnalysisScreen({super.key});
+class ActivityAnalysisScreen extends StatefulWidget {
+  final List<PostData> userPosts;
+  const ActivityAnalysisScreen({super.key, required this.userPosts});
+
+  @override
+  State<ActivityAnalysisScreen> createState() => _ActivityAnalysisScreenState();
+}
+
+class _ActivityAnalysisScreenState extends State<ActivityAnalysisScreen> {
+  int totalPicks = 0;
+  int totalLikes = 0;
+  double empathyRate = 0.0;
+  Map<String, int> categoryCounts = {};
+  List<int> weeklyPicks = [0, 0, 0, 0, 0, 0, 0];
+
+  @override
+  void initState() {
+    super.initState();
+    _calculateStats();
+  }
+
+  void _calculateStats() {
+    int picks = 0;
+    int likes = 0;
+    Map<int, int> dailyPicks = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0};
+    
+    DateTime now = DateTime.now();
+
+    for (var post in widget.userPosts) {
+      int vA = _parseVotes(post.voteCountA);
+      int vB = _parseVotes(post.voteCountB);
+      int postTotal = vA + vB;
+      picks += postTotal;
+      likes += post.likesCount;
+      
+      // Calculate trends for last 7 days
+      if (post.createdAt != null) {
+        int dayDiff = now.difference(post.createdAt!).inDays;
+        if (dayDiff >= 0 && dayDiff < 7) {
+          int index = 6 - dayDiff; // 0 is 6 days ago, 6 is today
+          weeklyPicks[index] += postTotal;
+        }
+      }
+
+      // Analyze categories from tags
+      if (post.tags != null) {
+        for (var tag in post.tags!) {
+          String t = tag.replaceAll('#', '').trim();
+          if (t.isNotEmpty) {
+            categoryCounts[t] = (categoryCounts[t] ?? 0) + 1;
+          }
+        }
+      }
+    }
+
+    setState(() {
+      totalPicks = picks;
+      totalLikes = likes;
+      // Empathy rate based on how many people liked vs picked (realer metric)
+      if (picks == 0) {
+        empathyRate = 0.0;
+      } else {
+        empathyRate = ((likes / picks) * 200 + 70).clamp(70.0, 99.0);
+      }
+    });
+  }
+
+  int _parseVotes(String s) {
+    s = s.toLowerCase().replaceAll(',', '').trim();
+    if (s.isEmpty) return 0;
+    if (s.endsWith('k')) {
+      return ((double.tryParse(s.substring(0, s.length - 1)) ?? 0) * 1000).toInt();
+    }
+    return int.tryParse(s) ?? 0;
+  }
+
+  String _formatNumber(int n) {
+    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}k';
+    return n.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,9 +112,7 @@ class ActivityAnalysisScreen extends StatelessWidget {
             const SizedBox(height: 30),
             _buildCategoryPreference(),
             const SizedBox(height: 30),
-            _buildTrendSection('주간 참여 Pick 트렌드', [12, 24, 8, 32, 18, 45, 28]),
-            const SizedBox(height: 20),
-            _buildTrendSection('주간 받은 Pick 트렌드', [150, 220, 110, 310, 180, 420, 290]),
+            _buildTrendSection('주간 받은 Pick 트렌드', weeklyPicks),
             const SizedBox(height: 50),
           ],
         ),
@@ -47,9 +125,14 @@ class ActivityAnalysisScreen extends StatelessWidget {
       children: [
         Container(
           width: 60, height: 60,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             shape: BoxShape.circle,
-            image: DecorationImage(image: AssetImage('assets/profiles/profile_11.jpg'), fit: BoxFit.cover),
+            image: DecorationImage(
+              image: gProfileImage.startsWith('http') 
+                ? NetworkImage(gProfileImage) 
+                : AssetImage(gProfileImage) as ImageProvider, 
+              fit: BoxFit.cover
+            ),
           ),
           child: Container(
             decoration: BoxDecoration(
@@ -59,12 +142,12 @@ class ActivityAnalysisScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 15),
-        const Column(
+        Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('나의 픽겟', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-            SizedBox(height: 4),
-            Text('@pickget_official', style: TextStyle(color: Colors.white38, fontSize: 13)),
+            Text(gNameText, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 4),
+            Text('@${gIdText.toLowerCase().replaceAll(' ', '_')}', style: const TextStyle(color: Colors.white38, fontSize: 13)),
           ],
         )
       ],
@@ -80,9 +163,9 @@ class ActivityAnalysisScreen extends StatelessWidget {
       mainAxisSpacing: 12,
       childAspectRatio: 1.6,
       children: [
-        _statCard('참여한 Pick', '152', Icons.touch_app_outlined),
-        _statCard('받은 Pick', '3.4k', Icons.front_hand_outlined),
-        _statCard('받은 공감', '842', Icons.favorite_border),
+        _statCard('콘텐츠 수', _formatNumber(widget.userPosts.length), Icons.article_outlined),
+        _statCard('받은 Pick', _formatNumber(totalPicks), Icons.front_hand_outlined),
+        _statCard('받은 공감', _formatNumber(totalLikes), Icons.favorite_border),
         GestureDetector(
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PointScreen(currentPoints: 1250))),
           child: _statCard('활동 포인트', '1,250', Icons.stars_outlined, isLink: true),
@@ -149,7 +232,6 @@ class ActivityAnalysisScreen extends StatelessWidget {
           const SizedBox(height: 25),
           Row(
             children: [
-              // 그래프 (왼쪽)
               Expanded(
                 flex: 1,
                 child: Stack(
@@ -158,33 +240,32 @@ class ActivityAnalysisScreen extends StatelessWidget {
                     SizedBox(
                       width: 120, height: 120,
                       child: CircularProgressIndicator(
-                        value: 0.82,
+                        value: empathyRate / 100,
                         strokeWidth: 10,
                         strokeCap: StrokeCap.round,
                         backgroundColor: Colors.white.withValues(alpha: 0.05),
                         color: Colors.cyanAccent,
                       ),
                     ),
-                    const Column(
+                    Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('82%', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
-                        Text('공감도', style: TextStyle(color: Colors.cyanAccent, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                        Text('${empathyRate.toInt()}%', style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+                        const Text('공감도', style: TextStyle(color: Colors.cyanAccent, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
                       ],
                     )
                   ],
                 ),
               ),
               const SizedBox(width: 20),
-              // 수치 정보 (오른쪽)
               Expanded(
                 flex: 1,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSympathyStatItem('총 Pick', '152', Colors.white54),
+                    _buildSympathyStatItem('총 피드백', _formatNumber(totalPicks + totalLikes), Colors.white54),
                     const SizedBox(height: 16),
-                    _buildSympathyStatItem('선택받은 Pick', '125', Colors.cyanAccent),
+                    _buildSympathyStatItem('긍정 반응', _formatNumber(totalLikes), Colors.cyanAccent),
                   ],
                 ),
               ),
@@ -201,10 +282,10 @@ class ActivityAnalysisScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(color: Colors.cyanAccent.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
-            child: const Text(
-              '당신의 취향은 유저들의 선택과 82% 일치합니다!',
+            child: Text(
+              '당신의 게시물은 유저들과 ${empathyRate.toInt()}% 공감하고 있습니다!',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.cyanAccent, fontSize: 13, fontWeight: FontWeight.w500),
+              style: const TextStyle(color: Colors.cyanAccent, fontSize: 13, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -224,16 +305,25 @@ class ActivityAnalysisScreen extends StatelessWidget {
   }
 
   Widget _buildCategoryPreference() {
+    var sortedEntries = categoryCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    var topEntries = sortedEntries.take(3).toList();
+    
+    if (topEntries.isEmpty) {
+      return const SizedBox();
+    }
+
+    int maxCount = topEntries[0].value;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('관심 카테고리 분석', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
         const SizedBox(height: 20),
-        _categoryBar('패션/뷰티', 0.65, Colors.cyanAccent),
-        const SizedBox(height: 16),
-        _categoryBar('음식/맛집', 0.45, Colors.white70),
-        const SizedBox(height: 16),
-        _categoryBar('라이프스타일', 0.30, Colors.white30),
+        ...topEntries.map((e) => Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _categoryBar('#${e.key}', e.value / maxCount, 
+              e == topEntries[0] ? Colors.cyanAccent : (e == topEntries[1] ? Colors.white70 : Colors.white30)),
+        )),
       ],
     );
   }
@@ -271,6 +361,11 @@ class ActivityAnalysisScreen extends StatelessWidget {
 
   Widget _buildTrendSection(String title, List<int> counts) {
     int maxVal = counts.reduce((a, b) => a > b ? a : b);
+    if (maxVal == 0) maxVal = 1;
+
+    List<String> days = ['월', '화', '수', '목', '금', '토', '일'];
+    int todayIdx = DateTime.now().weekday - 1; // 0 (Mon) to 6 (Sun)
+    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -292,23 +387,18 @@ class ActivityAnalysisScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _trendBar('월', counts[0] / maxVal, counts[0]),
-              _trendBar('화', counts[1] / maxVal, counts[1]),
-              _trendBar('수', counts[2] / maxVal, counts[2]),
-              _trendBar('목', counts[3] / maxVal, counts[3]),
-              _trendBar('금', counts[4] / maxVal, counts[4]),
-              _trendBar('토', counts[5] / maxVal, counts[5]),
-              _trendBar('일', counts[6] / maxVal, counts[6]),
-            ],
+            children: List.generate(7, (i) {
+              // Map index to day label (approximate based on today)
+              String dayLabel = days[(todayIdx - (6 - i) + 7) % 7];
+              return _trendBar(dayLabel, counts[i] / maxVal, counts[i], i == 6);
+            }),
           )
         ],
       ),
     );
   }
 
-  Widget _trendBar(String day, double heightFactor, int pickCount) {
-    bool isToday = day == '토';
+  Widget _trendBar(String day, double heightFactor, int pickCount, bool isToday) {
     return Column(
       children: [
         Text(
@@ -318,7 +408,7 @@ class ActivityAnalysisScreen extends StatelessWidget {
         const SizedBox(height: 6),
         Container(
           width: 14,
-          height: 100 * heightFactor.clamp(0.1, 1.0),
+          height: 100 * heightFactor.clamp(0.05, 1.0),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,

@@ -200,25 +200,24 @@ class _UploadScreenState extends State<UploadScreen> {
       // 2. Insert into Supabase
       final int totalMinutes = (_selectedHours * 60) + _selectedMinutes;
       final int? targetCount = _useTargetPick ? (int.tryParse(_targetPickController.text) ?? 100) : null;
+      final List<String> finalTags = _tagsController.text.split(RegExp(r'[#,\s]+')).where((t) => t.isNotEmpty).toList();
+      // Trick: Store duration and target count in tags since columns are missing
+      finalTags.add('duration:$totalMinutes');
+      if (targetCount != null) finalTags.add('target:$targetCount');
 
       final response = await SupabaseService.client.from('posts').insert({
         'title': _titleController.text,
         'uploader_id': gIdText,
-        // 'uploader_name': gNameText,
-        // 'uploader_image': gProfileImage,
         'image_a': urlA,
         'image_b': urlB,
         'description_a': _descAController.text.isEmpty ? '선택지 A' : _descAController.text,
         'description_b': _descBController.text.isEmpty ? '선택지 B' : _descBController.text,
-        // 'full_description': _descController.text, // Missing in DB
-        // 'duration_minutes': totalMinutes, // Missing in DB
-        // 'target_pick_count': targetCount, // Missing in DB
-        // 'tags': _tagsController.text.split(RegExp(r'[#,\s]+')).where((t) => t.isNotEmpty).toList(),
+        'tags': finalTags,
       }).select().single();
 
       final newPost = PostData(
         id: response['id'].toString(),
-        uploaderId: gNameText,
+        uploaderId: gIdText,
         uploaderImage: gProfileImage,
         title: _titleController.text,
         fullDescription: _descController.text,
@@ -227,7 +226,7 @@ class _UploadScreenState extends State<UploadScreen> {
         imageB: urlB,
         descriptionA: _descAController.text.isEmpty ? '선택지 A' : _descAController.text,
         descriptionB: _descBController.text.isEmpty ? '선택지 B' : _descBController.text,
-        tags: _tagsController.text.split(RegExp(r'[#,\s]+')).where((t) => t.isNotEmpty).toList(),
+        tags: finalTags,
         durationMinutes: totalMinutes,
         targetPickCount: targetCount,
         likesCount: 0,
@@ -239,14 +238,8 @@ class _UploadScreenState extends State<UploadScreen> {
       );
 
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => ChannelScreen(
-            uploaderId: newPost.uploaderId,
-            allPosts: [newPost], 
-            initialPost: newPost,
-          )),
-        );
+        // Return the new post to the previous screen (ChannelScreen) so it can be added to the list
+        Navigator.pop(context, newPost);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
