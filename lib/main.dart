@@ -19,6 +19,13 @@ import 'services/supabase_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   print('DEBUG: App starting with latest comment system code! (Ver. 1.0)');
+  
+  // 세로모드 고정
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
   await SupabaseService.initialize();
   runApp(const PickGetApp());
 }
