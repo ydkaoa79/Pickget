@@ -217,6 +217,8 @@ class _PostViewState extends State<PostView> {
         final currentWidthA = _widthA ?? (sw > 0 ? sw * 0.5 : 0.0);
         const double descWidth = 175.0;
         bool isExpired = _remainingSeconds <= 0;
+        print('DEBUG: imageA = "${widget.post.imageA}"');
+        print('DEBUG: imageB = "${widget.post.imageB}"');
 
         return GestureDetector(
           onTapUp: (d) => _handleTap(d, sw),
@@ -236,9 +238,9 @@ class _PostViewState extends State<PostView> {
                         Positioned.fill(
                           child: ImageFiltered(
                             imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                            child: widget.post.imageA.startsWith('http')
-                              ? Image.network(widget.post.imageA, fit: BoxFit.cover)
-                              : Image.asset(widget.post.imageA, fit: BoxFit.cover),
+                            child: widget.post.imageA.trim().contains('http')
+                              ? Image.network(widget.post.imageA.trim(), fit: BoxFit.cover)
+                              : Image.asset(widget.post.imageA.trim(), fit: BoxFit.cover),
                           ),
                         ),
                         Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.4))),
@@ -255,9 +257,9 @@ class _PostViewState extends State<PostView> {
                         Positioned.fill(
                           child: ImageFiltered(
                             imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                            child: widget.post.imageB.startsWith('http')
-                              ? Image.network(widget.post.imageB, fit: BoxFit.cover)
-                              : Image.asset(widget.post.imageB, fit: BoxFit.cover),
+                            child: widget.post.imageB.trim().contains('http')
+                              ? Image.network(widget.post.imageB.trim(), fit: BoxFit.cover)
+                              : Image.asset(widget.post.imageB.trim(), fit: BoxFit.cover),
                           ),
                         ),
                         Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.4))),
@@ -289,9 +291,9 @@ class _PostViewState extends State<PostView> {
                                   alignment: Alignment.topCenter,
                                   child: SizedBox(
                                     width: sw * 0.8,
-                                    child: widget.post.imageA.startsWith('http')
-                                      ? Image.network(widget.post.imageA, fit: BoxFit.fitWidth, alignment: Alignment.topCenter)
-                                      : Image.asset(widget.post.imageA, fit: BoxFit.fitWidth, alignment: Alignment.topCenter),
+                                    child: widget.post.imageA.trim().contains('http')
+                                      ? Image.network(widget.post.imageA.trim(), fit: BoxFit.fitWidth, alignment: Alignment.topCenter)
+                                      : Image.asset(widget.post.imageA.trim(), fit: BoxFit.fitWidth, alignment: Alignment.topCenter),
                                   ),
                                 ),
                               ),
@@ -306,9 +308,9 @@ class _PostViewState extends State<PostView> {
                                   alignment: Alignment.topCenter,
                                   child: SizedBox(
                                     width: sw * 0.8,
-                                    child: widget.post.imageB.startsWith('http')
-                                      ? Image.network(widget.post.imageB, fit: BoxFit.fitWidth, alignment: Alignment.topCenter)
-                                      : Image.asset(widget.post.imageB, fit: BoxFit.fitWidth, alignment: Alignment.topCenter),
+                                    child: widget.post.imageB.trim().contains('http')
+                                      ? Image.network(widget.post.imageB.trim(), fit: BoxFit.fitWidth, alignment: Alignment.topCenter)
+                                      : Image.asset(widget.post.imageB.trim(), fit: BoxFit.fitWidth, alignment: Alignment.topCenter),
                                   ),
                                 ),
                               ),
@@ -588,70 +590,6 @@ class _PostViewState extends State<PostView> {
                               fontWeight: FontWeight.w900,
                               shadows: [Shadow(color: Colors.cyanAccent.withValues(alpha: 0.5), blurRadius: 15)],
                             ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              // 마감된 결과 리포트 배너
-              if (isExpired)
-                Positioned(
-                  bottom: 120 + MediaQuery.of(context).padding.bottom,
-                  left: 20, right: 20,
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0.0, end: 1.0),
-                    duration: const Duration(milliseconds: 800),
-                    curve: Curves.easeOutBack,
-                    builder: (context, val, child) {
-                      final bool isAWin = (double.tryParse(widget.post.percentA.replaceAll('%', '')) ?? 0) > (double.tryParse(widget.post.percentB.replaceAll('%', '')) ?? 0);
-                      final bool isBWin = (double.tryParse(widget.post.percentB.replaceAll('%', '')) ?? 0) > (double.tryParse(widget.post.percentA.replaceAll('%', '')) ?? 0);
-                      final bool myPickWon = (_votedSide == 1 && isAWin) || (_votedSide == 2 && isBWin);
-                      
-                      return Transform.scale(
-                        scale: val,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.85),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
-                            boxShadow: [BoxShadow(color: Colors.cyanAccent.withValues(alpha: 0.2), blurRadius: 20)],
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(color: myPickWon ? Colors.amberAccent : Colors.white10, shape: BoxShape.circle),
-                                child: Icon(myPickWon ? Icons.emoji_events : Icons.check_circle_outline, color: myPickWon ? Colors.black : Colors.white38, size: 24),
-                              ),
-                              const SizedBox(width: 15),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      myPickWon ? '나의 선택 승리! 🏆' : 'Pick 결과 확인',
-                                      style: TextStyle(color: myPickWon ? Colors.amberAccent : Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${isAWin ? "A" : (isBWin ? "B" : "무승부")} 선택지가 최종 선택되었습니다.',
-                                      style: const TextStyle(color: Colors.white70, fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () => _showCommentsSheet(context),
-                                style: TextButton.styleFrom(
-                                  backgroundColor: Colors.cyanAccent.withValues(alpha: 0.1),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                child: const Text('댓글 보기', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
-                              ),
-                            ],
                           ),
                         ),
                       );

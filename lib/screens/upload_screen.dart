@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../models/post_data.dart';
 import '../core/app_state.dart';
 import 'channel_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import '../services/cloudflare_service.dart';
+import '../services/supabase_service.dart';
+import 'dart:io';
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -23,6 +27,10 @@ class _UploadScreenState extends State<UploadScreen> {
   int _selectedMinutes = 0;
   bool _useTargetPick = false;
   final TextEditingController _targetPickController = TextEditingController(text: '100');
+  
+  final ImagePicker _picker = ImagePicker();
+  final CloudflareService _cloudflareService = CloudflareService();
+  bool _isUploading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -38,10 +46,12 @@ class _UploadScreenState extends State<UploadScreen> {
         title: const Text('새 질문 하기', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
         centerTitle: true,
         actions: [
-          TextButton(
-            onPressed: _handleUpload,
-            child: const Text('등록', style: TextStyle(color: Colors.cyanAccent, fontSize: 16, fontWeight: FontWeight.bold)),
-          ),
+          _isUploading 
+            ? const Center(child: Padding(padding: EdgeInsets.all(8.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.cyanAccent))))
+            : TextButton(
+                onPressed: _handleUpload,
+                child: const Text('등록', style: TextStyle(color: Colors.cyanAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
           const SizedBox(width: 8),
         ],
       ),
@@ -159,52 +169,101 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
-  void _handleUpload() {
+  Future<void> _handleUpload() async {
     if (_titleController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('제목을 입력해주세요.')));
       return;
     }
     
-    final int totalMinutes = (_selectedHours * 60) + _selectedMinutes;
-    final int? targetCount = _useTargetPick ? (int.tryParse(_targetPickController.text) ?? 100) : null;
+    if (_imagePathA == null || _imagePathB == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('두 개의 이미지를 모두 업로드해주세요.')));
+      return;
+    }
 
-    final newPost = PostData(
-      id: 'post_${DateTime.now().millisecondsSinceEpoch}',
-      uploaderId: gNameText,
-      uploaderImage: gProfileImage,
-      title: _titleController.text,
-      fullDescription: _descController.text,
-      timeLocation: '방금 전 · 서울',
-      imageA: _imagePathA ?? 'https://picsum.photos/seed/a/800/1000',
-      imageB: _imagePathB ?? 'https://picsum.photos/seed/b/800/1000',
-      descriptionA: _descAController.text.isEmpty ? '선택지 A' : _descAController.text,
-      descriptionB: _descBController.text.isEmpty ? '선택지 B' : _descBController.text,
-      tags: _tagsController.text.split(RegExp(r'[#,\s]+')).where((t) => t.isNotEmpty).toList(),
-      durationMinutes: totalMinutes,
-      targetPickCount: targetCount,
-      likesCount: 0,
-      commentsCount: 0,
-      voteCountA: '0',
-      voteCountB: '0',
-      percentA: '0%',
-      percentB: '0%',
-    );
+    setState(() => _isUploading = true);
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => ChannelScreen(
-        uploaderId: newPost.uploaderId,
-        allPosts: [newPost], 
-        initialPost: newPost,
-      )),
-    );
+    try {
+      // 1. Upload images to R2 via Worker
+      String? urlA = await _cloudflareService.uploadFile(
+        File(_imagePathA!), 
+        'post_${DateTime.now().millisecondsSinceEpoch}_A.jpg'
+      );
+      String? urlB = await _cloudflareService.uploadFile(
+        File(_imagePathB!), 
+        'post_${DateTime.now().millisecondsSinceEpoch}_B.jpg'
+      );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('"${_titleController.text}" 질문이 등록되었습니다!'),
-        backgroundColor: Colors.cyanAccent.withValues(alpha: 0.9),
-      ),
-    );
+      if (urlA == null || urlB == null) {
+        throw Exception('이미지 업로드 실패');
+      }
+
+      // 2. Insert into Supabase
+      final int totalMinutes = (_selectedHours * 60) + _selectedMinutes;
+      final int? targetCount = _useTargetPick ? (int.tryParse(_targetPickController.text) ?? 100) : null;
+
+      final response = await SupabaseService.client.from('posts').insert({
+        'title': _titleController.text,
+        'uploader_id': gIdText,
+        // 'uploader_name': gNameText,
+        // 'uploader_image': gProfileImage,
+        'image_a': urlA,
+        'image_b': urlB,
+        'description_a': _descAController.text.isEmpty ? '선택지 A' : _descAController.text,
+        'description_b': _descBController.text.isEmpty ? '선택지 B' : _descBController.text,
+        // 'full_description': _descController.text, // Missing in DB
+        // 'duration_minutes': totalMinutes, // Missing in DB
+        // 'target_pick_count': targetCount, // Missing in DB
+        // 'tags': _tagsController.text.split(RegExp(r'[#,\s]+')).where((t) => t.isNotEmpty).toList(),
+      }).select().single();
+
+      final newPost = PostData(
+        id: response['id'].toString(),
+        uploaderId: gNameText,
+        uploaderImage: gProfileImage,
+        title: _titleController.text,
+        fullDescription: _descController.text,
+        timeLocation: '방금 전',
+        imageA: urlA,
+        imageB: urlB,
+        descriptionA: _descAController.text.isEmpty ? '선택지 A' : _descAController.text,
+        descriptionB: _descBController.text.isEmpty ? '선택지 B' : _descBController.text,
+        tags: _tagsController.text.split(RegExp(r'[#,\s]+')).where((t) => t.isNotEmpty).toList(),
+        durationMinutes: totalMinutes,
+        targetPickCount: targetCount,
+        likesCount: 0,
+        commentsCount: 0,
+        voteCountA: '0',
+        voteCountB: '0',
+        percentA: '0%',
+        percentB: '0%',
+      );
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => ChannelScreen(
+            uploaderId: newPost.uploaderId,
+            allPosts: [newPost], 
+            initialPost: newPost,
+          )),
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"${_titleController.text}" 질문이 등록되었습니다!'),
+            backgroundColor: Colors.cyanAccent.withValues(alpha: 0.9),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('등록 실패: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
   }
 
   Widget _sectionTitle(String title) {
@@ -236,14 +295,26 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Widget _abUploadCard(String label, String? path, Function(String) onPick) {
     return GestureDetector(
-      onTap: () => onPick('https://picsum.photos/seed/${label.toLowerCase()}${DateTime.now().millisecondsSinceEpoch}/800/1000'),
+      onTap: () async {
+        final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+        if (image != null) {
+          onPick(image.path);
+        }
+      },
       child: AspectRatio(
         aspectRatio: 1,
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(20),
-            image: path != null ? DecorationImage(image: NetworkImage(path), fit: BoxFit.cover) : null,
+            image: path != null 
+              ? DecorationImage(
+                  image: path.startsWith('http') 
+                    ? NetworkImage(path) 
+                    : FileImage(File(path)) as ImageProvider, 
+                  fit: BoxFit.cover
+                ) 
+              : null,
           ),
           child: Stack(
             alignment: Alignment.center,

@@ -352,7 +352,9 @@ class _SearchScreenState extends State<SearchScreen> {
                         child: Stack(
                           children: [
                             Positioned.fill(
-                              child: Image.asset(post.imageA, fit: BoxFit.cover),
+                              child: post.imageA.trim().contains('http')
+                                ? Image.network(post.imageA.trim(), fit: BoxFit.cover)
+                                : Image.asset(post.imageA.trim(), fit: BoxFit.cover),
                             ),
                             Positioned.fill(
                               child: Container(

@@ -376,9 +376,9 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                     children: [
                       CircleAvatar(
                         radius: 42,
-                        backgroundImage: _dImg.startsWith('http')
-                          ? NetworkImage(_dImg)
-                          : AssetImage(_dImg) as ImageProvider,
+                        backgroundImage: _dImg.trim().startsWith('http')
+                          ? NetworkImage(_dImg.trim())
+                          : AssetImage(_dImg.trim()) as ImageProvider,
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -692,7 +692,9 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.asset(post.imageA, fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null),
+              post.imageA.trim().contains('http')
+                ? Image.network(post.imageA.trim(), fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null)
+                : Image.asset(post.imageA.trim(), fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null),
               if (post.isHidden)
                 const Center(child: Icon(Icons.visibility_off, color: Colors.white54, size: 30)),
               Positioned(
