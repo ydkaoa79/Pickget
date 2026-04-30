@@ -34,6 +34,19 @@ class PostData {
   final DateTime createdAt;
   
   DateTime get endTime => createdAt.add(Duration(minutes: durationMinutes ?? 1440));
+  
+  // 🗳️ 진짜 투표수 합계 계산 (문자열 '1.2k' 등을 숫자로 변환)
+  int get totalVotes {
+    int parseV(String s) {
+      s = s.toLowerCase().replaceAll(',', '').trim();
+      if (s.isEmpty) return 0;
+      if (s.endsWith('k')) {
+        return ((double.tryParse(s.substring(0, s.length - 1)) ?? 0) * 1000).toInt();
+      }
+      return int.tryParse(s) ?? 0;
+    }
+    return parseV(voteCountA) + parseV(voteCountB);
+  }
 
   PostData({
     required this.id,

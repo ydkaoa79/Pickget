@@ -1753,9 +1753,7 @@ class _MainScreenState extends State<MainScreen> {
     // Simulate Top 10 from master posts list
     List<PostData> topPosts = List.from(_posts);
     topPosts.sort(
-      (a, b) => (b.likesCount + b.commentsCount).compareTo(
-        a.likesCount + a.commentsCount,
-      ),
+      (a, b) => b.totalVotes.compareTo(a.totalVotes),
     );
     topPosts = topPosts.take(10).toList();
 
@@ -1869,9 +1867,7 @@ class _MainScreenState extends State<MainScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  formatCount(
-                    post.likesCount + post.commentsCount,
-                  ), // Simple mock for votes/engagement
+                  formatCount(post.totalVotes), // 진짜 투표수(A+B) 표시!
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
