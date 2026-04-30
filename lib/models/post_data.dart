@@ -3,10 +3,10 @@ import 'comment_data.dart';
 class PostData {
   final String id;
   final String title;
-  final String uploaderId;
+  String uploaderId;
   final String? uploaderInternalId; // 🆔 주민번호 필드 추가!
-  final String uploaderName;
-  final String uploaderImage;
+  String uploaderName;
+  String uploaderImage;
   final String timeLocation;
   final String imageA;
   final String imageB;

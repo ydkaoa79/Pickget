@@ -227,7 +227,7 @@ class _MainScreenState extends State<MainScreen> {
         'user_id': gIdText,
         'nickname': gNameText,
         'profile_image': gProfileImage,
-      });
+      }, onConflict: 'id', ignoreDuplicates: true);
     } catch (e) {
       print('DEBUG [AUTH]: Profile sync error: $e');
     }
@@ -397,7 +397,7 @@ class _MainScreenState extends State<MainScreen> {
             final List<dynamic> userFollows = await SupabaseService.client
                 .from('follows')
                 .select('following_internal_id')
-                .eq('user_id', gUserInternalId!);
+                .eq('follower_internal_id', gUserInternalId!);
             followedUserIds = userFollows
                 .map((f) => f['following_internal_id'].toString())
                 .toSet();
@@ -1016,7 +1016,7 @@ class _MainScreenState extends State<MainScreen> {
                     try {
                       if (nowFollowing) {
                         await SupabaseService.client.from('follows').insert({
-                          'user_id': gUserInternalId!,
+                          'follower_internal_id': gUserInternalId!,
                           'following_internal_id': post.uploaderInternalId!,
                         });
                       } else {
@@ -1024,7 +1024,7 @@ class _MainScreenState extends State<MainScreen> {
                             .from('follows')
                             .delete()
                             .match({
-                              'user_id': gUserInternalId!,
+                              'follower_internal_id': gUserInternalId!,
                               'following_internal_id': post.uploaderInternalId!,
                             });
                       }

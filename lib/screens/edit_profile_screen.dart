@@ -247,6 +247,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           })
                           .eq('user_internal_id', gUserInternalId!);
 
+                      // 3. 피드 새로고침 예약 (메인 화면 등에서 즉시 반영되도록)
+                      gRefreshFeed?.call();
+
                       if (mounted) {
                         Navigator.pop(context); // 로딩 닫기
                         Navigator.pop(context, {

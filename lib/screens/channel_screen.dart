@@ -521,8 +521,16 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                                             _dBio = gBioText;
                                             _dImg = gProfileImage;
                                           });
-                                          // Global Feed Refresh!
-                                          gRefreshFeed?.call();
+                                            // 🎯 내 게시물 정보들도 실시간으로 동기화 (메인 안 나가도 바로 보이게!)
+                                            for (var p in widget.allPosts) {
+                                              if (p.uploaderInternalId == gUserInternalId) {
+                                                p.uploaderId = res['id'];
+                                                p.uploaderName = res['name'];
+                                                p.uploaderImage = res['image'];
+                                              }
+                                            }
+                                            // Global Feed Refresh!
+                                            gRefreshFeed?.call();
                                         }
                                       });
                                     },
