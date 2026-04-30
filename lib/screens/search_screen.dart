@@ -33,7 +33,7 @@ class _SearchScreenState extends State<SearchScreen> {
       final List<dynamic> data = await SupabaseService.client
           .from('search_history')
           .select('keyword')
-          .eq('user_id', gIdText)
+          .eq('user_internal_id', gUserInternalId!)
           .order('created_at', ascending: false)
           .limit(10);
       
@@ -52,10 +52,10 @@ class _SearchScreenState extends State<SearchScreen> {
       await SupabaseService.client
           .from('search_history')
           .upsert({
-            'user_id': gIdText, 
+            'user_internal_id': gUserInternalId!,
             'keyword': query,
             'created_at': DateTime.now().toIso8601String(),
-          }, onConflict: 'user_id,keyword');
+          }, onConflict: 'user_internal_id,keyword');
     } catch (e) {
       print('검색어 저장 실패: $e');
     }
@@ -110,7 +110,7 @@ class _SearchScreenState extends State<SearchScreen> {
       SupabaseService.client
           .from('search_history')
           .delete()
-          .match({'user_id': gIdText, 'keyword': item})
+          .match({'user_internal_id': gUserInternalId!, 'keyword': item})
           .then((_) => print('검색어 서버 삭제 완료'))
           .catchError((e) => print('검색어 서버 삭제 실패: $e'));
     }
@@ -125,7 +125,7 @@ class _SearchScreenState extends State<SearchScreen> {
       SupabaseService.client
           .from('search_history')
           .delete()
-          .eq('user_id', gIdText)
+          .eq('user_internal_id', gUserInternalId!)
           .then((_) => print('전체 검색 기록 서버 삭제 완료'))
           .catchError((e) => print('전체 검색 기록 서버 삭제 실패: $e'));
     }

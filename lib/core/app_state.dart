@@ -1,18 +1,17 @@
-
 import 'dart:ui';
 import '../services/supabase_service.dart';
 
 String gNameText = '테스트용';
 String gIdText = '테스트용';
-// 🆔 서버와 일치하는 진짜 주민번호 (정식 서비스 전에는 null로 변경)
-String? gUserInternalId = '3ee25993-1578-4283-a99b-109a51fe5f78'; 
-String gBioText = '세상의 모든 선택지를 픽겟하다. 하고 싶은 거 다 해요 ✨ 매일 새로운 선택지로 여러분의 참여를 기다립니다!';
+// 로그인 후 세팅되는 진짜 고유 ID (로그아웃 시에는 null로 초기화)
+String? gUserInternalId; // ← 하드코딩 UUID 제거!
+String gBioText = '안녕하세요! 저는 PickGet 유저입니다.';
 String gProfileImage = 'assets/profiles/profile_11.jpg';
 int gUserPoints = 0;
 bool gIsLoggedIn = false;
 VoidCallback? gShowLoginPopup;
-VoidCallback? gRefreshFeed; 
-VoidCallback? gOnLogout; // 🔄 로그아웃 신호기 복구!
+VoidCallback? gRefreshFeed;
+VoidCallback? gOnLogout;
 
 String formatCount(dynamic countVal) {
   int count = 0;

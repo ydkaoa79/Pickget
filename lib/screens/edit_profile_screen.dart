@@ -55,7 +55,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       setState(() => _isUploading = true);
       try {
-        final String fileName = 'profile_${gIdText}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final String fileName = 'profile_${gUserInternalId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final String? url = await _cloudflareService.uploadFile(File(croppedPath), fileName);
         if (url != null) {
           setState(() {
@@ -211,20 +211,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         }
                       }
 
-                      // 주민번호(User ID) 최종 확인 및 패치
+                      // 주민번호(User ID) 최종 확인 (이미 Auth 세션에서 설정되어 있어야 함)
                       if (gUserInternalId == null) {
-                        final p = await SupabaseService.client
-                            .from('user_profiles')
-                            .select('id')
-                            .eq('user_id', widget.currentId)
-                            .maybeSingle();
-                        if (p != null) {
-                          gUserInternalId = p['id'].toString();
-                        }
-                      }
-
-                      if (gUserInternalId == null) {
-                        throw Exception('고유 유저 ID를 확인할 수 없습니다. 다시 로그인해주세요.');
+                        throw Exception('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
                       }
 
                       // 1. 프로필 업데이트 (주민번호 기준!)

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:async';
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
+import 'package:app_links/app_links.dart';
 
 // New Imports
 import 'models/post_data.dart';
@@ -15,9 +17,15 @@ import 'screens/search_screen.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/channel_feed_screen.dart';
 import 'services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // ✅ 카카오 SDK 초기화 (네이티브 앱 키 적용)
+  KakaoSdk.init(nativeAppKey: 'c4f30c6f5fd4c09548c843ebe0e10074');
+  
   print('DEBUG: App starting with latest comment system code! (Ver. 1.0)');
   
   // 세로모드 고정
@@ -74,7 +82,11 @@ class _MainScreenState extends State<MainScreen> {
   int _userPoints = 0;
   int _selectedTopTabIndex = 0;
   bool _hasNewNotifications = true;
-  List<Map<String, dynamic>> _notifications = []; // Add this list!
+  List<Map<String, dynamic>> _notifications = [];
+  StreamSubscription<AuthState>? _authSubscription;
+  bool _isLoginPopupOpen = false;
+  bool _isProfileSetupOpen = false; // ✅ 추가 정보 입력 팝업 중복 방지용
+  BuildContext? _loginDialogContext; // 추가
 
   @override
   void initState() {
@@ -88,6 +100,11 @@ class _MainScreenState extends State<MainScreen> {
       if (mounted) {
         setState(() {
           gUserPoints = 0;
+          gIsLoggedIn = false;
+          gUserInternalId = null;   // ← 추가
+          gIdText = '테스트용';      // ← 추가
+          gNameText = '테스트용';    // ← 추가
+          gProfileImage = 'assets/profiles/profile_11.jpg'; // ← 추가
           _hasNewNotifications = false;
           _notifications = [];
         });
@@ -96,6 +113,185 @@ class _MainScreenState extends State<MainScreen> {
     };
     gRefreshFeed = fetchPosts;
     _startLoginTimer();
+    
+    // [보강] 시스템 레벨 딥링크 탐지기
+    final appLinks = AppLinks();
+    appLinks.uriLinkStream.listen((uri) {
+      print('DEBUG [SYSTEM_LINK]: Received link: $uri');
+      
+      // 딥링크가 들어오면 수파베이스가 세션을 파싱할 시간을 주고 체크
+      Future.delayed(const Duration(seconds: 1), () async {
+        final session = SupabaseService.client.auth.currentSession;
+        if (session != null) {
+          print('DEBUG [SYSTEM_LINK]: Session found after deep link!');
+          _handleLoginSuccess(session);
+        } else {
+          print('DEBUG [SYSTEM_LINK]: Session still null. Waiting more...');
+          // 1초 더 기다려보고 체크
+          Future.delayed(const Duration(seconds: 1), () {
+            final session2 = SupabaseService.client.auth.currentSession;
+            if (session2 != null) _handleLoginSuccess(session2);
+          });
+        }
+      });
+    });
+    
+    // 앱이 켜져 있을 때 resume 상태에서도 체크하도록 추가
+    SystemChannels.lifecycle.setMessageHandler((msg) async {
+      if (msg == AppLifecycleState.resumed.toString()) {
+        print('DEBUG [LIFECYCLE]: App resumed, checking session...');
+        final session = SupabaseService.client.auth.currentSession;
+        if (session != null && !gIsLoggedIn) {
+          _handleLoginSuccess(session);
+        }
+      }
+      return null;
+    });
+
+    // 인증 상태 감시자 설치
+    print('DEBUG [INIT]: Setting up AuthStateChange listener...');
+    _authSubscription = SupabaseService.client.auth.onAuthStateChange.listen((data) async {
+      final AuthChangeEvent event = data.event;
+      final Session? session = data.session;
+
+      print('DEBUG [AUTH]: Event occurred -> $event');
+
+      if (event == AuthChangeEvent.signedIn || event == AuthChangeEvent.initialSession) {
+        if (session != null) {
+          print('DEBUG [AUTH]: Login success detected via listener!');
+          _loginTimer?.cancel(); // ✅ 로그인 확인되는 즉시 타이머 종료!
+          _handleLoginSuccess(session);
+        }
+      } else if (event == AuthChangeEvent.signedOut) {
+        print('DEBUG [AUTH]: Logout detected.');
+        setState(() {
+          gIsLoggedIn = false;
+          gUserPoints = 0;
+        });
+      }
+    });
+
+    // 초기 세션 즉시 체크
+    print('DEBUG [INIT]: Preparing initial session check...');
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      print('DEBUG [INIT]: Inside postFrameCallback');
+      // 앱이 딥링크로 열렸을 때의 초기 주소 확인
+      try {
+        final initialUri = await appLinks.getInitialLink();
+        if (initialUri != null) {
+          print('DEBUG [SYSTEM_LINK]: Initial link on cold start: $initialUri');
+        }
+      } catch (e) {
+        print('DEBUG [SYSTEM_LINK]: Error getting initial link: $e');
+      }
+
+      final session = SupabaseService.client.auth.currentSession;
+      if (session != null && !gIsLoggedIn) {
+        print('DEBUG [AUTH]: Initial session found!');
+        _handleLoginSuccess(session);
+      }
+    });
+  }
+
+  void _handleLoginSuccess(Session session) async {
+    print('DEBUG [AUTH]: Handling login success for ${session.user.id}');
+    
+    // 💡 카카오 프로필 정보 추출 (metadata에서 가져옴)
+    final metadata = session.user.userMetadata ?? {};
+    final String kakaoName = metadata['full_name'] ?? metadata['name'] ?? '픽겟 유저';
+    final String kakaoImage = metadata['avatar_url'] ?? metadata['picture'] ?? 'assets/profiles/profile_11.jpg';
+
+    setState(() {
+      gIsLoggedIn = true;
+      gUserInternalId = session.user.id; // ✅ 진짜 고유 ID 저장!
+      gNameText = kakaoName;
+      gProfileImage = kakaoImage;
+      gIdText = session.user.email?.split('@').first ?? session.user.id.substring(0, 8);
+    });
+    
+    // DB 프로필 업데이트 (이미 있으면 업데이트, 없으면 생성)
+    try {
+      await SupabaseService.client.from('user_profiles').upsert({
+        'id': gUserInternalId,
+        'user_id': gIdText,
+        'nickname': gNameText,
+        'profile_image': gProfileImage,
+      });
+    } catch (e) {
+      print('DEBUG [AUTH]: Profile sync error: $e');
+    }
+    
+    await fetchPosts();
+
+    // 💡 추가 정보(나이, 성별 등)가 없으면 설정 화면으로 이동
+    if (mounted && !_isProfileSetupOpen) { // ✅ 이미 떠있으면 패스!
+      try {
+        final profile = await SupabaseService.client
+            .from('user_profiles')
+            .select('age, gender')
+            .eq('id', gUserInternalId!)
+            .maybeSingle();
+
+        if (profile != null && (profile['age'] == null || profile['gender'] == null)) {
+          print('DEBUG [AUTH]: Missing info detected, showing ProfileSetupScreen');
+          
+          _isProfileSetupOpen = true; // ✅ 깃발 올리기!
+          
+          if (mounted) {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
+            );
+
+            _isProfileSetupOpen = false; // ✅ 팝업 닫히면 깃발 내리기
+
+            if (result != null && result is Map) {
+              await SupabaseService.client.from('user_profiles').update({
+                'age': result['age'],
+                'gender': result['gender'],
+                'region': result['region'],
+              }).eq('id', gUserInternalId!);
+              
+              setState(() {
+                gUserPoints += 100;
+              });
+              _showLoginSuccessSnackBar('카카오');
+              
+              // 정보가 업데이트되었으니 다시 fetchPosts 해서 동기화
+              await fetchPosts();
+            }
+          }
+        }
+      } catch (e) {
+        _isProfileSetupOpen = false; // 에러 나도 깃발은 내려야 함
+        print('DEBUG [AUTH]: Profile check/update error: $e');
+      }
+    }
+
+    if (_isLoginPopupOpen) {
+      print('DEBUG [AUTH]: Attempting to close popup safely...');
+      if (mounted && _isLoginPopupOpen) {
+        if (_loginDialogContext != null) {
+          // 컨텍스트가 유효한지 한 번 더 확인하고 pop
+          try {
+            Navigator.of(_loginDialogContext!).pop();
+            print('DEBUG [AUTH]: Popup closed via context.');
+          } catch (e) {
+            print('DEBUG [AUTH]: Pop error (already closed?): $e');
+          }
+        }
+        _isLoginPopupOpen = false;
+        _loginDialogContext = null;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    _loginTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
   }
 
   Future<void> fetchPosts() async {
@@ -106,45 +302,32 @@ class _MainScreenState extends State<MainScreen> {
       
       if (gIsLoggedIn) {
         try {
-          // (참고: 테스트용 계정 처리 로직)
-          if (gIdText.startsWith('테스트용')) {
-            await SupabaseService.client.from('posts').update({'uploader_internal_id': '3ee25993-1578-4283-a99b-109a51fe5f78'}).ilike('uploader_id', '테스트용%'); 
-            await SupabaseService.client.from('comments').update({'user_internal_id': '3ee25993-1578-4283-a99b-109a51fe5f78'}).ilike('user_id', '테스트용%');
-            await SupabaseService.client.from('user_profiles').delete().eq('user_id', gIdText).neq('id', '3ee25993-1578-4283-a99b-109a51fe5f78');
-            await SupabaseService.client.from('user_profiles').update({'user_id': gIdText}).eq('id', '3ee25993-1578-4283-a99b-109a51fe5f78');
-          }
-
-          // 1. 프로필 정보부터 확정
+          // 1. 프로필 정보 확정 (Auth UUID 기반)
           Map<String, dynamic>? profileData;
           if (gUserInternalId != null) {
             profileData = await SupabaseService.client
                 .from('user_profiles')
-                .select('id, points, user_id, nickname, profile_image, bio')
+                .select('id, points, user_id, nickname, profile_image, bio, age, gender, region')
                 .eq('id', gUserInternalId!)
-                .maybeSingle();
-          }
-          
-          if (profileData == null) {
-            profileData = await SupabaseService.client
-                .from('user_profiles')
-                .select('id, points, user_id, nickname, profile_image, bio')
-                .eq('user_id', gIdText)
                 .maybeSingle();
           }
           
           if (profileData != null) {
             setState(() {
-              gUserInternalId = profileData!['id'].toString();
-              gUserPoints = profileData['points'] ?? 0;
+              // gUserInternalId는 이미 Auth 세션에서 설정되었으므로 덮어쓰지 않음
+              gUserPoints = profileData!['points'] ?? 0;
               gIdText = profileData['user_id'] ?? gIdText;
               gNameText = profileData['nickname'] ?? gNameText;
               gProfileImage = profileData['profile_image'] ?? gProfileImage;
               gBioText = profileData['bio'] ?? gBioText;
             });
           } else {
+            // 프로필이 없으면 현재 Auth UUID를 사용하여 새로 생성
+            print('DEBUG [PROFILE]: No profile found, creating new one for $gUserInternalId');
             final newProfile = await SupabaseService.client
                 .from('user_profiles')
                 .insert({
+                  'id': gUserInternalId, // ✅ Auth UUID를 프로필 ID로 사용!
                   'user_id': gIdText, 
                   'points': 5000,
                   'nickname': gNameText,
@@ -154,7 +337,6 @@ class _MainScreenState extends State<MainScreen> {
                 .single();
             setState(() {
               gUserPoints = 5000;
-              gUserInternalId = newProfile['id'].toString();
             });
           }
 
@@ -165,31 +347,31 @@ class _MainScreenState extends State<MainScreen> {
                 .select('post_id')
                 .eq('user_internal_id', gUserInternalId!); 
             likedPostIds = userLikes.map((l) => l['post_id'].toString()).toSet();
+
+            final List<dynamic> userBookmarks = await SupabaseService.client
+                .from('bookmarks')
+                .select('post_id')
+                .eq('user_internal_id', gUserInternalId!);
+            bookmarkedPostIds = userBookmarks.map((b) => b['post_id'].toString()).toSet();
+
+            final List<dynamic> userFollows = await SupabaseService.client
+                .from('follows')
+                .select('following_internal_id')
+                .eq('follower_internal_id', gUserInternalId!);
+            followedUserIds = userFollows.map((f) => f['following_internal_id'].toString()).toSet();
+
+            // 3. 알림 내역 가져오기
+            final List<dynamic> notifs = await SupabaseService.client
+                .from('notifications')
+                .select()
+                .eq('user_internal_id', gUserInternalId!)
+                .order('created_at', ascending: false);
+                
+            setState(() {
+              _notifications = List<Map<String, dynamic>>.from(notifs);
+              _hasNewNotifications = _notifications.any((n) => n['is_read'] == false);
+            });
           }
-
-          final List<dynamic> userBookmarks = await SupabaseService.client
-              .from('bookmarks')
-              .select('post_id')
-              .eq('user_id', gIdText);
-          bookmarkedPostIds = userBookmarks.map((b) => b['post_id'].toString()).toSet();
-
-          final List<dynamic> userFollows = await SupabaseService.client
-              .from('follows')
-              .select('following_id')
-              .eq('follower_id', gIdText);
-          followedUserIds = userFollows.map((f) => f['following_id'].toString()).toSet();
-
-          // 3. 알림 내역 가져오기
-          final List<dynamic> notifs = await SupabaseService.client
-              .from('notifications')
-              .select()
-              .eq('user_id', gIdText)
-              .order('created_at', ascending: false);
-              
-          setState(() {
-            _notifications = List<Map<String, dynamic>>.from(notifs);
-            _hasNewNotifications = _notifications.any((n) => n['is_read'] == false);
-          });
 
         } catch (e) {
           print('개인 데이터 가져오기 실패: $e');
@@ -269,9 +451,9 @@ class _MainScreenState extends State<MainScreen> {
           percentB: '50%', // Placeholder
           isLiked: gIsLoggedIn && likedPostIds.contains(json['id'].toString()),
           isBookmarked: gIsLoggedIn && bookmarkedPostIds.contains(json['id'].toString()),
-          isFollowing: gIsLoggedIn && followedUserIds.any((fid) => 
-            fid.replaceAll(' ', '').trim() == (json['uploader_id'] ?? '').toString().replaceAll(' ', '').trim()
-          ), // Robust normalization!
+          isFollowing: gIsLoggedIn && followedUserIds.contains(
+            json['uploader_internal_id']?.toString() ?? ''
+          ),
           tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
           isExpired: () {
             bool exp = json['is_expired'] ?? false;
@@ -314,8 +496,8 @@ class _MainScreenState extends State<MainScreen> {
 
       setState(() {
         _posts = loadedPosts.where((p) {
-          // 🆔 이름표(아이디)는 무시! 오직 주민번호(UUID)로만 내 글 확인!
-          bool isMine = p.uploaderInternalId != null && p.uploaderInternalId == gUserInternalId;
+          // 🆔 진짜 고유 번호(UUID)로 내 글인지 확인!
+          bool isMine = gIsLoggedIn && p.uploaderInternalId != null && p.uploaderInternalId == gUserInternalId;
           return isMine || !p.isHidden;
         }).toList();
         _refreshRecommended();
@@ -327,18 +509,15 @@ class _MainScreenState extends State<MainScreen> {
 
   void _startLoginTimer() {
     _loginTimer?.cancel();
-    _loginTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted) {
+    _loginTimer = Timer(const Duration(seconds: 4), () async {
+      // 타이머가 끝났을 때 세션을 한 번 더 직접 확인 (가장 확실한 방법)
+      final session = SupabaseService.client.auth.currentSession;
+      if (mounted && !gIsLoggedIn && session == null && !_isLoginPopupOpen) {
         _showLoginPopup();
       }
     });
   }
 
-  @override
-  void dispose() {
-    _loginTimer?.cancel();
-    super.dispose();
-  }
 
   void _refreshRecommended() {
     List<PostData> nonExpired = _posts.where((p) => !p.isExpired && !p.isHidden).toList();
@@ -409,15 +588,25 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _showLoginPopup() {
-    _loginTimer?.cancel(); // Cancel automatic timer if popup is shown manually or automatically
+    if (_isLoginPopupOpen) return;
+    _isLoginPopupOpen = true;
+    _loginTimer?.cancel(); 
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: '',
       barrierColor: Colors.black.withValues(alpha: 0.8), // 뒷화면 어둡게
       transitionDuration: const Duration(milliseconds: 400),
-      pageBuilder: (context, anim1, anim2) {
-        return Center(
+      pageBuilder: (dialogContext, anim1, anim2) {
+        _loginDialogContext = dialogContext; // 저장!
+        return PopScope(
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) {
+              _isLoginPopupOpen = false;
+              _loginDialogContext = null;
+            }
+          },
+          child: Center(
           child: Container(
             width: MediaQuery.of(context).size.width * 0.85,
             padding: const EdgeInsets.all(32),
@@ -460,23 +649,34 @@ class _MainScreenState extends State<MainScreen> {
                     textColor: const Color(0xFF191919).withValues(alpha: 0.85),
                     iconSize: 28, 
                     onTap: () async {
-                      // 1. 로그인 상태로 변경
-                      setState(() { gIsLoggedIn = true; });
-                      
-                      // 2. 프로필 및 주민번호 즉시 확보 (정석!)
-                      await fetchPosts(); 
-                      
-                      Navigator.pop(context);
-                      
-                      // Show Profile Setup after login (only if needed)
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
-                      );
-                      
-                      if (result != null) {
-                        setState(() { _userPoints += 100; }); // Welcome Bonus
-                        _showLoginSuccessSnackBar('카카오');
+                      // 💡 안전하게 팝업 닫기 (중복 pop 방지)
+                      if (_isLoginPopupOpen && _loginDialogContext != null) {
+                        final targetCtx = _loginDialogContext;
+                        _isLoginPopupOpen = false;
+                        _loginDialogContext = null;
+                        try {
+                          Navigator.of(targetCtx!).pop();
+                        } catch (e) {
+                          print('DEBUG [AUTH]: Tap pop error: $e');
+                        }
+                      }
+
+                      try {
+                        // 1. 수파베이스 카카오 로그인 실행
+                        await SupabaseService.client.auth.signInWithOAuth(
+                          OAuthProvider.kakao,
+                          redirectTo: 'pickget://login-callback',
+                          authScreenLaunchMode: LaunchMode.inAppBrowserView,
+                        );
+                      } catch (e) {
+
+                        // 💡 참고: 로그인이 완료되면 딥링크를 통해 앱으로 돌아오고, 
+                        // supabase_flutter 패키지가 자동으로 세션을 인식합니다.
+                      } catch (e) {
+                        print('카카오 로그인 에러: $e');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('로그인 중 오류가 발생했습니다: $e')),
+                        );
                       }
                     },
                   ),
@@ -498,9 +698,19 @@ class _MainScreenState extends State<MainScreen> {
                         MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
                       );
                       
-                      if (result != null) {
-                        setState(() { _userPoints += 100; }); 
-                        _showLoginSuccessSnackBar('네이버');
+                      if (result != null && result is Map) {
+                        try {
+                          await SupabaseService.client.from('user_profiles').update({
+                            'age': result['age'],
+                            'gender': result['gender'],
+                            'region': result['region'],
+                          }).eq('id', gUserInternalId!);
+                          
+                          setState(() { gUserPoints += 100; }); 
+                          _showLoginSuccessSnackBar('네이버');
+                        } catch (e) {
+                          print('DEBUG [AUTH]: Naver profile update error: $e');
+                        }
                       }
                     },
                   ),
@@ -523,15 +733,28 @@ class _MainScreenState extends State<MainScreen> {
                         MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
                       );
                       
-                      if (result != null) {
-                        setState(() { _userPoints += 100; }); 
-                        _showLoginSuccessSnackBar('Google');
+                      if (result != null && result is Map) {
+                        try {
+                          await SupabaseService.client.from('user_profiles').update({
+                            'age': result['age'],
+                            'gender': result['gender'],
+                            'region': result['region'],
+                          }).eq('id', gUserInternalId!);
+                          
+                          setState(() { gUserPoints += 100; }); 
+                          _showLoginSuccessSnackBar('Google');
+                        } catch (e) {
+                          print('DEBUG [AUTH]: Google profile update error: $e');
+                        }
                       }
                     },
                   ),
                   const SizedBox(height: 30),
                   TextButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      _isLoginPopupOpen = false;
+                      Navigator.pop(context);
+                    },
                     child: const Text(
                       '나중에 할게요',
                       style: TextStyle(color: Colors.white38, fontSize: 14, decoration: TextDecoration.underline),
@@ -541,8 +764,9 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           ),
-        );
-      },
+        ),
+      );
+    },
       transitionBuilder: (context, anim1, anim2, child) {
         return FadeTransition(
           opacity: anim1,
@@ -658,12 +882,18 @@ class _MainScreenState extends State<MainScreen> {
                     if (nowFollowing) {
                       await SupabaseService.client
                         .from('follows')
-                        .insert({'follower_id': gIdText, 'following_id': post.uploaderId});
+                        .insert({
+                          'follower_internal_id': gUserInternalId!,
+                          'following_internal_id': post.uploaderInternalId!,
+                        });
                     } else {
                       await SupabaseService.client
                         .from('follows')
                         .delete()
-                        .match({'follower_id': gIdText, 'following_id': post.uploaderId});
+                        .match({
+                          'follower_internal_id': gUserInternalId!,
+                          'following_internal_id': post.uploaderInternalId!,
+                        });
                     }
                   } catch (e) {
                     print('팔로우 서버 동기화 에러: $e');
@@ -684,12 +914,18 @@ class _MainScreenState extends State<MainScreen> {
                     if (nowBookmarked) {
                       await SupabaseService.client
                         .from('bookmarks')
-                        .insert({'user_id': gIdText, 'post_id': post.id});
+                        .insert({
+                          'user_internal_id': gUserInternalId!,
+                          'post_id': post.id,
+                        });
                     } else {
                       await SupabaseService.client
                         .from('bookmarks')
                         .delete()
-                        .match({'user_id': gIdText, 'post_id': post.id});
+                        .match({
+                          'user_internal_id': gUserInternalId!,
+                          'post_id': post.id,
+                        });
                     }
                   } catch (e) {
                     print('즐겨찾기 동기화 에러: $e');

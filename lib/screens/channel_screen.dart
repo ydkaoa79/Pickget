@@ -600,12 +600,18 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                                 if (nowFollowing) {
                                   await SupabaseService.client
                                     .from('follows')
-                                    .insert({'follower_id': gIdText, 'following_id': widget.uploaderId});
+                                    .insert({
+                                      'follower_internal_id': gUserInternalId!, 
+                                      'following_internal_id': widget.initialPost.uploaderInternalId!
+                                    });
                                 } else {
                                   await SupabaseService.client
                                     .from('follows')
                                     .delete()
-                                    .match({'follower_id': gIdText, 'following_id': widget.uploaderId});
+                                    .match({
+                                      'follower_internal_id': gUserInternalId!, 
+                                      'following_internal_id': widget.initialPost.uploaderInternalId!
+                                    });
                                 }
                               } catch (e) {
                                 debugPrint('팔로우 서버 동기화 에러: $e');
