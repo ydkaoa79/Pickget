@@ -1338,9 +1338,13 @@ class _MainScreenState extends State<MainScreen> {
                   }
                 });
               }, 
-              child: gIsLoggedIn 
-                ? CircleAvatar(radius: 12, backgroundImage: gProfileImage.startsWith('http') ? NetworkImage(gProfileImage) : AssetImage(gProfileImage) as ImageProvider)
-                : const Icon(Icons.account_circle_outlined, color: Colors.white54, size: 24),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding: const EdgeInsets.all(10), // 터치 마스크 영역 넉넉하게 확장
+                child: gIsLoggedIn 
+                  ? CircleAvatar(radius: 12, backgroundImage: gProfileImage.startsWith('http') ? NetworkImage(gProfileImage) : AssetImage(gProfileImage) as ImageProvider)
+                  : const Icon(Icons.account_circle_outlined, color: Colors.white54, size: 24),
+              ),
             ),
           ],
         ),
