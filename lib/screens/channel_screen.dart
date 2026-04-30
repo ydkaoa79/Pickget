@@ -115,7 +115,12 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                 Navigator.pop(context);
                 _showLogoutDialog();
               }, color: Colors.redAccent),
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
+              const Text(
+                'v1.0.0',
+                style: TextStyle(color: Colors.white24, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
             ],
           ),
         );
