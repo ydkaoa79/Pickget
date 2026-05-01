@@ -1283,7 +1283,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
               ),
             ),
             if (hasVoted) Positioned(
-              top: 38, left: 0, right: 0,
+              top: 34, left: 0, right: 0, // 38에서 34로 더 위로 밀착
               child: Column(
                 children: [
                   Row(
@@ -1301,7 +1301,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           ]
                         ),
                       ),
-                      const SizedBox(width: 35),
+                      const SizedBox(width: 15), // 간격을 35에서 15로 대폭 축소 (옹기종기)
                       SizedBox(
                         width: 45,
                         child: Column(
