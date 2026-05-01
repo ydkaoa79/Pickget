@@ -1283,7 +1283,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
               ),
             ),
             if (hasVoted) Positioned(
-              top: 34, left: 0, right: 0, // 38에서 34로 더 위로 밀착
+              top: 58, left: 0, right: 0, 
               child: Column(
                 children: [
                   Row(
@@ -1293,28 +1293,46 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                       // 왼쪽 A 통계 (시안색 - 우측 정렬)
                       SizedBox(
                         width: 45,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end, // 우측 정렬로 변경
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          alignment: Alignment.centerRight,
                           children: [
-                            if (_votedSide == 1) _myPickLabel(),
-                            _shadowText(post.percentA, color: Colors.cyanAccent, size: 14, weight: FontWeight.w900), 
-                            _shadowText(post.voteCountA, color: Colors.white70, size: 9, weight: FontWeight.bold),
-                          ]
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                _shadowText(post.percentA, color: Colors.cyanAccent, size: 14, weight: FontWeight.w900),
+                                _shadowText(post.voteCountA, color: Colors.white70, size: 9, weight: FontWeight.bold),
+                              ],
+                            ),
+                            if (_votedSide == 1) Positioned(
+                              top: -18, right: 0,
+                              child: _myPickLabel(),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 15),
                       // 오른쪽 B 통계 (빨간색 - 좌측 정렬)
                       SizedBox(
-                        width: 50, // 5픽셀 이동을 고려해 가로폭 소폭 확대
+                        width: 50,
                         child: Padding(
-                          padding: const EdgeInsets.only(left: 5), // 오른쪽으로 5픽셀 이동
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start, // 좌측 정렬
+                          padding: const EdgeInsets.only(left: 5),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            alignment: Alignment.centerLeft,
                             children: [
-                              if (_votedSide == 2) _myPickLabel(),
-                              _shadowText(post.percentB, color: Colors.redAccent, size: 14, weight: FontWeight.w900), 
-                              _shadowText(post.voteCountB, color: Colors.white70, size: 9, weight: FontWeight.bold),
-                            ]
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _shadowText(post.percentB, color: Colors.redAccent, size: 14, weight: FontWeight.w900),
+                                  _shadowText(post.voteCountB, color: Colors.white70, size: 9, weight: FontWeight.bold),
+                                ],
+                              ),
+                              if (_votedSide == 2) Positioned(
+                                top: -18, left: 0,
+                                child: _myPickLabel(),
+                              ),
+                            ],
                           ),
                         ),
                       ),
