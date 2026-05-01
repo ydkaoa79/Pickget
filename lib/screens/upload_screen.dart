@@ -2,16 +2,15 @@ import 'package:flutter/material.dart';
 import '../models/post_data.dart';
 import '../core/app_state.dart';
 import 'channel_screen.dart';
-import 'video_edit_screen.dart'; // 🚀 편집기 임포트!
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import '../services/cloudflare_service.dart';
 import '../services/supabase_service.dart';
 import 'dart:io';
-import 'package:flutter/foundation.dart'; // kIsWeb 사용을 위해 추가
-import '../services/media_compressor.dart'; // 🚀 압축기 임포트!
-import 'package:video_compress/video_compress.dart'; // 🚀 영상 썸네일용!
-import 'package:path/path.dart' as p; // 🚀 확장자 추출용!
+import 'package:flutter/foundation.dart';
+import '../services/media_compressor.dart';
+import 'package:video_player/video_player.dart'; // 🎬 영상 길이 확인용!
+import 'package:path/path.dart' as p;
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -373,29 +372,62 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Future<void> _handlePickedMedia(String path, String label, Function(String) onPick, {required bool isVideo}) async {
     if (isVideo) {
-      // 🚀 사수님의 6초 룰! 편집기 먼저 다녀오기
-      final File? editedFile = await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => VideoEditScreen(file: File(path))),
-      );
+      // 🎬 1단계: 영상 길이 확인 (6초 초과 시 경고!)
+      final controller = VideoPlayerController.file(File(path));
+      try {
+        await controller.initialize();
+        final duration = controller.value.duration;
+        controller.dispose();
 
-      if (editedFile == null) return; // 편집 취소 시 중단
+        if (duration.inSeconds > 6) {
+          // ⚠️ 6초 초과 경고 팝업!
+          if (mounted) {
+            await showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                backgroundColor: const Color(0xFF1C1C1C),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                title: const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.amberAccent, size: 24),
+                    SizedBox(width: 8),
+                    Text('영상 길이 초과', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                content: Text(
+                  '선택하신 영상은 ${duration.inSeconds}초입니다.\n\n최대 6초까지만 업로드 가능합니다.\n6초 이하의 영상을 선택해주세요.',
+                  style: const TextStyle(color: Colors.white70, height: 1.5),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('확인', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+          }
+          return; // 6초 초과 시 업로드 중단!
+        }
+      } catch (e) {
+        controller.dispose();
+        print('DEBUG [VIDEO]: 영상 길이 확인 실패 - $e');
+      }
 
-      final String finalPath = editedFile.path;
-
-      // 🎬 잘린 영상으로 썸네일 생성
-      final thumbFile = await VideoCompress.getFileThumbnail(finalPath, quality: 50, position: -1);
+      // 🎬 2단계: 썸네일 생성
+      final thumbFile = await MediaCompressor.generateThumbnail(path);
+      
       if (mounted) {
         setState(() {
           if (label == 'A') {
-            _imagePathA = finalPath;
-            _thumbPathA = thumbFile.path;
+            _imagePathA = path;
+            _thumbPathA = thumbFile?.path;
           } else {
-            _imagePathB = finalPath;
-            _thumbPathB = thumbFile.path;
+            _imagePathB = path;
+            _thumbPathB = thumbFile?.path;
           }
         });
-        onPick(finalPath);
+        onPick(path);
       }
     } else {
       // 📸 사진일 경우 기존처럼 크롭 로직 가동!

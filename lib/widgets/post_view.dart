@@ -58,15 +58,17 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   bool _showIsMeToast = false; // 🚫 본인 게시물 알림용 추가!
   bool _isSheetOpening = false;
   
-  // 🎬 영상 컨트롤러 세트
+  // 🎬 영상 재생 시스템 (v2.0 - 깔끔 재구축)
   VideoPlayerController? _controllerA;
   VideoPlayerController? _controllerB;
   bool _isInitializedA = false;
   bool _isInitializedB = false;
-  int _activeVideoSide = 1;
-  bool _isVisible = false;
   bool _isInitializingA = false;
   bool _isInitializingB = false;
+  int _playingSide = 0; // 0: 없음, 1: A재생중, 2: B재생중
+  bool _isVisible = false;
+  bool _videoAFinished = false;
+  bool _videoBFinished = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -91,113 +93,139 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     _updateRemainingTime();
     _startTimer();
 
-    // 🎬 영상은 자동 재생하지 않고 사용자가 클릭(Play 버튼)할 때만 초기화! (데이터/배터리 폭탄 방지)
-    // _initVideo(widget.post.imageA, 1);
-    // _initVideo(widget.post.imageB, 2);
+    // 🎬 영상 초기화는 화면에 보일 때(VisibilityDetector)에서 자동 처리!
   }
 
+  // 🎬 모든 영상 리소스 해제
   void _releaseAllVideos() {
-    if (_controllerA != null) {
-      _controllerA!.dispose();
-      _controllerA = null;
-      _isInitializedA = false;
-    }
-    if (_controllerB != null) {
-      _controllerB!.dispose();
-      _controllerB = null;
-      _isInitializedB = false;
-    }
-  }
-
-  void _updateVideoStates() {
-    if (!_isVisible) {
-      _releaseAllVideos();
-      return;
-    }
+    _controllerA?.dispose();
+    _controllerA = null;
+    _isInitializedA = false;
+    _isInitializingA = false;
     
-    if (!_isInitializedA && !_isInitializingA) _initVideo(widget.post.imageA, 1);
-    if (!_isInitializedB && !_isInitializingB) _initVideo(widget.post.imageB, 2);
-
-    if (_activeVideoSide == 1) {
-      if (_isInitializedB && _controllerB != null) _controllerB!.pause();
-      if (_isInitializedA && _controllerA != null) _controllerA!.play();
-    } else {
-      if (_isInitializedA && _controllerA != null) _controllerA!.pause();
-      if (_isInitializedB && _controllerB != null) _controllerB!.play();
-    }
-    setState(() {});
+    _controllerB?.dispose();
+    _controllerB = null;
+    _isInitializedB = false;
+    _isInitializingB = false;
+    
+    _playingSide = 0;
+    _videoAFinished = false;
+    _videoBFinished = false;
   }
 
+  // 🎬 영상 초기화 (네트워크 URL 직접 사용, 6초 영상이라 빠름)
   Future<void> _initVideo(String url, int side) async {
     if (!_isVideo(url)) return;
+    if (side == 1 && (_isInitializedA || _isInitializingA)) return;
+    if (side == 2 && (_isInitializedB || _isInitializingB)) return;
 
     if (side == 1) _isInitializingA = true;
     else _isInitializingB = true;
 
     try {
-      print('DEBUG [VIDEO]: Side $side 캐싱 시작 - $url');
-      // 🚀 [사수표 무중력 캐싱] 폰에 먼저 저장하고 로컬 파일로 플레이!
-      final file = await DefaultCacheManager().getSingleFile(url);
+      print('DEBUG [VIDEO v2]: Side $side 초기화 시작 - $url');
       
+      // 🚀 캐시 매니저로 먼저 다운로드 후 로컬 파일로 재생 (안정성 UP)
+      final file = await DefaultCacheManager().getSingleFile(url);
       final controller = VideoPlayerController.file(file);
       await controller.initialize();
-      await controller.setLooping(false); 
-      await controller.setVolume(0);
+      await controller.setLooping(false);
+      await controller.setVolume(0); // 🔇 음소거 (소리는 업로드 시 이미 삭제됨)
       
-      bool isFinished = false;
+      // 🎬 영상 끝 감지 리스너
       controller.addListener(() {
         if (!mounted) return;
-        if (controller.value.isInitialized && controller.value.position >= controller.value.duration && controller.value.duration > Duration.zero) {
-           if (!isFinished) {
-             isFinished = true;
-             if (_expandedSide == 0 && _activeVideoSide == side) {
-               setState(() {
-                 _activeVideoSide = (side == 1) ? 2 : 1;
-               });
-               controller.seekTo(Duration.zero).then((_) {
-                 isFinished = false;
-               });
-               _updateVideoStates();
-             } else if (_expandedSide != 0 && _activeVideoSide == side) {
-               controller.seekTo(Duration.zero).then((_) {
-                 controller.play();
-                 isFinished = false;
-               });
-             } else {
-               isFinished = false;
-             }
-           }
+        final pos = controller.value.position;
+        final dur = controller.value.duration;
+        if (dur > Duration.zero && pos >= dur) {
+          _onVideoFinished(side);
         }
       });
 
-      if (mounted) {
-        if (!_isVisible) {
-          controller.dispose();
-          if (side == 1) _isInitializingA = false;
-          else _isInitializingB = false;
-          return;
-        }
-        
-        setState(() {
-          if (side == 1) {
-            _controllerA = controller;
-            _isInitializedA = true;
-            _isInitializingA = false;
-          } else {
-            _controllerB = controller;
-            _isInitializedB = true;
-            _isInitializingB = false;
-          }
-        });
-        
-        if (_activeVideoSide == side) {
-          controller.play();
-        }
+      if (!mounted || !_isVisible) {
+        controller.dispose();
+        if (side == 1) _isInitializingA = false;
+        else _isInitializingB = false;
+        return;
       }
+
+      setState(() {
+        if (side == 1) {
+          _controllerA = controller;
+          _isInitializedA = true;
+          _isInitializingA = false;
+        } else {
+          _controllerB = controller;
+          _isInitializedB = true;
+          _isInitializingB = false;
+        }
+      });
+
+      // 🎬 A가 준비되면 자동 재생 시작!
+      if (side == 1 && _playingSide == 0) {
+        _switchToSide(1);
+      }
+      
+      print('DEBUG [VIDEO v2]: Side $side 초기화 완료!');
     } catch (e) {
       if (side == 1) _isInitializingA = false;
       else _isInitializingB = false;
-      print('DEBUG [VIDEO]: Side $side 초기화 실패 - $e');
+      print('DEBUG [VIDEO v2]: Side $side 초기화 실패 - $e');
+    }
+  }
+
+  // 🎬 영상 재생 완료 시 처리
+  void _onVideoFinished(int side) {
+    if (!mounted) return;
+    
+    if (side == 1 && !_videoAFinished) {
+      _videoAFinished = true;
+      print('DEBUG [VIDEO v2]: A 영상 재생 완료 → B로 전환');
+      
+      // A 끝나면 → B 자동 재생
+      _controllerA?.pause();
+      _controllerA?.seekTo(Duration.zero);
+      
+      if (_isInitializedB && _controllerB != null) {
+        _switchToSide(2);
+      }
+    } else if (side == 2 && !_videoBFinished) {
+      _videoBFinished = true;
+      print('DEBUG [VIDEO v2]: B 영상 재생 완료 → 전체 정지');
+      
+      // B 끝나면 → 전체 정지 (루프 없음)
+      _controllerB?.pause();
+      _controllerB?.seekTo(Duration.zero);
+      setState(() => _playingSide = 0);
+    }
+  }
+
+  // 🎬 특정 사이드로 즉시 전환 (터치/슬라이드 시 호출)
+  void _switchToSide(int side) {
+    if (!mounted) return;
+    
+    if (side == 1 && _isInitializedA && _controllerA != null) {
+      _controllerB?.pause();
+      _videoAFinished = false;
+      _controllerA!.seekTo(Duration.zero);
+      _controllerA!.play();
+      setState(() => _playingSide = 1);
+    } else if (side == 2 && _isInitializedB && _controllerB != null) {
+      _controllerA?.pause();
+      _videoBFinished = false;
+      _controllerB!.seekTo(Duration.zero);
+      _controllerB!.play();
+      setState(() => _playingSide = 2);
+    }
+  }
+
+  // 🎬 화면 진입 시 영상 시작
+  void _onBecomeVisible() {
+    if (_isVideo(widget.post.imageA)) {
+      _initVideo(widget.post.imageA, 1);
+    }
+    if (_isVideo(widget.post.imageB)) {
+      _initVideo(widget.post.imageB, 2);
     }
   }
 
@@ -458,14 +486,16 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     setState(() {
       if (tapX < currentWidthA) {
         if (_expandedSide == 1) { _expandedSide = 0; _widthA = sw * 0.5; }
-        else { _expandedSide = 1; _widthA = sw * 0.8; _activeVideoSide = 1; }
+        else { _expandedSide = 1; _widthA = sw * 0.8; }
       } else {
         if (_expandedSide == 2) { _expandedSide = 0; _widthA = sw * 0.5; }
-        else { _expandedSide = 2; _widthA = sw * 0.2; _activeVideoSide = 2; }
+        else { _expandedSide = 2; _widthA = sw * 0.2; }
       }
     });
     HapticFeedback.lightImpact();
-    _updateVideoStates();
+    // 🎬 터치 시 해당 사이드 영상 즉시 전환!
+    if (_expandedSide == 1) _switchToSide(1);
+    else if (_expandedSide == 2) _switchToSide(2);
   }
 
   String _formatTimer(int seconds) {
@@ -484,13 +514,11 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
         if (!mounted) return;
         final visible = info.visibleFraction > 0.5;
         if (_isVisible != visible) {
-          setState(() {
-            _isVisible = visible;
-          });
+          _isVisible = visible;
           if (visible) {
-             _updateVideoStates();
+            _onBecomeVisible();
           } else {
-             _releaseAllVideos();
+            _releaseAllVideos();
           }
         }
       },
@@ -1433,7 +1461,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     if (_isVideo(url)) {
       final controller = (side == 1) ? _controllerA : _controllerB;
       final isInitialized = (side == 1) ? _isInitializedA : _isInitializedB;
-      final isPlaying = (_activeVideoSide == side);
+      final isPlaying = (_playingSide == side);
 
       Widget content;
       if (!forceThumb && isInitialized && controller != null) {
@@ -1451,6 +1479,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
           content = CachedNetworkImage(
             imageUrl: thumbUrl.trim(),
             fit: BoxFit.cover,
+            fadeInDuration: const Duration(milliseconds: 200),
+            fadeOutDuration: const Duration(milliseconds: 200),
             placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2)),
             errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white24),
           );
@@ -1466,6 +1496,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
           ? CachedNetworkImage(
               imageUrl: url.trim(),
               fit: BoxFit.cover,
+              fadeInDuration: const Duration(milliseconds: 200),
+              fadeOutDuration: const Duration(milliseconds: 200),
               placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2)),
               errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white24),
             )
