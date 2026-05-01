@@ -1407,11 +1407,17 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
               ),
             ) else Positioned(
               top: 66, // ⚪ 조금 더 여유 있게 아래로 배치
-              child: _shadowText(
-                '투표 후 확인 가능', 
-                color: Colors.white.withValues(alpha: 0.85), 
-                size: 11, // 🚀 시원하게 키웠습니다!
-                weight: FontWeight.w900 // 💥 더 굵게!
+              left: 5, right: 5, // 🚀 양옆 여백을 줘서 중앙 정렬 유도
+              child: Center(
+                child: FittedBox( // 💥 [대응] 작은 폰에서도 글자가 안 깨지게 자동 축소!
+                  fit: BoxFit.scaleDown,
+                  child: _shadowText(
+                    '투표 후 확인 가능', 
+                    color: Colors.white.withValues(alpha: 0.85), 
+                    size: 11,
+                    weight: FontWeight.w900
+                  ),
+                ),
               ),
             ),
           ],
