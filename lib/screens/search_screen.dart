@@ -371,14 +371,8 @@ class _SearchScreenState extends State<SearchScreen> {
             borderRadius: BorderRadius.circular(20),
           ),
           child: _isLoadingPopular
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.cyanAccent,
-                      strokeWidth: 2,
-                    ),
-                  ),
+              ? Column(
+                  children: List.generate(10, (index) => _buildSkeletonTile(index + 1)),
                 )
               : Column(
                   children: List.generate(_popularSearches.length, (index) {
@@ -471,7 +465,7 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Text(
                 '$rank',
                 style: TextStyle(
-                  color: rank <= 3 ? Colors.cyanAccent : Colors.white38,
+                  color: rank <= 3 ? Colors.cyanAccent : Colors.white24,
                   fontWeight: FontWeight.w900,
                   fontSize: 15,
                 ),
@@ -493,6 +487,46 @@ class _SearchScreenState extends State<SearchScreen> {
             _buildStatusIndicator(status, change),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonTile(int rank) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 24,
+            child: Text(
+              '$rank',
+              style: TextStyle(
+                color: rank <= 3 ? Colors.cyanAccent.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.05),
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Container(
+              height: 14,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+          const SizedBox(width: 20),
+          Container(
+            width: 30,
+            height: 12,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
       ),
     );
   }
