@@ -17,6 +17,7 @@ import 'screens/search_screen.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/channel_feed_screen.dart';
 import 'services/supabase_service.dart';
+import 'core/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
@@ -314,6 +315,34 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
+  // 🌐 [CDN 무적 연동] 모든 저장소 주소를 최종 CDN 주소로 단축 및 통합
+  String toCdnUrl(String? url) {
+    if (url == null || url.isEmpty) return '';
+    if (url.startsWith('assets/')) return url; // 로컬 에셋은 통과
+
+    final cdnBase = CloudflareConfig.cdnUrl;
+
+    // 1. 이미 CDN 주소면 그대로 반환
+    if (url.contains('cdn.pickget.net')) {
+      return url;
+    }
+
+    // 2. Worker, Supabase, R2 직항 주소 등 모든 케이스를 CDN으로 통합
+    if (url.contains('workers.dev') || 
+        url.contains('supabase.co') || 
+        url.contains('r2.cloudflarestorage.com')) {
+      
+      // 파일명만 추출 (마지막 / 이후의 문자열)
+      final fileName = url.split('/').last;
+      // 쿼리 스트링(?...)이 붙어있을 경우 제거하여 깔끔한 파일명만 추출
+      final cleanFileName = fileName.split('?').first;
+      
+      return '$cdnBase$cleanFileName';
+    }
+
+    return url;
+  }
+
   Future<void> fetchPosts() async {
     try {
       Set<String> likedPostIds = {};
@@ -487,10 +516,10 @@ class _MainScreenState extends State<MainScreen> {
         final String nickname = (profile != null && profile['nickname'] != null)
             ? profile['nickname'].toString()
             : (json['uploader_id'] ?? '익명');
-        final String profileImg =
+        final String profileImg = toCdnUrl(
             (profile != null && profile['profile_image'] != null)
             ? profile['profile_image'].toString()
-            : (json['uploader_image'] ?? 'assets/profiles/profile_11.jpg');
+            : (json['uploader_image'] ?? 'assets/profiles/profile_11.jpg'));
 
         final String? finalInternalId =
             internalId ?? profile?['id']?.toString();
@@ -503,8 +532,8 @@ class _MainScreenState extends State<MainScreen> {
           uploaderName: nickname,
           uploaderImage: profileImg,
           timeLocation: '방금 전',
-          imageA: json['image_a'] ?? '',
-          imageB: json['image_b'] ?? '',
+          imageA: toCdnUrl(json['image_a'] ?? ''),
+          imageB: toCdnUrl(json['image_b'] ?? ''),
           descriptionA: json['description_a'] ?? '선택지 A',
           descriptionB: json['description_b'] ?? '선택지 B',
           fullDescription: json['full_description'] ?? '',

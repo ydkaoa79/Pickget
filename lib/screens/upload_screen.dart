@@ -186,13 +186,17 @@ class _UploadScreenState extends State<UploadScreen> {
 
     try {
       // 1. Upload images to R2 via Worker
+      // 🆔 중복 방지를 위해 마이크로초 + 랜덤 문자열 조합으로 파일명 생성
+      final String timestamp = DateTime.now().microsecondsSinceEpoch.toString();
+      final String randomStr = (DateTime.now().millisecond % 1000).toString().padLeft(3, '0');
+      
       String? urlA = await _cloudflareService.uploadFile(
         File(_imagePathA!), 
-        'post_${DateTime.now().millisecondsSinceEpoch}_A.jpg'
+        'post_${timestamp}_${randomStr}_A.jpg'
       );
       String? urlB = await _cloudflareService.uploadFile(
         File(_imagePathB!), 
-        'post_${DateTime.now().millisecondsSinceEpoch}_B.jpg'
+        'post_${timestamp}_${randomStr}_B.jpg'
       );
 
       if (urlA == null || urlB == null) {

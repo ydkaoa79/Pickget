@@ -20,14 +20,14 @@ class CloudflareService {
         options: Options(
           headers: {
             'Content-Type': _getContentType(fileName),
-            'X-Access-Key': CloudflareConfig.accessKey, 
           },
         ),
       );
       print('Upload response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        return '$uploadUrl$fileName';
+        // 🎯 저장할 때는 업로드용 주소(Worker)가 아니라, 다운로드용 주소(CDN)를 리턴합니다!
+        return '${CloudflareConfig.cdnUrl}$fileName';
       }
     } catch (e) {
       print('Upload error: $e');

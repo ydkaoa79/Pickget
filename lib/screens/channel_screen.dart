@@ -32,6 +32,8 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
   bool _isBioExpanded = false;
   bool _isSelectionMode = false;
   final Set<String> _selectedPostIds = {};
+  double _empathyRate = 0.0; // [신규] 진짜 공감도 저장을 위한 변수
+  int _followerCount = 0; // [신규] 실제 팔로워 수
 
   bool get isMe {
     // 🆔 오직 주민번호(UUID) 하나로만 판단 (진짜 정석!)
@@ -67,11 +69,113 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabSelection);
     _loadPosts();
+    _calculateRealEmpathy(); // [신규] 진짜 공감도 계산 시작
+    _fetchFollowerCount(); // [신규] 실제 팔로워 수 조회
 
     // 🏛️ 정석 강제 새로고침: 혹시 모를 인식 지연을 방지하기 위해 0.1초 뒤 다시 확인!
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) setState(() {});
     });
+  }
+
+  // 🏛️ [활동분석 정석 로직 이식] 진짜 공감도 계산 함수
+  Future<void> _calculateRealEmpathy() async {
+    try {
+      final String? targetInternalId = isMe ? gUserInternalId : widget.initialPost.uploaderInternalId;
+      if (targetInternalId == null) return;
+
+      // 1. 투표 참여 내역 가져오기
+      final List<dynamic> myVotes = await SupabaseService.client
+          .from('votes')
+          .select('post_id, side')
+          .eq('user_internal_id', targetInternalId);
+
+      int votedCount = 0;
+      int matchCount = 0;
+
+      if (myVotes.isNotEmpty) {
+        for (var vote in myVotes) {
+          final postId = vote['post_id'].toString();
+          final mySide = vote['side'] as int;
+
+          final postData = await SupabaseService.client
+              .from('posts')
+              .select('vote_count_a, vote_count_b, created_at, tags')
+              .eq('id', postId)
+              .maybeSingle();
+
+          if (postData != null) {
+            // 종료 여부 직접 계산 (활동분석 로직과 동일)
+            bool isExpiredPost = false;
+            final String? createdAtStr = postData['created_at'];
+            final List<dynamic> tags = postData['tags'] as List? ?? [];
+            
+            if (createdAtStr != null) {
+              final createdAt = DateTime.tryParse(createdAtStr);
+              if (createdAt != null) {
+                for (var tag in tags) {
+                  String t = tag.toString();
+                  if (t.startsWith('duration:')) {
+                    final mins = int.tryParse(t.split(':')[1]);
+                    if (mins != null && DateTime.now().isAfter(createdAt.add(Duration(minutes: mins)))) {
+                      isExpiredPost = true;
+                    }
+                  }
+                }
+              }
+            }
+
+            if (!isExpiredPost) continue; 
+
+            votedCount++; 
+            int countA = _parseTotalVotesRaw(postData['vote_count_a']?.toString() ?? '0');
+            int countB = _parseTotalVotesRaw(postData['vote_count_b']?.toString() ?? '0');
+            int winnerSide = (countA > countB) ? 1 : (countB > countA ? 2 : 0);
+            
+            if (mySide == winnerSide || winnerSide == 0) {
+              matchCount++;
+            }
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _empathyRate = votedCount > 0 ? (matchCount / votedCount) * 100 : 0.0;
+        });
+      }
+    } catch (e) {
+      print('채널 공감도 계산 실패: $e');
+    }
+  }
+
+  int _parseTotalVotesRaw(String s) {
+    s = s.toLowerCase().replaceAll(',', '').trim();
+    if (s.isEmpty) return 0;
+    if (s.endsWith('k')) return ((double.tryParse(s.substring(0, s.length - 1)) ?? 0) * 1000).toInt();
+    return int.tryParse(s) ?? 0;
+  }
+
+  // 🏛️ [신규] 실제 팔로워 수 조회 함수
+  Future<void> _fetchFollowerCount() async {
+    try {
+      final String? targetInternalId = isMe ? gUserInternalId : widget.initialPost.uploaderInternalId;
+      if (targetInternalId == null) return;
+
+      // follows 테이블에서 나를 팔로우한 데이터를 가져와 개수를 셉니다. (정확한 컬럼명 적용)
+      final List<dynamic> response = await SupabaseService.client
+          .from('follows')
+          .select('id')
+          .eq('following_internal_id', targetInternalId);
+      
+      if (mounted) {
+        setState(() {
+          _followerCount = response.length;
+        });
+      }
+    } catch (e) {
+      print('팔로워 수 조회 실패: $e');
+    }
   }
 
   void _loadPosts() {
@@ -543,7 +647,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              "팔로워 58.8k · 콘텐츠 ${formatCount(_channelPosts.length)}",
+                              "팔로워 ${formatCount(_followerCount)} · 콘텐츠 ${formatCount(_channelPosts.length)}",
                               style: const TextStyle(color: Colors.white38, fontSize: 13),
                             ),
                           ],
@@ -667,16 +771,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                               const Icon(Icons.auto_awesome, color: Colors.cyanAccent, size: 16),
                               const SizedBox(width: 6),
                               Text(
-                                '공감도 ${() {
-                                  int picks = 0;
-                                  int likes = 0;
-                                  for (var p in _channelPosts) {
-                                    picks += _parseTotalVotes(p);
-                                    likes += p.likesCount;
-                                  }
-                                  if (picks == 0) return "0";
-                                  return ((likes / picks) * 200 + 70).toInt().clamp(70, 99).toString();
-                                }()}%',
+                                '공감도 ${_empathyRate.toInt()}%',
                                 style: const TextStyle(
                                   color: Colors.cyanAccent, 
                                   fontWeight: FontWeight.w900, 
