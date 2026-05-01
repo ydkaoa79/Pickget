@@ -114,6 +114,17 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
+  bool _isVideo(String url) {
+    final path = url.toLowerCase();
+    return path.endsWith('.mp4') || 
+           path.endsWith('.mov') || 
+           path.endsWith('.m4v') || 
+           path.endsWith('.avi') || 
+           path.endsWith('.wmv') || 
+           path.endsWith('.mkv') || 
+           path.endsWith('.3gp');
+  }
+
   void _filterResults(String query) {
     if (query.isEmpty) {
       setState(() {
@@ -642,15 +653,13 @@ class _SearchScreenState extends State<SearchScreen> {
                           child: Stack(
                             children: [
                               Positioned.fill(
-                                child: post.imageA.trim().contains('http')
-                                    ? Image.network(
-                                        post.imageA.trim(),
-                                        fit: BoxFit.cover,
-                                      )
-                                    : Image.asset(
-                                        post.imageA.trim(),
-                                        fit: BoxFit.cover,
-                                      ),
+                                child: (post.thumbA != null && post.thumbA!.isNotEmpty)
+                                  ? Image.network(post.thumbA!.trim(), fit: BoxFit.cover)
+                                  : (_isVideo(post.imageA)
+                                      ? Container(color: Colors.black26, child: const Center(child: Icon(Icons.play_circle_outline, color: Colors.white54)))
+                                      : (post.imageA.trim().contains('http')
+                                          ? Image.network(post.imageA.trim(), fit: BoxFit.cover)
+                                          : Image.asset(post.imageA.trim(), fit: BoxFit.cover))),
                               ),
                               Positioned.fill(
                                 child: Container(

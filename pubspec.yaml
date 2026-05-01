@@ -50,6 +50,7 @@ dependencies:
   cached_network_image: ^3.4.1
   flutter_cache_manager: ^3.4.1
   video_editor: ^3.0.0
+  visibility_detector: ^0.4.0+2
 
 dev_dependencies:
   flutter_test:

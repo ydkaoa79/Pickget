@@ -4,8 +4,9 @@ import 'dart:ui';
 import 'dart:async';
 import 'dart:io'; // 🚀 파일 처리를 위해 추가!
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:video_player/video_player.dart'; // 🚀 기본 비디오 플레이어
-import 'package:flutter_cache_manager/flutter_cache_manager.dart'; // 🚀 사수님의 무중력 캐싱 엔진!
+import 'package:video_player/video_player.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 import '../models/post_data.dart';
 import '../models/comment_data.dart';
 import '../core/app_state.dart';
@@ -62,6 +63,10 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   VideoPlayerController? _controllerB;
   bool _isInitializedA = false;
   bool _isInitializedB = false;
+  int _activeVideoSide = 1;
+  bool _isVisible = false;
+  bool _isInitializingA = false;
+  bool _isInitializingB = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -86,13 +91,48 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     _updateRemainingTime();
     _startTimer();
 
-    // 🎬 영상 초기화 시작!
-    _initVideo(widget.post.imageA, 1);
-    _initVideo(widget.post.imageB, 2);
+    // 🎬 영상은 자동 재생하지 않고 사용자가 클릭(Play 버튼)할 때만 초기화! (데이터/배터리 폭탄 방지)
+    // _initVideo(widget.post.imageA, 1);
+    // _initVideo(widget.post.imageB, 2);
+  }
+
+  void _releaseAllVideos() {
+    if (_controllerA != null) {
+      _controllerA!.dispose();
+      _controllerA = null;
+      _isInitializedA = false;
+    }
+    if (_controllerB != null) {
+      _controllerB!.dispose();
+      _controllerB = null;
+      _isInitializedB = false;
+    }
+  }
+
+  void _updateVideoStates() {
+    if (!_isVisible) {
+      _releaseAllVideos();
+      return;
+    }
+    
+    if (!_isInitializedA && !_isInitializingA) _initVideo(widget.post.imageA, 1);
+    if (!_isInitializedB && !_isInitializingB) _initVideo(widget.post.imageB, 2);
+
+    if (_activeVideoSide == 1) {
+      if (_isInitializedB && _controllerB != null) _controllerB!.pause();
+      if (_isInitializedA && _controllerA != null) _controllerA!.play();
+    } else {
+      if (_isInitializedA && _controllerA != null) _controllerA!.pause();
+      if (_isInitializedB && _controllerB != null) _controllerB!.play();
+    }
+    setState(() {});
   }
 
   Future<void> _initVideo(String url, int side) async {
     if (!_isVideo(url)) return;
+
+    if (side == 1) _isInitializingA = true;
+    else _isInitializingB = true;
 
     try {
       print('DEBUG [VIDEO]: Side $side 캐싱 시작 - $url');
@@ -101,24 +141,62 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       
       final controller = VideoPlayerController.file(file);
       await controller.initialize();
-      await controller.setLooping(true);
+      await controller.setLooping(false); 
       await controller.setVolume(0);
       
+      bool isFinished = false;
+      controller.addListener(() {
+        if (!mounted) return;
+        if (controller.value.isInitialized && controller.value.position >= controller.value.duration && controller.value.duration > Duration.zero) {
+           if (!isFinished) {
+             isFinished = true;
+             if (_expandedSide == 0 && _activeVideoSide == side) {
+               setState(() {
+                 _activeVideoSide = (side == 1) ? 2 : 1;
+               });
+               controller.seekTo(Duration.zero).then((_) {
+                 isFinished = false;
+               });
+               _updateVideoStates();
+             } else if (_expandedSide != 0 && _activeVideoSide == side) {
+               controller.seekTo(Duration.zero).then((_) {
+                 controller.play();
+                 isFinished = false;
+               });
+             } else {
+               isFinished = false;
+             }
+           }
+        }
+      });
+
       if (mounted) {
+        if (!_isVisible) {
+          controller.dispose();
+          if (side == 1) _isInitializingA = false;
+          else _isInitializingB = false;
+          return;
+        }
+        
         setState(() {
           if (side == 1) {
             _controllerA = controller;
             _isInitializedA = true;
+            _isInitializingA = false;
           } else {
             _controllerB = controller;
             _isInitializedB = true;
+            _isInitializingB = false;
           }
         });
         
-        // 🎬 로컬 파일이 준비되었으므로 즉시 재생!
-        controller.play();
+        if (_activeVideoSide == side) {
+          controller.play();
+        }
       }
     } catch (e) {
+      if (side == 1) _isInitializingA = false;
+      else _isInitializingB = false;
       print('DEBUG [VIDEO]: Side $side 초기화 실패 - $e');
     }
   }
@@ -380,13 +458,14 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     setState(() {
       if (tapX < currentWidthA) {
         if (_expandedSide == 1) { _expandedSide = 0; _widthA = sw * 0.5; }
-        else { _expandedSide = 1; _widthA = sw * 0.8; }
+        else { _expandedSide = 1; _widthA = sw * 0.8; _activeVideoSide = 1; }
       } else {
         if (_expandedSide == 2) { _expandedSide = 0; _widthA = sw * 0.5; }
-        else { _expandedSide = 2; _widthA = sw * 0.2; }
+        else { _expandedSide = 2; _widthA = sw * 0.2; _activeVideoSide = 2; }
       }
     });
     HapticFeedback.lightImpact();
+    _updateVideoStates();
   }
 
   String _formatTimer(int seconds) {
@@ -399,7 +478,23 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return LayoutBuilder(
+    return VisibilityDetector(
+      key: Key('post_view_${widget.post.id}'),
+      onVisibilityChanged: (info) {
+        if (!mounted) return;
+        final visible = info.visibleFraction > 0.5;
+        if (_isVisible != visible) {
+          setState(() {
+            _isVisible = visible;
+          });
+          if (visible) {
+             _updateVideoStates();
+          } else {
+             _releaseAllVideos();
+          }
+        }
+      },
+      child: LayoutBuilder(
       builder: (context, constraints) {
         final sw = constraints.maxWidth;
         final sh = constraints.maxHeight;
@@ -431,7 +526,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         Positioned.fill(
                           child: ImageFiltered(
                             imageFilter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                            child: _buildMedia(1, widget.post.imageA, sw),
+                            child: _buildMedia(1, widget.post.imageA, sw, thumbUrl: widget.post.thumbA, forceThumb: true),
                           ),
                         ),
                         Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.3))),
@@ -440,7 +535,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           child: OverflowBox(
                             maxWidth: sw * 0.8, // 이미지는 항상 화면의 80% 크기!
                             minWidth: sw * 0.8,
-                            child: _buildMedia(1, widget.post.imageA, sw),
+                            child: _buildMedia(1, widget.post.imageA, sw, thumbUrl: widget.post.thumbA),
                           ),
                         ),
                       ],
@@ -460,7 +555,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         Positioned.fill(
                           child: ImageFiltered(
                             imageFilter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                            child: _buildMedia(2, widget.post.imageB, sw),
+                            child: _buildMedia(2, widget.post.imageB, sw, thumbUrl: widget.post.thumbB, forceThumb: true),
                           ),
                         ),
                         Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.3))),
@@ -469,7 +564,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           child: OverflowBox(
                             maxWidth: sw * 0.8, // 이미지는 항상 화면의 80% 크기!
                             minWidth: sw * 0.8,
-                            child: _buildMedia(2, widget.post.imageB, sw),
+                            child: _buildMedia(2, widget.post.imageB, sw, thumbUrl: widget.post.thumbB),
                           ),
                         ),
                       ],
@@ -869,6 +964,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
           ),
         );
       },
+    ),
     );
   }
 
@@ -1333,13 +1429,15 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     ); 
   }
 
-  Widget _buildMedia(int side, String url, double sw) {
+  Widget _buildMedia(int side, String url, double sw, {String? thumbUrl, bool forceThumb = false}) {
     if (_isVideo(url)) {
       final controller = (side == 1) ? _controllerA : _controllerB;
       final isInitialized = (side == 1) ? _isInitializedA : _isInitializedB;
+      final isPlaying = (_activeVideoSide == side);
 
-      if (isInitialized && controller != null) {
-        return FittedBox(
+      Widget content;
+      if (!forceThumb && isInitialized && controller != null) {
+        content = FittedBox(
           fit: BoxFit.cover,
           clipBehavior: Clip.hardEdge,
           child: SizedBox(
@@ -1349,10 +1447,19 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
           ),
         );
       } else {
-        return const Center(
-          child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2),
-        );
+        if (thumbUrl != null && thumbUrl.isNotEmpty) {
+          content = CachedNetworkImage(
+            imageUrl: thumbUrl.trim(),
+            fit: BoxFit.cover,
+            placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2)),
+            errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white24),
+          );
+        } else {
+          content = const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2));
+        }
       }
+
+      return content;
     } else {
       // 이미지일 때 (기존 로직 그대로 캐싱 적용!)
       return url.trim().contains('http')

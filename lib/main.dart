@@ -477,6 +477,8 @@ class _MainScreenState extends State<MainScreen> {
           timeLocation: '방금 전',
           imageA: toCdnUrl(json['image_a'] ?? ''),
           imageB: toCdnUrl(json['image_b'] ?? ''),
+          thumbA: json['thumb_a'] != null ? toCdnUrl(json['thumb_a']) : null,
+          thumbB: json['thumb_b'] != null ? toCdnUrl(json['thumb_b']) : null,
           descriptionA: json['description_a'] ?? '선택지 A',
           descriptionB: json['description_b'] ?? '선택지 B',
           fullDescription: json['full_description'] ?? '',

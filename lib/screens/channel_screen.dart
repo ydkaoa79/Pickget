@@ -149,6 +149,17 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
     }
   }
 
+  bool _isVideo(String url) {
+    final path = url.toLowerCase();
+    return path.endsWith('.mp4') || 
+           path.endsWith('.mov') || 
+           path.endsWith('.m4v') || 
+           path.endsWith('.avi') || 
+           path.endsWith('.wmv') || 
+           path.endsWith('.mkv') || 
+           path.endsWith('.3gp');
+  }
+
   int _parseTotalVotesRaw(String s) {
     s = s.toLowerCase().replaceAll(',', '').trim();
     if (s.isEmpty) return 0;
@@ -956,9 +967,13 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
           child: Stack(
             fit: StackFit.expand,
             children: [
-              post.imageA.trim().contains('http')
-                ? Image.network(post.imageA.trim(), fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null)
-                : Image.asset(post.imageA.trim(), fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null),
+              (post.thumbA != null && post.thumbA!.isNotEmpty)
+                ? Image.network(post.thumbA!.trim(), fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null)
+                : (_isVideo(post.imageA)
+                   ? Container(color: Colors.black26, child: const Center(child: Icon(Icons.play_circle_outline, color: Colors.white54)))
+                   : (post.imageA.trim().contains('http')
+                        ? Image.network(post.imageA.trim(), fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null)
+                        : Image.asset(post.imageA.trim(), fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null))),
               
               // Status Badge (Top Left)
               Positioned(

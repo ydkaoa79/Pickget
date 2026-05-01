@@ -227,6 +227,16 @@ class _UploadScreenState extends State<UploadScreen> {
         'post_${timestamp}_${randomStr}_B$extB'
       );
 
+      // 🚀 썸네일 업로드 추가 (존재할 경우)
+      String? thumbUrlA;
+      if (_thumbPathA != null) {
+        thumbUrlA = await _cloudflareService.uploadFile(File(_thumbPathA!), 'post_${timestamp}_${randomStr}_thumbA.jpg');
+      }
+      String? thumbUrlB;
+      if (_thumbPathB != null) {
+        thumbUrlB = await _cloudflareService.uploadFile(File(_thumbPathB!), 'post_${timestamp}_${randomStr}_thumbB.jpg');
+      }
+
       if (urlA == null || urlB == null) {
         throw Exception('파일 업로드 실패');
       }
@@ -247,6 +257,8 @@ class _UploadScreenState extends State<UploadScreen> {
         'uploader_internal_id': gUserInternalId, // 주민번호 시스템 도입!
         'image_a': urlA,
         'image_b': urlB,
+        if (thumbUrlA != null) 'thumb_a': thumbUrlA,
+        if (thumbUrlB != null) 'thumb_b': thumbUrlB,
         'description_a': _descAController.text.isEmpty ? '선택지 A' : _descAController.text,
         'description_b': _descBController.text.isEmpty ? '선택지 B' : _descBController.text,
         'tags': finalTags,
@@ -263,6 +275,8 @@ class _UploadScreenState extends State<UploadScreen> {
         timeLocation: '방금 전',
         imageA: urlA,
         imageB: urlB,
+        thumbA: thumbUrlA,
+        thumbB: thumbUrlB,
         descriptionA: _descAController.text.isEmpty ? '선택지 A' : _descAController.text,
         descriptionB: _descBController.text.isEmpty ? '선택지 B' : _descBController.text,
         tags: finalTags,

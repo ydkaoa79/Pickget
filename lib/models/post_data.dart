@@ -10,6 +10,8 @@ class PostData {
   final String timeLocation;
   final String imageA;
   final String imageB;
+  final String? thumbA;
+  final String? thumbB;
   final String descriptionA;
   final String descriptionB;
   int likesCount;
@@ -61,6 +63,8 @@ class PostData {
     required this.timeLocation,
     required this.imageA,
     required this.imageB,
+    this.thumbA,
+    this.thumbB,
     required this.descriptionA,
     required this.descriptionB,
     this.shortDescA,
