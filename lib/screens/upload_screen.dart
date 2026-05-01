@@ -134,6 +134,13 @@ class _UploadScreenState extends State<UploadScreen> {
             ),
             const SizedBox(height: 32),
 
+            // 🔞 성인/AI 콘텐츠 설정 (주의사항 바로 위!)
+            _cardBlock(
+              title: '콘텐츠 설정',
+              child: _safetyOptions(),
+            ),
+            const SizedBox(height: 16),
+
             _precautionsBlock(),
             const SizedBox(height: 32),
 
@@ -152,12 +159,7 @@ class _UploadScreenState extends State<UploadScreen> {
                 child: const Text('질문 등록하기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
               ),
             ),
-              const SizedBox(height: 16),
-              _cardBlock(
-                title: '콘텐츠 설정',
-                child: _safetyOptions(),
-              ),
-              const SizedBox(height: 40),
+            const SizedBox(height: 40),
           ],
         ),
       ),
