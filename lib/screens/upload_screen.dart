@@ -200,15 +200,15 @@ class _UploadScreenState extends State<UploadScreen> {
     setState(() => _isUploading = true);
 
     try {
-      // 🚀 1. 이미지/영상 압축 (파일 성격에 맞춰서!)
+      // 🚀 1. 이미지만 압축 (영상은 트림 화면에서 이미 압축+오디오삭제 완료!)
       File fileA = File(_imagePathA!);
       File fileB = File(_imagePathB!);
 
       bool isVideoA = _isVideo(_imagePathA!);
       bool isVideoB = _isVideo(_imagePathB!);
 
-      File? compressedA = isVideoA ? await MediaCompressor.compressVideo(fileA) : await MediaCompressor.compressImage(fileA);
-      File? compressedB = isVideoB ? await MediaCompressor.compressVideo(fileB) : await MediaCompressor.compressImage(fileB);
+      File? compressedA = isVideoA ? fileA : await MediaCompressor.compressImage(fileA);
+      File? compressedB = isVideoB ? fileB : await MediaCompressor.compressImage(fileB);
 
       // 2. R2 업로드 (확장자 똑똑하게 챙기기!)
       final String timestamp = DateTime.now().microsecondsSinceEpoch.toString();
