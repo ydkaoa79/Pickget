@@ -50,6 +50,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   bool _isDescAExpanded = false;
   bool _isDescBExpanded = false;
   bool _showAlreadySelectedToast = false;
+  bool _showIsMeToast = false; // 🚫 본인 게시물 알림용 추가!
   bool _isSheetOpening = false;
 
   @override
@@ -162,8 +163,16 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   void _showAlreadySelectedMessage() {
     if (_showAlreadySelectedToast) return;
     setState(() => _showAlreadySelectedToast = true);
-    Future.delayed(const Duration(seconds: 2), () {
+    Future.delayed(const Duration(milliseconds: 1000), () { // ⏱️ 시간 1초로 단축!
       if (mounted) setState(() => _showAlreadySelectedToast = false);
+    });
+  }
+
+  void _showIsMeMessage() {
+    if (_showIsMeToast) return;
+    setState(() => _showIsMeToast = true);
+    Future.delayed(const Duration(milliseconds: 1000), () { // ⏱️ 1초만 잔류!
+      if (mounted) setState(() => _showIsMeToast = false);
     });
   }
 
@@ -182,7 +191,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     print('DEBUG [VOTE]: gUserInternalId=$gUserInternalId, postUploaderInternalId=${widget.post.uploaderInternalId}, isMe=$isMe');
 
     if (isMe) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('본인이 올린 질문에는 참여할 수 없습니다.')));
+      _showIsMeMessage(); // 🚀 SnackBar 대신 전용 토스트 호출!
+      HapticFeedback.vibrate(); // 진동으로 피드백!
       return;
     }
 
@@ -733,18 +743,57 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
               if (_showAlreadySelectedToast && !isExpired)
                 Positioned(
-                  top: 260, 
+                  top: sh * 0.45, 
                   left: 0, right: 0,
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.black.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.3)),
                       ),
                       child: const Text(
                         '이미 선택한 콘텐츠입니다',
-                        style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.w600, fontSize: 13),
+                        style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.w900, fontSize: 14),
+                      ),
+                    ),
+                  ),
+                ),
+
+              if (_showIsMeToast)
+                Positioned(
+                  top: sh * 0.45, 
+                  left: 0, right: 0,
+                  child: Center(
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 200),
+                      builder: (context, val, child) => Transform.scale(
+                        scale: 0.8 + (0.2 * val),
+                        child: Opacity(
+                          opacity: val,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.75),
+                              borderRadius: BorderRadius.circular(25),
+                              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+                              boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 20)],
+                            ),
+                            child: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.info_outline, color: Colors.redAccent, size: 28),
+                                SizedBox(height: 8),
+                                Text(
+                                  '본인 질문에는 투표할 수 없어요!',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -1339,6 +1388,14 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                     ],
                   ),
                 ],
+              ),
+            ) else Positioned(
+              top: 66, // ⚪ 조금 더 여유 있게 아래로 배치
+              child: _shadowText(
+                '투표 후 확인 가능', 
+                color: Colors.white.withValues(alpha: 0.85), 
+                size: 11, // 🚀 시원하게 키웠습니다!
+                weight: FontWeight.w900 // 💥 더 굵게!
               ),
             ),
           ],

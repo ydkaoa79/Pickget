@@ -88,12 +88,13 @@ class _MainScreenState extends State<MainScreen> {
   bool _isLoginPopupOpen = false;
   bool _isProfileSetupOpen = false; // ✅ 추가 정보 입력 팝업 중복 방지용
   BuildContext? _loginDialogContext; // 추가
+  bool _isInitialLoading = false; // 🛡️ 중복 로딩 방어막 추가!
 
   @override
   void initState() {
     super.initState();
     _posts = [];
-    fetchPosts();
+    // fetchPosts(); // 🚀 [최적화] 여기서 부르지 않고 아래 리스너/콜백에서 한 번만 부릅니다!
 
     gShowLoginPopup = _showLoginPopup;
     gOnLogout = () {
@@ -193,14 +194,25 @@ class _MainScreenState extends State<MainScreen> {
       }
 
       final session = SupabaseService.client.auth.currentSession;
-      if (session != null && !gIsLoggedIn) {
-        print('DEBUG [AUTH]: Initial session found!');
-        _handleLoginSuccess(session);
+      if (session != null) {
+        if (!gIsLoggedIn) {
+          print('DEBUG [AUTH]: Initial session found in callback!');
+          _handleLoginSuccess(session);
+        }
+      } else {
+        if (!gIsLoggedIn && !_isInitialLoading) {
+          print('DEBUG [INIT]: No session, fetching guest data...');
+          _isInitialLoading = true;
+          fetchPosts();
+        }
       }
     });
   }
 
   void _handleLoginSuccess(Session session) async {
+    if (_isInitialLoading) return; // 🛡️ 이미 로딩 중이면 바로 퇴장!
+    _isInitialLoading = true;
+
     print('DEBUG [AUTH]: Handling login success for ${session.user.id}');
 
     // 💡 카카오 프로필 정보 추출 (metadata에서 가져옴)
