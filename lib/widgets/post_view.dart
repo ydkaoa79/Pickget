@@ -176,6 +176,20 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     });
   }
 
+  // 🛡️ 진짜 유효한 설명글인지 확인하는 판별기
+  bool _isValidDescription(String? text) {
+    if (text == null) return false;
+    final clean = text.trim();
+    if (clean.isEmpty) return false;
+    // 의미 없는 기본값들이나 공백만 있는 경우 차단!
+    final blackList = [
+      "내용을 입력하세요", "내용 없음", "내용이 없습니다", "설명을 입력하세요",
+      "선택지A", "선택지B", "선택지 A", "선택지 B"
+    ];
+    if (blackList.contains(clean)) return false;
+    return clean.length > 1; // 최소 2글자는 되어야 함
+  }
+
   void _onVote(int side) async {
     if (!gIsLoggedIn) {
       gShowLoginPopup?.call();
@@ -607,7 +621,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                 left: (currentWidthA / 2) - (descWidth / 2), 
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 300),
-                  opacity: _expandedSide == 1 ? 1.0 : 0.0,
+                  // 🚀 판별기를 통과한 '진짜 내용'이 있을 때만 드래그/클릭 시 노출!
+                  opacity: ((_expandedSide == 1 || (_isDragging && currentWidthA > sw * 0.55)) && _isValidDescription(widget.post.descriptionA)) ? 1.0 : 0.0,
                   child: IgnorePointer(
                     ignoring: _expandedSide != 1,
                     child: _descBox(widget.post.descriptionA, _isDescAExpanded, () => setState(() => _isDescAExpanded = !_isDescAExpanded)),
@@ -621,7 +636,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                 left: currentWidthA + ((sw - currentWidthA) / 2) - (descWidth / 2), 
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 300),
-                  opacity: _expandedSide == 2 ? 1.0 : 0.0,
+                  // 🚀 판별기를 통과한 '진짜 내용'이 있을 때만 드래그/클릭 시 노출!
+                  opacity: ((_expandedSide == 2 || (_isDragging && currentWidthA < sw * 0.45)) && _isValidDescription(widget.post.descriptionB)) ? 1.0 : 0.0,
                   child: IgnorePointer(
                     ignoring: _expandedSide != 2,
                     child: _descBox(widget.post.descriptionB, _isDescBExpanded, () => setState(() => _isDescBExpanded = !_isDescBExpanded)),
