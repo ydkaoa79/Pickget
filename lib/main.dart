@@ -512,9 +512,19 @@ class _MainScreenState extends State<MainScreen> {
           commentsCount: json['comments_count'] ?? 0,
           voteCountA: (json['vote_count_a'] ?? 0).toString(),
           voteCountB: (json['vote_count_b'] ?? 0).toString(),
-          totalVotesCount: json['total_votes'] ?? 0, // [추가]
-          percentA: '50%', // Placeholder
-          percentB: '50%', // Placeholder
+          totalVotesCount: json['total_votes'] ?? 0,
+          percentA: (() {
+            int a = json['vote_count_a'] ?? 0;
+            int b = json['vote_count_b'] ?? 0;
+            if (a + b == 0) return '50%';
+            return '${(a / (a + b) * 100).round()}%';
+          })(),
+          percentB: (() {
+            int a = json['vote_count_a'] ?? 0;
+            int b = json['vote_count_b'] ?? 0;
+            if (a + b == 0) return '50%';
+            return '${(b / (a + b) * 100).round()}%';
+          })(),
           isLiked: gIsLoggedIn && likedPostIds.contains(json['id'].toString()),
           isBookmarked:
               gIsLoggedIn && bookmarkedPostIds.contains(json['id'].toString()),
@@ -1876,9 +1886,19 @@ class _MainScreenState extends State<MainScreen> {
           commentsCount: json['comments_count'] ?? 0,
           voteCountA: vA,
           voteCountB: vB,
-          totalVotesCount: json['total_votes'] ?? 0, // [추가]
-          percentA: '50%',
-          percentB: '50%',
+          totalVotesCount: json['total_votes'] ?? 0,
+          percentA: (() {
+            int a = int.tryParse(vA) ?? 0;
+            int b = int.tryParse(vB) ?? 0;
+            if (a + b == 0) return '50%';
+            return '${(a / (a + b) * 100).round()}%';
+          })(),
+          percentB: (() {
+            int a = int.tryParse(vA) ?? 0;
+            int b = int.tryParse(vB) ?? 0;
+            if (a + b == 0) return '50%';
+            return '${(b / (a + b) * 100).round()}%';
+          })(),
           tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
           isExpired: () {
             // 종료 여부 계산 로직 (메인과 동일)
