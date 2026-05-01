@@ -68,6 +68,10 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   void initState() {
     super.initState();
     print('DEBUG: PostView State initialized for post_id: ${widget.post.id} (Ver. 1.0)');
+    
+    // 이전 투표 내역 불러오기
+    _votedSide = gUserVotes[widget.post.id] ?? 0;
+    
     _updateRemainingTime();
     _startTimer();
   }
@@ -211,6 +215,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
     setState(() {
       _votedSide = side;
+      gUserVotes[widget.post.id] = side; // 전역 상태에 즉시 반영
       
       int parseV(String s) {
         s = s.toLowerCase().replaceAll(',', '').trim();

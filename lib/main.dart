@@ -394,6 +394,7 @@ class _MainScreenState extends State<MainScreen> {
                 .map((b) => b['post_id'].toString())
                 .toSet();
 
+             // 팔로우(follows) 가져오기
             final List<dynamic> userFollows = await SupabaseService.client
                 .from('follows')
                 .select('following_internal_id')
@@ -401,6 +402,15 @@ class _MainScreenState extends State<MainScreen> {
             followedUserIds = userFollows
                 .map((f) => f['following_internal_id'].toString())
                 .toSet();
+
+            // 투표(votes) 가져오기
+            final List<dynamic> userVotes = await SupabaseService.client
+                .from('votes')
+                .select('post_id, side')
+                .eq('user_internal_id', gUserInternalId!);
+            gUserVotes = {
+              for (var v in userVotes) v['post_id'].toString(): v['side'] as int
+            };
 
             print('DEBUG [FETCH]: gUserInternalId=$gUserInternalId');
             print('DEBUG [FETCH]: likedPostIds=$likedPostIds');
