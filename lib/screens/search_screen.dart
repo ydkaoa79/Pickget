@@ -25,6 +25,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _loadHistory();
+    _loadPopularSearches(); // 인기 검색어 로딩 추가
   }
 
   Future<void> _loadHistory() async {
@@ -38,12 +39,50 @@ class _SearchScreenState extends State<SearchScreen> {
           .limit(10);
 
       setState(() {
-        _searchHistory = data
-            .map((item) => item['keyword'].toString())
-            .toList();
+        _searchHistory = data.map((item) => item['keyword'].toString()).toList();
       });
     } catch (e) {
       print('검색 기록 불러오기 실패: $e');
+    }
+  }
+
+  Future<void> _loadPopularSearches() async {
+    try {
+      // 1. 최근 24시간 내 모든 유저의 검색 데이터 조회
+      final List<dynamic> data = await SupabaseService.client
+          .from('search_history')
+          .select('keyword')
+          .gte('created_at',
+              DateTime.now().subtract(const Duration(hours: 24)).toIso8601String());
+
+      if (data.isEmpty) return;
+
+      // 2. 키워드별 검색 횟수 집계
+      Map<String, int> counts = {};
+      for (var item in data) {
+        String keyword = item['keyword']?.toString() ?? '';
+        if (keyword.trim().isNotEmpty) {
+          counts[keyword] = (counts[keyword] ?? 0) + 1;
+        }
+      }
+
+      // 3. 검색 횟수 기준 내림차순 정렬
+      var sortedEntries = counts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+      // 4. 상위 10개만 리스트에 반영
+      setState(() {
+        _popularSearches.clear();
+        for (var entry in sortedEntries.take(10)) {
+          _popularSearches.add({
+            'term': entry.key,
+            'status': 'NEW',
+            'change': 0,
+          });
+        }
+      });
+    } catch (e) {
+      debugPrint('실시간 인기 검색어 로드 실패: $e');
     }
   }
 
