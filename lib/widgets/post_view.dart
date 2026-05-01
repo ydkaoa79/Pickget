@@ -1464,7 +1464,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       final isPlaying = (_playingSide == side);
 
       Widget content;
-      if (!forceThumb && isInitialized && controller != null) {
+      if (!forceThumb && isInitialized && controller != null && isPlaying && controller.value.isPlaying) {
+        // 🎬 영상이 실제로 재생 중일 때만 VideoPlayer 표시!
         content = FittedBox(
           fit: BoxFit.cover,
           clipBehavior: Clip.hardEdge,
