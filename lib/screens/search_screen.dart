@@ -17,6 +17,7 @@ class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<PostData> _searchResults = [];
   bool _isSearching = false;
+  bool _isLoadingPopular = false;
 
   List<String> _searchHistory = [];
   final List<Map<String, dynamic>> _popularSearches = [];
@@ -47,6 +48,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _loadPopularSearches() async {
+    setState(() => _isLoadingPopular = true);
     try {
       // 1. 최근 24시간 내 모든 유저의 검색 데이터 조회
       final List<dynamic> data = await SupabaseService.client
@@ -71,18 +73,24 @@ class _SearchScreenState extends State<SearchScreen> {
         ..sort((a, b) => b.value.compareTo(a.value));
 
       // 4. 상위 10개만 리스트에 반영
-      setState(() {
-        _popularSearches.clear();
-        for (var entry in sortedEntries.take(10)) {
-          _popularSearches.add({
-            'term': entry.key,
-            'status': 'NEW',
-            'change': 0,
-          });
-        }
-      });
+      if (mounted) {
+        setState(() {
+          _popularSearches.clear();
+          for (var entry in sortedEntries.take(10)) {
+            _popularSearches.add({
+              'term': entry.key,
+              'status': 'NEW',
+              'change': 0,
+            });
+          }
+        });
+      }
     } catch (e) {
       debugPrint('실시간 인기 검색어 로드 실패: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingPopular = false);
+      }
     }
   }
 
@@ -362,17 +370,27 @@ class _SearchScreenState extends State<SearchScreen> {
             color: Colors.white.withValues(alpha: 0.03),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Column(
-            children: List.generate(_popularSearches.length, (index) {
-              final item = _popularSearches[index];
-              return _popularSearchTile(
-                index + 1,
-                item['term'],
-                item['status'],
-                item['change'],
-              );
-            }),
-          ),
+          child: _isLoadingPopular
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.cyanAccent,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                )
+              : Column(
+                  children: List.generate(_popularSearches.length, (index) {
+                    final item = _popularSearches[index];
+                    return _popularSearchTile(
+                      index + 1,
+                      item['term'],
+                      item['status'],
+                      item['change'],
+                    );
+                  }),
+                ),
         ),
         const SizedBox(height: 40),
         const Text(

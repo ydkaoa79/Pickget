@@ -1759,78 +1759,132 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  void _showRankingSheet(BuildContext context) {
-    // Simulate Top 10 from master posts list
-    List<PostData> topPosts = List.from(_posts);
-    topPosts.sort(
-      (a, b) => b.totalVotes.compareTo(a.totalVotes),
-    );
-    topPosts = topPosts.take(10).toList();
-
+  void _showRankingSheet(BuildContext context) async {
+    // 1. 로딩 창 먼저 표시
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => SafeArea(
-        child: Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          decoration: const BoxDecoration(
-            color: Color(0xFF121212),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                '어제 인기 Pick (TOP 10)',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                '지난 24시간 동안 가장 뜨거웠던 Pick',
-                style: TextStyle(color: Colors.white38, fontSize: 12),
-              ),
-              const Divider(color: Colors.white10, height: 30),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: topPosts.length,
-                  itemBuilder: (context, index) {
-                    final post = topPosts[index];
-                    return _rankingItem(index + 1, post, () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ChannelFeedScreen(
-                            initialIndex: index,
-                            channelPosts: topPosts,
-                            allPosts: _posts,
-                          ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return FutureBuilder<List<PostData>>(
+            future: _fetchTopRankings(),
+            builder: (context, snapshot) {
+              bool isLoading = snapshot.connectionState == ConnectionState.waiting;
+              List<PostData> topPosts = snapshot.data ?? [];
+
+              return SafeArea(
+                child: Container(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF121212),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+                  ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                      );
-                    });
-                  },
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        '어제 인기 Pick (TOP 10)',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        '지난 24시간 동안 가장 뜨거웠던 Pick',
+                        style: TextStyle(color: Colors.white38, fontSize: 12),
+                      ),
+                      const Divider(color: Colors.white10, height: 30),
+                      Expanded(
+                        child: isLoading
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                  color: Colors.cyanAccent,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                itemCount: topPosts.length,
+                                itemBuilder: (context, index) {
+                                  final post = topPosts[index];
+                                  return _rankingItem(index + 1, post, () {
+                                    Navigator.pop(context);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ChannelFeedScreen(
+                                          initialIndex: 0, // 랭킹에서 누르면 해당 포스트가 첫번째
+                                          channelPosts: [post],
+                                          allPosts: _posts,
+                                        ),
+                                      ),
+                                    );
+                                  });
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
+              );
+            },
+          );
+        },
       ),
     );
+  }
+
+  Future<List<PostData>> _fetchTopRankings() async {
+    try {
+      // 서버에서 직접 최신 투표 데이터가 포함된 게시물 조회
+      final List<dynamic> data = await SupabaseService.client
+          .from('posts')
+          .select()
+          .order('likes_count', ascending: false) // 우선 좋아요 순으로 50개 조회
+          .limit(50);
+
+      List<PostData> loadedPosts = data.map((json) {
+        // PostData 생성 로직 (main.dart의 fetchPosts와 동일)
+        return PostData(
+          id: json['id'].toString(),
+          title: json['title'] ?? '제목 없음',
+          uploaderId: json['uploader_id'] ?? '익명',
+          uploaderName: json['uploader_id'] ?? '익명',
+          uploaderImage: json['uploader_image'] ?? 'assets/profiles/profile_11.jpg',
+          timeLocation: '어제',
+          imageA: json['image_a'] ?? '',
+          imageB: json['image_b'] ?? '',
+          descriptionA: json['description_a'] ?? '',
+          descriptionB: json['description_b'] ?? '',
+          likesCount: json['likes_count'] ?? 0,
+          commentsCount: json['comments_count'] ?? 0,
+          voteCountA: (json['vote_count_a'] ?? 0).toString(),
+          voteCountB: (json['vote_count_b'] ?? 0).toString(),
+          percentA: '50%',
+          percentB: '50%',
+          tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+        );
+      }).toList();
+
+      // 투표 합계 순으로 정밀 정렬
+      loadedPosts.sort((a, b) => b.totalVotes.compareTo(a.totalVotes));
+      return loadedPosts.take(10).toList();
+    } catch (e) {
+      print('랭킹 데이터 로드 실패: $e');
+      return [];
+    }
   }
 
   Widget _rankingItem(int rank, PostData post, VoidCallback onTap) {
