@@ -62,4 +62,25 @@ class MediaCompressor {
       return null;
     }
   }
+
+  /// ✂️ 비디오 트림 + 압축 + 오디오 삭제 (올인원!)
+  static Future<File?> trimAndCompress(File file, int startMs, int durationMs) async {
+    try {
+      final MediaInfo? mediaInfo = await VideoCompress.compressVideo(
+        file.path,
+        quality: VideoQuality.MediumQuality,
+        startTime: startMs ~/ 1000,     // 초 단위로 변환
+        duration: durationMs ~/ 1000,   // 초 단위로 변환
+        deleteOrigin: false,
+        includeAudio: false, // 🔇 소리 완전 삭제!
+      );
+
+      if (mediaInfo == null || mediaInfo.file == null) return null;
+      return mediaInfo.file;
+
+    } catch (e) {
+      print('DEBUG [TRIM]: 영상 트림+압축 실패 - $e');
+      return file; // 실패 시 원본 반환
+    }
+  }
 }

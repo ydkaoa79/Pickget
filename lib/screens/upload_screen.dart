@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/post_data.dart';
 import '../core/app_state.dart';
 import 'channel_screen.dart';
+import 'video_trim_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import '../services/cloudflare_service.dart';
@@ -9,7 +10,6 @@ import '../services/supabase_service.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../services/media_compressor.dart';
-import 'package:video_player/video_player.dart'; // 🎬 영상 길이 확인용!
 import 'package:path/path.dart' as p;
 
 class UploadScreen extends StatefulWidget {
@@ -372,62 +372,30 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Future<void> _handlePickedMedia(String path, String label, Function(String) onPick, {required bool isVideo}) async {
     if (isVideo) {
-      // 🎬 1단계: 영상 길이 확인 (6초 초과 시 경고!)
-      final controller = VideoPlayerController.file(File(path));
-      try {
-        await controller.initialize();
-        final duration = controller.value.duration;
-        controller.dispose();
+      // 🎬 영상 트림 화면으로 이동 (6초 이내 조절 + 압축 + 오디오 삭제)
+      final File? trimmedFile = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => VideoTrimScreen(file: File(path))),
+      );
 
-        if (duration.inSeconds > 6) {
-          // ⚠️ 6초 초과 경고 팝업!
-          if (mounted) {
-            await showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                backgroundColor: const Color(0xFF1C1C1C),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                title: const Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.amberAccent, size: 24),
-                    SizedBox(width: 8),
-                    Text('영상 길이 초과', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                content: Text(
-                  '선택하신 영상은 ${duration.inSeconds}초입니다.\n\n최대 6초까지만 업로드 가능합니다.\n6초 이하의 영상을 선택해주세요.',
-                  style: const TextStyle(color: Colors.white70, height: 1.5),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('확인', style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            );
-          }
-          return; // 6초 초과 시 업로드 중단!
-        }
-      } catch (e) {
-        controller.dispose();
-        print('DEBUG [VIDEO]: 영상 길이 확인 실패 - $e');
-      }
+      if (trimmedFile == null) return; // 취소 시 중단
 
-      // 🎬 2단계: 썸네일 생성
-      final thumbFile = await MediaCompressor.generateThumbnail(path);
+      final String finalPath = trimmedFile.path;
+
+      // 🖼️ 트림된 영상으로 썸네일 생성
+      final thumbFile = await MediaCompressor.generateThumbnail(finalPath);
       
       if (mounted) {
         setState(() {
           if (label == 'A') {
-            _imagePathA = path;
+            _imagePathA = finalPath;
             _thumbPathA = thumbFile?.path;
           } else {
-            _imagePathB = path;
+            _imagePathB = finalPath;
             _thumbPathB = thumbFile?.path;
           }
         });
-        onPick(path);
+        onPick(finalPath);
       }
     } else {
       // 📸 사진일 경우 기존처럼 크롭 로직 가동!
