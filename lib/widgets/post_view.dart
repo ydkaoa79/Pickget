@@ -1290,10 +1290,11 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
+                      // 왼쪽 A 통계 (시안색 - 우측 정렬)
                       SizedBox(
                         width: 45,
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end, // 우측 정렬로 변경
                           children: [
                             if (_votedSide == 1) _myPickLabel(),
                             _shadowText(post.percentA, color: Colors.cyanAccent, size: 14, weight: FontWeight.w900), 
@@ -1301,11 +1302,12 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           ]
                         ),
                       ),
-                      const SizedBox(width: 15), // 간격을 35에서 15로 대폭 축소 (옹기종기)
+                      const SizedBox(width: 15),
+                      // 오른쪽 B 통계 (빨간색 - 좌측 정렬)
                       SizedBox(
                         width: 45,
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start, // 좌측 정렬로 변경
                           children: [
                             if (_votedSide == 2) _myPickLabel(),
                             _shadowText(post.percentB, color: Colors.redAccent, size: 14, weight: FontWeight.w900), 
