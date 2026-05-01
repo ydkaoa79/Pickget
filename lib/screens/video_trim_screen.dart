@@ -77,16 +77,28 @@ class _VideoTrimScreenState extends State<VideoTrimScreen> with SingleTickerProv
     HapticFeedback.mediumImpact();
 
     try {
-      final File? trimmedFile = await MediaCompressor.trimAndCompress(
-        widget.file,
-        _startMs.toInt(),
-        (_endMs - _startMs).toInt(),
-      );
+      // 🎬 실제로 구간을 조정했는지 판단
+      final bool didTrim = (_startMs > 100) || (_endMs < _totalDurationMs - 100);
+      
+      File? resultFile;
+      if (didTrim) {
+        // ✂️ 실제로 잘랐을 때만 트림+압축
+        print('DEBUG [TRIM]: 구간 자르기 모드 (${_startMs}ms ~ ${_endMs}ms)');
+        resultFile = await MediaCompressor.trimAndCompress(
+          widget.file,
+          _startMs.toInt(),
+          (_endMs - _startMs).toInt(),
+        );
+      } else {
+        // 🎬 안 잘랐으면 단순 압축+오디오삭제만 (안정적!)
+        print('DEBUG [TRIM]: 전체 압축 모드 (트림 없음)');
+        resultFile = await MediaCompressor.compressVideo(widget.file);
+      }
 
       if (mounted) {
         setState(() => _isExporting = false);
-        if (trimmedFile != null) {
-          Navigator.pop(context, trimmedFile);
+        if (resultFile != null) {
+          Navigator.pop(context, resultFile);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('영상 편집에 실패했습니다.'), backgroundColor: Colors.redAccent),
