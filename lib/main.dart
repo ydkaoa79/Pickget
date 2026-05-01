@@ -440,39 +440,25 @@ class _MainScreenState extends State<MainScreen> {
         print('DEBUG [SCHEMA]: posts fetch failed: $e');
       }
 
-      // 2. Fetch all posts and user profiles for real-time profile merging
+      // 2. [최적화] 게시물을 가져올 때 작성자의 최신 프로필 정보를 '조인(Join)'해서 한 번에 가져옵니다.
+      // uploader_internal_id를 기준으로 user_profiles 테이블의 정보를 함께 긁어옵니다.
       final List<dynamic> postsData = await SupabaseService.client
           .from('posts')
-          .select('*, total_votes')
+          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image)')
           .order('created_at', ascending: false);
 
-      final List<dynamic> profilesData = await SupabaseService.client
-          .from('user_profiles')
-          .select('id, user_id, nickname, profile_image');
-
-      // Create maps for quick profile lookup (by ID and by Handle)
-      final Map<String, dynamic> profileById = {
-        for (var p in profilesData) p['id'].toString(): p,
-      };
-      final Map<String, dynamic> profileByHandle = {
-        for (var p in profilesData) p['user_id'].toString(): p,
-      };
-
       final loadedPosts = postsData.map((json) {
+        final profile = json['profiles']; // 조인된 프로필 데이터
         final String handle = json['uploader_id']?.toString() ?? '';
         final String? internalId = json['uploader_internal_id']?.toString();
 
-        // Priority: Match by Internal ID, then fallback to Handle
-        final profile = (internalId != null)
-            ? profileById[internalId]
-            : profileByHandle[handle];
-
+        // 최신 프로필 정보가 있으면 그것을 쓰고, 없으면 게시물의 기본 정보를 사용합니다 (방어 로직)
         final String latestId = (profile != null && profile['user_id'] != null)
             ? profile['user_id'].toString()
             : handle;
         final String nickname = (profile != null && profile['nickname'] != null)
             ? profile['nickname'].toString()
-            : (json['uploader_id'] ?? '익명');
+            : (json['uploader_name'] ?? json['uploader_id'] ?? '익명');
         final String profileImg = toCdnUrl(
             (profile != null && profile['profile_image'] != null)
             ? profile['profile_image'].toString()
