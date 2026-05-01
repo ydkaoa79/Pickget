@@ -1852,8 +1852,8 @@ class _MainScreenState extends State<MainScreen> {
       // 서버에서 직접 최신 투표 데이터가 포함된 게시물 조회
       final List<dynamic> data = await SupabaseService.client
           .from('posts')
-          .select('id, title, uploader_id, uploader_image, image_a, image_b, description_a, description_b, likes_count, comments_count, vote_count_a, vote_count_b, total_votes, tags, created_at')
-          .order('total_votes', ascending: false) // [수정] 이제 진짜 픽수 순으로 서버에서 바로 정렬!
+          .select('*, total_votes') // 필요한 필드를 모두 포함하되 누락 방지
+          .order('total_votes', ascending: false)
           .limit(50);
 
       List<PostData> loadedPosts = data.map((json) {
