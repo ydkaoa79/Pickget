@@ -108,6 +108,7 @@ class _MainScreenState extends State<MainScreen> {
           gIdText = '테스트용'; // ← 추가
           gNameText = '테스트용'; // ← 추가
           gProfileImage = 'assets/profiles/profile_11.jpg'; // ← 추가
+          gUserVotes.clear(); // 🗳️ 투표 내역 초기화 (로그아웃 시 VS 마크 복구용!)
           _hasNewNotifications = false;
           _notifications = [];
         });
