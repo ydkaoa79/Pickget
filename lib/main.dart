@@ -1856,12 +1856,15 @@ class _MainScreenState extends State<MainScreen> {
           .limit(50);
 
       List<PostData> loadedPosts = data.map((json) {
-        // PostData 생성 로직 (main.dart의 fetchPosts와 동일)
+        // [수정] 데이터 타입을 명확히 하고, null 처리를 더 견고하게 함
+        String vA = (json['vote_count_a'] ?? '0').toString();
+        String vB = (json['vote_count_b'] ?? '0').toString();
+
         return PostData(
           id: json['id'].toString(),
           title: json['title'] ?? '제목 없음',
-          uploaderId: json['uploader_id'] ?? '익명',
-          uploaderName: json['uploader_id'] ?? '익명',
+          uploaderId: json['uploader_id']?.toString() ?? '익명',
+          uploaderName: json['uploader_id']?.toString() ?? '익명',
           uploaderImage: json['uploader_image'] ?? 'assets/profiles/profile_11.jpg',
           timeLocation: '어제',
           imageA: json['image_a'] ?? '',
@@ -1870,11 +1873,31 @@ class _MainScreenState extends State<MainScreen> {
           descriptionB: json['description_b'] ?? '',
           likesCount: json['likes_count'] ?? 0,
           commentsCount: json['comments_count'] ?? 0,
-          voteCountA: (json['vote_count_a'] ?? 0).toString(),
-          voteCountB: (json['vote_count_b'] ?? 0).toString(),
+          voteCountA: vA,
+          voteCountB: vB,
           percentA: '50%',
           percentB: '50%',
           tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+          isExpired: () {
+            // 종료 여부 계산 로직 (메인과 동일)
+            final String? createdAtStr = json['created_at'];
+            final List<dynamic> tags = json['tags'] as List? ?? [];
+            if (createdAtStr != null) {
+              final createdAt = DateTime.tryParse(createdAtStr);
+              if (createdAt != null) {
+                for (var tag in tags) {
+                  String t = tag.toString();
+                  if (t.startsWith('duration:')) {
+                    final mins = int.tryParse(t.split(':')[1]);
+                    if (mins != null && DateTime.now().isAfter(createdAt.add(Duration(minutes: mins)))) {
+                      return true;
+                    }
+                  }
+                }
+              }
+            }
+            return false;
+          }(),
         );
       }).toList();
 
