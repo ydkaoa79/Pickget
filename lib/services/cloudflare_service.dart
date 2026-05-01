@@ -7,30 +7,31 @@ class CloudflareService {
 
   Future<String?> uploadFile(File file, String fileName) async {
     try {
-      // 1. Get Presigned URL from Worker (or just upload directly to Worker if it handles it)
-      // Assuming the worker handles the upload directly for simplicity if it's a "PUT" uploader
-      
       String uploadUrl = CloudflareConfig.workerUrl;
-      if (!uploadUrl.endsWith('/')) uploadUrl += '/';
       
-      print('Uploading to: $uploadUrl$fileName');
-      final response = await _dio.put(
-        '$uploadUrl$fileName',
-        data: file.openRead(),
-        options: Options(
-          headers: {
-            'Content-Type': _getContentType(fileName),
-          },
+      print('DEBUG [UPLOAD]: Attempting POST upload to $uploadUrl with filename: $fileName');
+
+      // 🚀 POST 방식 + FormData로 포장해서 전송!
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          file.path,
+          filename: fileName,
         ),
+      });
+
+      final response = await _dio.post(
+        uploadUrl,
+        data: formData,
       );
-      print('Upload response: ${response.statusCode}');
+
+      print('DEBUG [UPLOAD]: Server response -> ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        // 🎯 저장할 때는 업로드용 주소(Worker)가 아니라, 다운로드용 주소(CDN)를 리턴합니다!
+        // 🎯 저장할 때는 CDN 주소로 리턴
         return '${CloudflareConfig.cdnUrl}$fileName';
       }
     } catch (e) {
-      print('Upload error: $e');
+      print('DEBUG [UPLOAD]: ERROR -> $e');
     }
     return null;
   }
