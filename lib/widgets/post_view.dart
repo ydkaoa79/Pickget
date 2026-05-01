@@ -1268,52 +1268,58 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     bool isExpired = _remainingSeconds <= 0 || post.isExpired;
     bool hasVoted = _votedSide != 0 || isExpired;
     return Positioned(
-      bottom: 67 + MediaQuery.of(context).padding.bottom, right: 30,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 1. 도넛 그래프 (상단 고정)
-          SizedBox(
-            width: 58, height: 58,
-            child: CustomPaint(
-              painter: DonutPainter(percentA: hasVoted ? (double.tryParse(post.percentA.replaceAll('%', '')) ?? 50) / 100 : 1.0, isPreVote: !hasVoted),
-              child: Center(child: Text(hasVoted ? 'VS' : 'Pick\nView', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: hasVoted ? 13 : 10, height: 1.1))),
+      bottom: 67 + MediaQuery.of(context).padding.bottom, right: 35,
+      child: SizedBox(
+        width: 120, height: 110,
+        child: Stack(
+          alignment: Alignment.topCenter,
+          clipBehavior: Clip.none, // 에러 방지용! 박스를 벗어나도 보이게 설정
+          children: [
+            SizedBox(
+              width: 58, height: 58,
+              child: CustomPaint(
+                painter: DonutPainter(percentA: hasVoted ? (double.tryParse(post.percentA.replaceAll('%', '')) ?? 50) / 100 : 1.0, isPreVote: !hasVoted),
+                child: Center(child: Text(hasVoted ? 'VS' : 'Pick\nView', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: hasVoted ? 13 : 10, height: 1.1))),
+              ),
             ),
-          ),
-          // 2. 투표 통계 (투표 후에만 나타남)
-          if (hasVoted) ...[
-            const SizedBox(height: 6), // 그래프와 숫자 사이의 황금 간격
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // 왼쪽 A
-                SizedBox(
-                  width: 45,
-                  child: Column(
+            if (hasVoted) Positioned(
+              top: 38, left: 0, right: 0,
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      if (_votedSide == 1) _myPickLabel(),
-                      _shadowText(post.percentA, color: Colors.cyanAccent, size: 14, weight: FontWeight.w900), 
-                      _shadowText(post.voteCountA, color: Colors.white70, size: 9, weight: FontWeight.bold),
+                      SizedBox(
+                        width: 45,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            if (_votedSide == 1) _myPickLabel(),
+                            _shadowText(post.percentA, color: Colors.cyanAccent, size: 14, weight: FontWeight.w900), 
+                            _shadowText(post.voteCountA, color: Colors.white70, size: 9, weight: FontWeight.bold),
+                          ]
+                        ),
+                      ),
+                      const SizedBox(width: 35),
+                      SizedBox(
+                        width: 45,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            if (_votedSide == 2) _myPickLabel(),
+                            _shadowText(post.percentB, color: Colors.redAccent, size: 14, weight: FontWeight.w900), 
+                            _shadowText(post.voteCountB, color: Colors.white70, size: 9, weight: FontWeight.bold),
+                          ]
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 30),
-                // 오른쪽 B
-                SizedBox(
-                  width: 45,
-                  child: Column(
-                    children: [
-                      if (_votedSide == 2) _myPickLabel(),
-                      _shadowText(post.percentB, color: Colors.redAccent, size: 14, weight: FontWeight.w900), 
-                      _shadowText(post.voteCountB, color: Colors.white70, size: 9, weight: FontWeight.bold),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
