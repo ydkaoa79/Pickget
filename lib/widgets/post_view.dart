@@ -1282,27 +1282,28 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
               ),
             ),
             if (hasVoted) Positioned(
-              top: 48, left: 0, right: 0,
+              top: 38, left: 0, right: 0, // 46에서 38로 더 위로 올림
               child: Column(
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end, // 하단 기준 정렬로 변경 (딱지 위치 대응)
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end, 
                         children: [
                           if (_votedSide == 1) _myPickLabel(),
-                          _shadowText(post.percentA, color: Colors.cyanAccent, size: 13, weight: FontWeight.w900), 
-                          _shadowText(post.voteCountA, color: Colors.white70, size: 9, weight: FontWeight.bold)
+                          _shadowText(post.percentA, color: Colors.cyanAccent, size: 14, weight: FontWeight.w900), 
+                          _shadowText(post.voteCountA, color: Colors.white70, size: 9, weight: FontWeight.bold),
                         ]
                       ),
-                      const SizedBox(width: 35),
+                      const SizedBox(width: 32),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start, 
                         children: [
                           if (_votedSide == 2) _myPickLabel(),
-                          _shadowText(post.percentB, color: Colors.redAccent, size: 13, weight: FontWeight.w900), 
-                          _shadowText(post.voteCountB, color: Colors.white70, size: 9, weight: FontWeight.bold)
+                          _shadowText(post.percentB, color: Colors.redAccent, size: 14, weight: FontWeight.w900), 
+                          _shadowText(post.voteCountB, color: Colors.white70, size: 9, weight: FontWeight.bold),
                         ]
                       ),
                     ],
@@ -1319,7 +1320,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   Widget _myPickLabel() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-      margin: const EdgeInsets.only(bottom: 2),
+      margin: const EdgeInsets.only(bottom: 2), // 다시 숫자 위에 위치하므로 하단 마진으로 복구
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
       child: const Text('My Pick', style: TextStyle(color: Colors.black, fontSize: 7, fontWeight: FontWeight.w900)),
     );
