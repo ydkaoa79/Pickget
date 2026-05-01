@@ -62,12 +62,31 @@ class _ActivityAnalysisScreenState extends State<ActivityAnalysisScreen> {
 
           final postData = await SupabaseService.client
               .from('posts')
-              .select('vote_count_a, vote_count_b, is_expired')
+              .select('vote_count_a, vote_count_b, created_at, tags')
               .eq('id', postId)
               .maybeSingle();
 
           if (postData != null) {
-            bool isExpiredPost = postData['is_expired'] ?? false;
+            // [수정] DB에 없는 is_expired 대신 시간과 태그로 종료 여부 직접 계산
+            bool isExpiredPost = false;
+            final String? createdAtStr = postData['created_at'];
+            final List<dynamic> tags = postData['tags'] as List? ?? [];
+            
+            if (createdAtStr != null) {
+              final createdAt = DateTime.tryParse(createdAtStr);
+              if (createdAt != null) {
+                for (var tag in tags) {
+                  String tagStr = tag.toString();
+                  if (tagStr.startsWith('duration:')) {
+                    final mins = int.tryParse(tagStr.split(':')[1]);
+                    if (mins != null && DateTime.now().isAfter(createdAt.add(Duration(minutes: mins)))) {
+                      isExpiredPost = true;
+                    }
+                  }
+                }
+              }
+            }
+
             if (!isExpiredPost) continue; // 종료되지 않은 투표는 계산에서 제외
 
             votedCount++; // 종료된 투표만 카운트
