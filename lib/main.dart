@@ -1851,7 +1851,7 @@ class _MainScreenState extends State<MainScreen> {
       // 서버에서 직접 최신 투표 데이터가 포함된 게시물 조회
       final List<dynamic> data = await SupabaseService.client
           .from('posts')
-          .select()
+          .select('id, title, uploader_id, uploader_image, image_a, image_b, description_a, description_b, likes_count, comments_count, vote_count_a, vote_count_b, tags, created_at')
           .order('likes_count', ascending: false) // 우선 좋아요 순으로 50개 조회
           .limit(50);
 
