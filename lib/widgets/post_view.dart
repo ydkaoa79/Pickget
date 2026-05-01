@@ -205,23 +205,23 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       // 3. [추가] 게시물 투표수 업데이트 (서버 반영!)
       final String col = (side == 1) ? 'vote_count_a' : 'vote_count_b';
       
-      // 현재 숫자를 먼저 가져와서 안전하게 1 증가
+      // 현재 숫자들을 가져와서 안전하게 1 증가 (total_votes 포함)
       final pData = await SupabaseService.client
           .from('posts')
-          .select(col)
+          .select('vote_count_a, vote_count_b, total_votes')
           .eq('id', widget.post.id)
           .single();
       
-      int currentVal = 0;
-      if (pData[col] is int) {
-        currentVal = pData[col];
-      } else {
-        currentVal = int.tryParse(pData[col].toString()) ?? 0;
-      }
+      int valA = int.tryParse(pData['vote_count_a']?.toString() ?? '0') ?? 0;
+      int valB = int.tryParse(pData['vote_count_b']?.toString() ?? '0') ?? 0;
+      int valTotal = int.tryParse(pData['total_votes']?.toString() ?? '0') ?? 0;
 
       await SupabaseService.client
           .from('posts')
-          .update({col: currentVal + 1})
+          .update({
+            col: (side == 1 ? valA : valB) + 1,
+            'total_votes': valTotal + 1, // [핵심] 전체 투표수도 동시에 1 증가!
+          })
           .eq('id', widget.post.id);
 
       // 4. 앱 내 점수 즉시 반영

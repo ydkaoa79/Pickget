@@ -32,11 +32,14 @@ class PostData {
   final int? durationMinutes;
   final int? targetPickCount;
   final DateTime createdAt;
+  int totalVotesCount; // 🗳️ 서버에서 가져온 진짜 총 투표수 추가
   
   DateTime get endTime => createdAt.add(Duration(minutes: durationMinutes ?? 1440));
   
-  // 🗳️ 진짜 투표수 합계 계산 (문자열 '1.2k' 등을 숫자로 변환)
+  // 🗳️ 진짜 투표수 합계 계산 (DB 컬럼이 있으면 우선 사용, 없으면 직접 계산)
   int get totalVotes {
+    if (totalVotesCount > 0) return totalVotesCount;
+    
     int parseV(String s) {
       s = s.toLowerCase().replaceAll(',', '').trim();
       if (s.isEmpty) return 0;
@@ -79,6 +82,7 @@ class PostData {
     this.fullDescription = "이 포스트에 대한 상세 설명이 여기에 표시됩니다.",
     this.isExpired = false,
     this.userVotedSide = 0,
+    this.totalVotesCount = 0, // 기본값 추가
     List<CommentData>? comments,
   }) : createdAt = createdAt ?? DateTime.now(),
        comments = comments ?? [];

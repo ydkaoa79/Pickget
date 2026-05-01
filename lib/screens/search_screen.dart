@@ -734,7 +734,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               Row(
                                 children: [
                                   Text(
-                                    '${(post.likesCount / 100).toStringAsFixed(1)}k views',
+                                    '${post.totalVotes} picks',
                                     style: TextStyle(
                                       color: Colors.white.withValues(
                                         alpha: 0.4,

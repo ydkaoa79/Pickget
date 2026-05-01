@@ -436,15 +436,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
   }
 
   int _parseTotalVotes(PostData post) {
-    int parseV(String s) {
-      s = s.toLowerCase().replaceAll(',', '').trim();
-      if (s.isEmpty) return 0;
-      if (s.endsWith('k')) {
-        return ((double.tryParse(s.substring(0, s.length - 1)) ?? 0) * 1000).toInt();
-      }
-      return int.tryParse(s) ?? 0;
-    }
-    return parseV(post.voteCountA) + parseV(post.voteCountB);
+    return post.totalVotes;
   }
 
   String _formatVotes(int count) {

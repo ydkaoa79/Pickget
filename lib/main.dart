@@ -457,7 +457,7 @@ class _MainScreenState extends State<MainScreen> {
       // 2. Fetch all posts and user profiles for real-time profile merging
       final List<dynamic> postsData = await SupabaseService.client
           .from('posts')
-          .select()
+          .select('*, total_votes')
           .order('created_at', ascending: false);
 
       final List<dynamic> profilesData = await SupabaseService.client
@@ -512,6 +512,7 @@ class _MainScreenState extends State<MainScreen> {
           commentsCount: json['comments_count'] ?? 0,
           voteCountA: (json['vote_count_a'] ?? 0).toString(),
           voteCountB: (json['vote_count_b'] ?? 0).toString(),
+          totalVotesCount: json['total_votes'] ?? 0, // [추가]
           percentA: '50%', // Placeholder
           percentB: '50%', // Placeholder
           isLiked: gIsLoggedIn && likedPostIds.contains(json['id'].toString()),
@@ -1851,8 +1852,8 @@ class _MainScreenState extends State<MainScreen> {
       // 서버에서 직접 최신 투표 데이터가 포함된 게시물 조회
       final List<dynamic> data = await SupabaseService.client
           .from('posts')
-          .select('id, title, uploader_id, uploader_image, image_a, image_b, description_a, description_b, likes_count, comments_count, vote_count_a, vote_count_b, tags, created_at')
-          .order('likes_count', ascending: false) // 우선 좋아요 순으로 50개 조회
+          .select('id, title, uploader_id, uploader_image, image_a, image_b, description_a, description_b, likes_count, comments_count, vote_count_a, vote_count_b, total_votes, tags, created_at')
+          .order('total_votes', ascending: false) // [수정] 이제 진짜 픽수 순으로 서버에서 바로 정렬!
           .limit(50);
 
       List<PostData> loadedPosts = data.map((json) {
@@ -1875,6 +1876,7 @@ class _MainScreenState extends State<MainScreen> {
           commentsCount: json['comments_count'] ?? 0,
           voteCountA: vA,
           voteCountB: vB,
+          totalVotesCount: json['total_votes'] ?? 0, // [추가]
           percentA: '50%',
           percentB: '50%',
           tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
