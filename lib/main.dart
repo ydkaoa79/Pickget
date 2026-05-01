@@ -97,18 +97,27 @@ class _MainScreenState extends State<MainScreen> {
     // fetchPosts(); // 🚀 [최적화] 여기서 부르지 않고 아래 리스너/콜백에서 한 번만 부릅니다!
 
     gShowLoginPopup = _showLoginPopup;
-    gOnLogout = () {
-      print(
-        'DEBUG [LOGOUT]: Logout triggered, clearing points and notifications...',
-      );
+    gOnLogout = () async {
+      print('DEBUG [LOGOUT]: Logout triggered, clearing points and notifications...');
+
+      try {
+        // 🚀 [핵심] 수파베이스 세션 로그아웃 (기기 저장소 비우기)
+        await Supabase.instance.client.auth.signOut(); 
+        
+        // 🚀 카카오 SDK 로그아웃 (이미 되어있다면 넘어가도록 try-catch)
+        await UserApi.instance.logout();
+      } catch (e) {
+        print('로그아웃 과정 중 알림: $e');
+      }
+
       if (mounted) {
         setState(() {
           gUserPoints = 0;
           gIsLoggedIn = false;
-          gUserInternalId = null; // ← 추가
-          gIdText = '테스트용'; // ← 추가
-          gNameText = '테스트용'; // ← 추가
-          gProfileImage = 'assets/profiles/profile_11.jpg'; // ← 추가
+          gUserInternalId = null; 
+          gIdText = '테스트용';
+          gNameText = '테스트용';
+          gProfileImage = 'assets/profiles/profile_11.jpg';
           gUserVotes.clear(); // 🗳️ 투표 내역 초기화 (로그아웃 시 VS 마크 복구용!)
           _hasNewNotifications = false;
           _notifications = [];
@@ -155,27 +164,31 @@ class _MainScreenState extends State<MainScreen> {
 
     // 인증 상태 감시자 설치
     print('DEBUG [INIT]: Setting up AuthStateChange listener...');
-    _authSubscription = SupabaseService.client.auth.onAuthStateChange.listen((
-      data,
-    ) async {
+    _authSubscription = SupabaseService.client.auth.onAuthStateChange.listen((data) {
       final AuthChangeEvent event = data.event;
       final Session? session = data.session;
 
-      print('DEBUG [AUTH]: Event occurred -> $event');
+      // 1. 로그를 찍어서 지금 무슨 일이 일어나는지 확인 (디버깅용)
+      print('DEBUG [AUTH]: 이벤트 발생 -> $event, 세션 존재여부 -> ${session != null}');
 
-      if (event == AuthChangeEvent.signedIn ||
-          event == AuthChangeEvent.initialSession) {
-        if (session != null) {
-          print('DEBUG [AUTH]: Login success detected via listener!');
+      // 2. 핵심 로직: 진짜로 '세션'이 들어왔을 때만 성공 처리를 해야 합니다.
+      if ((event == AuthChangeEvent.signedIn || event == AuthChangeEvent.initialSession) && session != null) {
+        // 만약 이미 로그인 처리(gIsLoggedIn)가 끝났다면 또 실행하지 않게 막아야 함
+        if (!gIsLoggedIn) {
+          print('DEBUG [AUTH]: 진짜 로그인 성공! 이제 팝업 닫고 데이터 세팅함.');
           _loginTimer?.cancel(); // ✅ 로그인 확인되는 즉시 타이머 종료!
-          _handleLoginSuccess(session);
+          _handleLoginSuccess(session); 
         }
-      } else if (event == AuthChangeEvent.signedOut) {
-        print('DEBUG [AUTH]: Logout detected.');
-        setState(() {
-          gIsLoggedIn = false;
-          gUserPoints = 0;
-        });
+      } 
+      // 만약 로그아웃 이벤트가 오면 상태 초기화
+      else if (event == AuthChangeEvent.signedOut) {
+        print('DEBUG [AUTH]: 로그아웃 됨');
+        if (mounted) {
+          setState(() {
+            gIsLoggedIn = false;
+            gUserPoints = 0;
+          });
+        }
       }
     });
 
@@ -210,114 +223,45 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _handleLoginSuccess(Session session) async {
-    if (_isInitialLoading) return; // 🛡️ 이미 로딩 중이면 바로 퇴장!
-    _isInitialLoading = true;
+    final user = session.user;
 
-    print('DEBUG [AUTH]: Handling login success for ${session.user.id}');
+    print('DEBUG [AUTH]: Handling login success for ${user.id}');
 
-    // 💡 카카오 프로필 정보 추출 (metadata에서 가져옴)
-    final metadata = session.user.userMetadata ?? {};
-    final String kakaoName =
-        metadata['full_name'] ?? metadata['name'] ?? '픽겟 유저';
-    final String kakaoImage =
-        metadata['avatar_url'] ??
-        metadata['picture'] ??
-        'assets/profiles/profile_11.jpg';
-
+    // 1. 앱의 전역 상태를 '로그인 됨'으로 실제 변경 (setState 필수!)
     setState(() {
       gIsLoggedIn = true;
-      gUserInternalId = session.user.id; // ✅ 진짜 고유 ID 저장!
-      gNameText = kakaoName;
-      gProfileImage = kakaoImage;
-      gIdText =
-          session.user.email?.split('@').first ??
-          session.user.id.substring(0, 8);
+      gUserInternalId = user.id; // 수파베이스의 유니크 ID 저장
+      
+      // 유저 정보 세팅 (카카오/네이버 등에서 넘어온 정보)
+      gIdText = user.email?.split('@').first ?? user.id.substring(0, 8);
+      gNameText = user.userMetadata?['full_name'] ?? 
+                  user.userMetadata?['name'] ?? '픽겟 유저';
+      
+      // 프로필 이미지가 있다면 세팅, 없으면 기본값
+      gProfileImage = user.userMetadata?['avatar_url'] ?? 'assets/profiles/profile_11.jpg';
     });
 
-    // DB 프로필 업데이트 (이미 있으면 업데이트, 없으면 생성)
-    try {
-      await SupabaseService.client.from('user_profiles').upsert({
-        'id': gUserInternalId,
-        'user_id': gIdText,
-        'nickname': gNameText,
-        'profile_image': gProfileImage,
-      }, onConflict: 'id', ignoreDuplicates: true);
-    } catch (e) {
-      print('DEBUG [AUTH]: Profile sync error: $e');
-    }
+    print('✅ [STATE UPDATE]: 전역 변수 업데이트 완료! (ID: ${user.id})');
 
-    await fetchPosts();
-
-    // 💡 추가 정보(나이, 성별 등)가 없으면 설정 화면으로 이동
-    if (mounted && !_isProfileSetupOpen) {
-      // ✅ 이미 떠있으면 패스!
-      try {
-        final profile = await SupabaseService.client
-            .from('user_profiles')
-            .select('age, gender')
-            .eq('id', gUserInternalId!)
-            .maybeSingle();
-
-        if (profile != null &&
-            (profile['age'] == null || profile['gender'] == null)) {
-          print(
-            'DEBUG [AUTH]: Missing info detected, showing ProfileSetupScreen',
-          );
-
-          _isProfileSetupOpen = true; // ✅ 깃발 올리기!
-
-          if (mounted) {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ProfileSetupScreen(),
-              ),
-            );
-
-            _isProfileSetupOpen = false; // ✅ 팝업 닫히면 깃발 내리기
-
-            if (result != null && result is Map) {
-              await SupabaseService.client
-                  .from('user_profiles')
-                  .update({
-                    'age': result['age'],
-                    'gender': result['gender'],
-                    'region': result['region'],
-                  })
-                  .eq('id', gUserInternalId!);
-
-              setState(() {
-                gUserPoints += 100;
-              });
-              _showLoginSuccessSnackBar('카카오');
-
-              // 정보가 업데이트되었으니 다시 fetchPosts 해서 동기화
-              await fetchPosts();
-            }
-          }
-        }
-      } catch (e) {
-        _isProfileSetupOpen = false; // 에러 나도 깃발은 내려야 함
-        print('DEBUG [AUTH]: Profile check/update error: $e');
-      }
-    }
-
+    // 2. 띄워져 있는 로그인 팝업 닫기
     if (_isLoginPopupOpen) {
-      print('DEBUG [AUTH]: Attempting to close popup safely...');
-      if (mounted && _isLoginPopupOpen) {
-        if (_loginDialogContext != null) {
-          // 컨텍스트가 유효한지 한 번 더 확인하고 pop
-          try {
+      if (mounted) {
+        try {
+          if (_loginDialogContext != null) {
             Navigator.of(_loginDialogContext!).pop();
-            print('DEBUG [AUTH]: Popup closed via context.');
-          } catch (e) {
-            print('DEBUG [AUTH]: Pop error (already closed?): $e');
+          } else if (Navigator.canPop(context)) {
+            Navigator.pop(context);
           }
+        } catch (e) {
+          print('DEBUG [AUTH]: Pop error: $e');
         }
-        _isLoginPopupOpen = false;
-        _loginDialogContext = null;
       }
+      _isLoginPopupOpen = false;
+      _loginDialogContext = null;
     }
+
+    // 3. 로그인된 유저의 투표 내역이나 포인트 등을 새로고침
+    await fetchPosts(); 
   }
 
   @override

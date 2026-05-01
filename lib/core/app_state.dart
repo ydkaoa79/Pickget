@@ -11,7 +11,7 @@ int gUserPoints = 0;
 bool gIsLoggedIn = false;
 VoidCallback? gShowLoginPopup;
 VoidCallback? gRefreshFeed;
-VoidCallback? gOnLogout;
+Function()? gOnLogout;
 Map<String, int> gUserVotes = {};
 
 String formatCount(dynamic countVal) {

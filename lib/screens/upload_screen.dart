@@ -8,6 +8,7 @@ import '../services/cloudflare_service.dart';
 import '../services/supabase_service.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart'; // kIsWeb 사용을 위해 추가
+import '../services/media_compressor.dart'; // 🚀 압축기 임포트!
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -185,17 +186,24 @@ class _UploadScreenState extends State<UploadScreen> {
     setState(() => _isUploading = true);
 
     try {
-      // 1. Upload images to R2 via Worker
-      // 🆔 중복 방지를 위해 마이크로초 + 랜덤 문자열 조합으로 파일명 생성
+      // 🚀 1. 이미지 압축 (고속도로 태우기 전에 짐 줄이기!)
+      File fileA = File(_imagePathA!);
+      File fileB = File(_imagePathB!);
+
+      // 이미지일 경우 압축 실행 (추후 영상 도입 시 확장 가능)
+      File? compressedA = await MediaCompressor.compressImage(fileA);
+      File? compressedB = await MediaCompressor.compressImage(fileB);
+
+      // 2. R2 업로드 (압축된 파일로 전송!)
       final String timestamp = DateTime.now().microsecondsSinceEpoch.toString();
       final String randomStr = (DateTime.now().millisecond % 1000).toString().padLeft(3, '0');
       
       String? urlA = await _cloudflareService.uploadFile(
-        File(_imagePathA!), 
+        compressedA ?? fileA, 
         'post_${timestamp}_${randomStr}_A.jpg'
       );
       String? urlB = await _cloudflareService.uploadFile(
-        File(_imagePathB!), 
+        compressedB ?? fileB, 
         'post_${timestamp}_${randomStr}_B.jpg'
       );
 
