@@ -1305,14 +1305,17 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                       const SizedBox(width: 15),
                       // 오른쪽 B 통계 (빨간색 - 좌측 정렬)
                       SizedBox(
-                        width: 45,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start, // 좌측 정렬로 변경
-                          children: [
-                            if (_votedSide == 2) _myPickLabel(),
-                            _shadowText(post.percentB, color: Colors.redAccent, size: 14, weight: FontWeight.w900), 
-                            _shadowText(post.voteCountB, color: Colors.white70, size: 9, weight: FontWeight.bold),
-                          ]
+                        width: 50, // 5픽셀 이동을 고려해 가로폭 소폭 확대
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 5), // 오른쪽으로 5픽셀 이동
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start, // 좌측 정렬
+                            children: [
+                              if (_votedSide == 2) _myPickLabel(),
+                              _shadowText(post.percentB, color: Colors.redAccent, size: 14, weight: FontWeight.w900), 
+                              _shadowText(post.voteCountB, color: Colors.white70, size: 9, weight: FontWeight.bold),
+                            ]
+                          ),
                         ),
                       ),
                     ],
