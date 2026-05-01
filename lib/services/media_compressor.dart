@@ -36,9 +36,9 @@ class MediaCompressor {
     try {
       final MediaInfo? mediaInfo = await VideoCompress.compressVideo(
         file.path,
-        quality: VideoQuality.MediumQuality, // 720p 수준 (SNS 피드용으로 아주 적합)
-        deleteOrigin: false,                 // 폰 갤러리에 있는 원본 영상은 지우지 않음
-        includeAudio: true,                  // 소리 포함
+        quality: VideoQuality.MediumQuality,
+        deleteOrigin: false,
+        includeAudio: false, // 🚀 소리 완전 삭제! (사수님 지시)
       );
 
       if (mediaInfo == null || mediaInfo.file == null) return null;
@@ -46,7 +46,28 @@ class MediaCompressor {
 
     } catch (e) {
       print('DEBUG [COMPRESS]: 영상 압축 실패 - $e');
-      return file; // 압축 실패 시 원본 반환
+      return file;
+    }
+  }
+
+  /// 🎬 3. 비디오 자르기 (사수님의 6초 룰! 전용 근육)
+  static Future<File?> trimVideo(File file, int startMs, int durationMs) async {
+    try {
+      final MediaInfo? mediaInfo = await VideoCompress.compressVideo(
+        file.path,
+        quality: VideoQuality.MediumQuality,
+        startTime: startMs ~/ 1000,
+        duration: durationMs ~/ 1000,
+        deleteOrigin: false,
+        includeAudio: false, // 🚀 소리 완전 삭제! (사수님 지시)
+      );
+
+      if (mediaInfo == null || mediaInfo.file == null) return null;
+      return mediaInfo.file;
+
+    } catch (e) {
+      print('DEBUG [TRIM]: 영상 자르기 실패 - $e');
+      return file;
     }
   }
 }

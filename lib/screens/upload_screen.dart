@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/post_data.dart';
 import '../core/app_state.dart';
 import 'channel_screen.dart';
+import 'video_edit_screen.dart'; // 🚀 편집기 임포트!
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import '../services/cloudflare_service.dart';
@@ -9,6 +10,8 @@ import '../services/supabase_service.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart'; // kIsWeb 사용을 위해 추가
 import '../services/media_compressor.dart'; // 🚀 압축기 임포트!
+import 'package:video_compress/video_compress.dart'; // 🚀 영상 썸네일용!
+import 'package:path/path.dart' as p; // 🚀 확장자 추출용!
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -26,10 +29,15 @@ class _UploadScreenState extends State<UploadScreen> {
 
   String? _imagePathA;
   String? _imagePathB;
+  String? _thumbPathA; // 🎬 영상 썸네일 경로 추가!
+  String? _thumbPathB;
   int _selectedHours = 24;
   int _selectedMinutes = 0;
   bool _useTargetPick = false;
   final TextEditingController _targetPickController = TextEditingController(text: '100');
+  
+  bool _isAdult = false; // 🔞 성인 콘텐츠 여부
+  bool _isAI = false;    // 🤖 AI 생성 여부
   
   final ImagePicker _picker = ImagePicker();
   final CloudflareService _cloudflareService = CloudflareService();
@@ -144,7 +152,12 @@ class _UploadScreenState extends State<UploadScreen> {
                 child: const Text('질문 등록하기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
               ),
             ),
-            const SizedBox(height: 40),
+              const SizedBox(height: 16),
+              _cardBlock(
+                title: '콘텐츠 설정',
+                child: _safetyOptions(),
+              ),
+              const SizedBox(height: 40),
           ],
         ),
       ),
@@ -186,29 +199,34 @@ class _UploadScreenState extends State<UploadScreen> {
     setState(() => _isUploading = true);
 
     try {
-      // 🚀 1. 이미지 압축 (고속도로 태우기 전에 짐 줄이기!)
+      // 🚀 1. 이미지/영상 압축 (파일 성격에 맞춰서!)
       File fileA = File(_imagePathA!);
       File fileB = File(_imagePathB!);
 
-      // 이미지일 경우 압축 실행 (추후 영상 도입 시 확장 가능)
-      File? compressedA = await MediaCompressor.compressImage(fileA);
-      File? compressedB = await MediaCompressor.compressImage(fileB);
+      bool isVideoA = _isVideo(_imagePathA!);
+      bool isVideoB = _isVideo(_imagePathB!);
 
-      // 2. R2 업로드 (압축된 파일로 전송!)
+      File? compressedA = isVideoA ? await MediaCompressor.compressVideo(fileA) : await MediaCompressor.compressImage(fileA);
+      File? compressedB = isVideoB ? await MediaCompressor.compressVideo(fileB) : await MediaCompressor.compressImage(fileB);
+
+      // 2. R2 업로드 (확장자 똑똑하게 챙기기!)
       final String timestamp = DateTime.now().microsecondsSinceEpoch.toString();
       final String randomStr = (DateTime.now().millisecond % 1000).toString().padLeft(3, '0');
       
+      String extA = p.extension(_imagePathA!).toLowerCase();
+      String extB = p.extension(_imagePathB!).toLowerCase();
+
       String? urlA = await _cloudflareService.uploadFile(
         compressedA ?? fileA, 
-        'post_${timestamp}_${randomStr}_A.jpg'
+        'post_${timestamp}_${randomStr}_A$extA'
       );
       String? urlB = await _cloudflareService.uploadFile(
         compressedB ?? fileB, 
-        'post_${timestamp}_${randomStr}_B.jpg'
+        'post_${timestamp}_${randomStr}_B$extB'
       );
 
       if (urlA == null || urlB == null) {
-        throw Exception('이미지 업로드 실패');
+        throw Exception('파일 업로드 실패');
       }
 
       // 2. Insert into Supabase
@@ -218,6 +236,8 @@ class _UploadScreenState extends State<UploadScreen> {
       // Trick: Store duration and target count in tags since columns are missing
       finalTags.add('duration:$totalMinutes');
       if (targetCount != null) finalTags.add('target:$targetCount');
+      if (_isAdult) finalTags.add('adult:true'); // 🔞 성인 태그 추가
+      if (_isAI) finalTags.add('ai:true');       // 🤖 AI 태그 추가
 
       final response = await SupabaseService.client.from('posts').insert({
         'title': _titleController.text,
@@ -276,6 +296,102 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
+  bool _isVideo(String url) {
+    final path = url.toLowerCase();
+    return path.endsWith('.mp4') || 
+           path.endsWith('.mov') || 
+           path.endsWith('.m4v') || 
+           path.endsWith('.avi') || 
+           path.endsWith('.wmv') || 
+           path.endsWith('.mkv') || 
+           path.endsWith('.3gp');
+  }
+
+  void _showImageSourceActionSheet(String label, Function(String) onPick) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            const Text('업로드 방식 선택', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Colors.cyanAccent),
+              title: const Text('사진 찍기 (카메라)', style: TextStyle(color: Colors.white)),
+              onTap: () async {
+                Navigator.pop(context);
+                final XFile? image = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                if (image != null) _handlePickedMedia(image.path, label, onPick, isVideo: false);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Colors.cyanAccent),
+              title: const Text('갤러리에서 사진 선택', style: TextStyle(color: Colors.white)),
+              onTap: () async {
+                Navigator.pop(context);
+                final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+                if (image != null) _handlePickedMedia(image.path, label, onPick, isVideo: false);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.videocam, color: Colors.redAccent),
+              title: const Text('갤러리에서 영상 선택', style: TextStyle(color: Colors.white)),
+              onTap: () async {
+                Navigator.pop(context);
+                final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
+                if (video != null) _handlePickedMedia(video.path, label, onPick, isVideo: true);
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handlePickedMedia(String path, String label, Function(String) onPick, {required bool isVideo}) async {
+    if (isVideo) {
+      // 🚀 사수님의 6초 룰! 편집기 먼저 다녀오기
+      final File? editedFile = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => VideoEditScreen(file: File(path))),
+      );
+
+      if (editedFile == null) return; // 편집 취소 시 중단
+
+      final String finalPath = editedFile.path;
+
+      // 🎬 잘린 영상으로 썸네일 생성
+      final thumbFile = await VideoCompress.getFileThumbnail(finalPath, quality: 50, position: -1);
+      if (mounted) {
+        setState(() {
+          if (label == 'A') {
+            _imagePathA = finalPath;
+            _thumbPathA = thumbFile.path;
+          } else {
+            _imagePathB = finalPath;
+            _thumbPathB = thumbFile.path;
+          }
+        });
+        onPick(finalPath);
+      }
+    } else {
+      // 📸 사진일 경우 기존처럼 크롭 로직 가동!
+      setState(() {
+        if (label == 'A') _thumbPathA = null;
+        else _thumbPathB = null;
+      });
+      final String? croppedPath = await _cropImage(path);
+      if (croppedPath != null) onPick(croppedPath);
+    }
+  }
+
   Future<String?> _cropImage(String path) async {
     final croppedFile = await ImageCropper().cropImage(
       sourcePath: path,
@@ -325,33 +441,23 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   Widget _abUploadCard(String label, String? path, Function(String) onPick) {
+    String? thumbPath = (label == 'A') ? _thumbPathA : _thumbPathB;
+    
     return GestureDetector(
-      onTap: () async {
-        // 1. 사진 고르기 (압축 적용)
-        final XFile? image = await _picker.pickImage(
-          source: ImageSource.gallery,
-          imageQuality: 70, // 1차 압축!
-        );
-        
-        if (image != null) {
-          // 2. 편집하기 (자르기/회전)
-          final String? croppedPath = await _cropImage(image.path);
-          if (croppedPath != null) {
-            onPick(croppedPath);
-          }
-        }
-      },
+      onTap: () => _showImageSourceActionSheet(label, onPick),
       child: AspectRatio(
         aspectRatio: 1,
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(20),
-            image: path != null 
+            image: (path != null || thumbPath != null)
               ? DecorationImage(
-                  image: path.startsWith('http') 
-                    ? NetworkImage(path) 
-                    : FileImage(File(path)) as ImageProvider, 
+                  image: thumbPath != null 
+                    ? FileImage(File(thumbPath)) 
+                    : (path!.startsWith('http') 
+                        ? NetworkImage(path) 
+                        : FileImage(File(path)) as ImageProvider), 
                   fit: BoxFit.cover
                 ) 
               : null,
@@ -359,18 +465,20 @@ class _UploadScreenState extends State<UploadScreen> {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              if (path == null) ...[
+              if (path == null && thumbPath == null) ...[
                 Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.03), fontSize: 80, fontWeight: FontWeight.w900)),
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.add_a_photo_outlined, color: Colors.cyanAccent, size: 32),
+                    const Icon(Icons.add_circle_outline, color: Colors.cyanAccent, size: 32),
                     const SizedBox(height: 8),
                     Text('$label 업로드', style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ],
-              if (path != null)
+              if (thumbPath != null) // 영상일 경우 플레이 아이콘 표시
+                const Icon(Icons.play_circle_outline, color: Colors.white70, size: 40),
+              if (path != null || thumbPath != null)
                 Positioned(
                   top: 8, right: 8,
                   child: Container(
@@ -472,6 +580,49 @@ class _UploadScreenState extends State<UploadScreen> {
               ],
             ),
           ),
+      ],
+    );
+  }
+
+  Widget _safetyOptions() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.explicit_outlined, color: Colors.redAccent, size: 20),
+                SizedBox(width: 8),
+                Text('성인 콘텐츠 표시', style: TextStyle(color: Colors.white, fontSize: 14)),
+              ],
+            ),
+            Switch(
+              value: _isAdult, 
+              onChanged: (v) => setState(() => _isAdult = v),
+              activeTrackColor: Colors.redAccent.withValues(alpha: 0.3),
+              activeThumbColor: Colors.redAccent,
+            ),
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.psychology_outlined, color: Colors.cyanAccent, size: 20),
+                SizedBox(width: 8),
+                Text('AI 생성 콘텐츠 표시', style: TextStyle(color: Colors.white, fontSize: 14)),
+              ],
+            ),
+            Switch(
+              value: _isAI, 
+              onChanged: (v) => setState(() => _isAI = v),
+              activeTrackColor: Colors.cyanAccent.withValues(alpha: 0.3),
+              activeThumbColor: Colors.cyanAccent,
+            ),
+          ],
+        ),
       ],
     );
   }

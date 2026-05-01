@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'dart:async';
+import 'dart:io'; // 🚀 파일 처리를 위해 추가!
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:video_player/video_player.dart'; // 🚀 기본 비디오 플레이어
+import 'package:flutter_cache_manager/flutter_cache_manager.dart'; // 🚀 사수님의 무중력 캐싱 엔진!
 import '../models/post_data.dart';
 import '../models/comment_data.dart';
 import '../core/app_state.dart';
@@ -52,6 +56,12 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   bool _showAlreadySelectedToast = false;
   bool _showIsMeToast = false; // 🚫 본인 게시물 알림용 추가!
   bool _isSheetOpening = false;
+  
+  // 🎬 영상 컨트롤러 세트
+  VideoPlayerController? _controllerA;
+  VideoPlayerController? _controllerB;
+  bool _isInitializedA = false;
+  bool _isInitializedB = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -75,6 +85,53 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     
     _updateRemainingTime();
     _startTimer();
+
+    // 🎬 영상 초기화 시작!
+    _initVideo(widget.post.imageA, 1);
+    _initVideo(widget.post.imageB, 2);
+  }
+
+  Future<void> _initVideo(String url, int side) async {
+    if (!_isVideo(url)) return;
+
+    try {
+      print('DEBUG [VIDEO]: Side $side 캐싱 시작 - $url');
+      // 🚀 [사수표 무중력 캐싱] 폰에 먼저 저장하고 로컬 파일로 플레이!
+      final file = await DefaultCacheManager().getSingleFile(url);
+      
+      final controller = VideoPlayerController.file(file);
+      await controller.initialize();
+      await controller.setLooping(true);
+      await controller.setVolume(0);
+      
+      if (mounted) {
+        setState(() {
+          if (side == 1) {
+            _controllerA = controller;
+            _isInitializedA = true;
+          } else {
+            _controllerB = controller;
+            _isInitializedB = true;
+          }
+        });
+        
+        // 🎬 로컬 파일이 준비되었으므로 즉시 재생!
+        controller.play();
+      }
+    } catch (e) {
+      print('DEBUG [VIDEO]: Side $side 초기화 실패 - $e');
+    }
+  }
+
+  bool _isVideo(String url) {
+    final path = url.toLowerCase();
+    return path.endsWith('.mp4') || 
+           path.endsWith('.mov') || 
+           path.endsWith('.m4v') || 
+           path.endsWith('.avi') || 
+           path.endsWith('.wmv') || 
+           path.endsWith('.mkv') || 
+           path.endsWith('.3gp');
   }
 
   void _updateRemainingTime() {
@@ -102,6 +159,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _controllerA?.dispose(); // 🎬 영상 리소스 해제 필수!
+    _controllerB?.dispose();
     super.dispose();
   }
 
@@ -372,9 +431,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         Positioned.fill(
                           child: ImageFiltered(
                             imageFilter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                            child: widget.post.imageA.trim().contains('http')
-                              ? Image.network(widget.post.imageA.trim(), fit: BoxFit.cover)
-                              : Image.asset(widget.post.imageA.trim(), fit: BoxFit.cover),
+                            child: _buildMedia(1, widget.post.imageA, sw),
                           ),
                         ),
                         Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.3))),
@@ -383,9 +440,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           child: OverflowBox(
                             maxWidth: sw * 0.8, // 이미지는 항상 화면의 80% 크기!
                             minWidth: sw * 0.8,
-                            child: widget.post.imageA.trim().contains('http')
-                              ? Image.network(widget.post.imageA.trim(), fit: BoxFit.cover)
-                              : Image.asset(widget.post.imageA.trim(), fit: BoxFit.cover),
+                            child: _buildMedia(1, widget.post.imageA, sw),
                           ),
                         ),
                       ],
@@ -405,9 +460,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         Positioned.fill(
                           child: ImageFiltered(
                             imageFilter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                            child: widget.post.imageB.trim().contains('http')
-                              ? Image.network(widget.post.imageB.trim(), fit: BoxFit.cover)
-                              : Image.asset(widget.post.imageB.trim(), fit: BoxFit.cover),
+                            child: _buildMedia(2, widget.post.imageB, sw),
                           ),
                         ),
                         Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.3))),
@@ -416,9 +469,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           child: OverflowBox(
                             maxWidth: sw * 0.8, // 이미지는 항상 화면의 80% 크기!
                             minWidth: sw * 0.8,
-                            child: widget.post.imageB.trim().contains('http')
-                              ? Image.network(widget.post.imageB.trim(), fit: BoxFit.cover)
-                              : Image.asset(widget.post.imageB.trim(), fit: BoxFit.cover),
+                            child: _buildMedia(2, widget.post.imageB, sw),
                           ),
                         ),
                       ],
@@ -657,7 +708,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           CircleAvatar(
                             radius: 28, 
                             backgroundImage: widget.post.uploaderImage.startsWith('http')
-                              ? NetworkImage(widget.post.uploaderImage)
+                              ? CachedNetworkImageProvider(widget.post.uploaderImage)
                               : AssetImage(widget.post.uploaderImage) as ImageProvider,
                           ),
                           const SizedBox(width: 12),
@@ -1282,6 +1333,39 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     ); 
   }
 
+  Widget _buildMedia(int side, String url, double sw) {
+    if (_isVideo(url)) {
+      final controller = (side == 1) ? _controllerA : _controllerB;
+      final isInitialized = (side == 1) ? _isInitializedA : _isInitializedB;
+
+      if (isInitialized && controller != null) {
+        return FittedBox(
+          fit: BoxFit.cover,
+          clipBehavior: Clip.hardEdge,
+          child: SizedBox(
+            width: controller.value.size.width,
+            height: controller.value.size.height,
+            child: VideoPlayer(controller),
+          ),
+        );
+      } else {
+        return const Center(
+          child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2),
+        );
+      }
+    } else {
+      // 이미지일 때 (기존 로직 그대로 캐싱 적용!)
+      return url.trim().contains('http')
+          ? CachedNetworkImage(
+              imageUrl: url.trim(),
+              fit: BoxFit.cover,
+              placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2)),
+              errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white24),
+            )
+          : Image.asset(url.trim(), fit: BoxFit.cover);
+    }
+  }
+
   Widget _descBox(String text, bool isExpanded, VoidCallback onTap) { 
     bool needsExpansion = false;
     if (text.isNotEmpty) {
@@ -1466,7 +1550,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                 child: CircleAvatar(
                   radius: depth > 0 ? 14 : 18, 
                   backgroundImage: c.image.startsWith('http') 
-                    ? NetworkImage(c.image) 
+                    ? CachedNetworkImageProvider(c.image) 
                     : AssetImage(c.image) as ImageProvider
                 ),
               ),
@@ -1546,7 +1630,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                                 c.isHidden = !c.isHidden;
                               });
                             } else if (value == '신고') {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('신고가 접수되었습니다.')));
+                              _showReportSheet(context);
                             } else if (value == '수정') {
                               _showEditCommentDialog(c, setSheetState);
                             }
@@ -1655,35 +1739,66 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   }
 
   void _showReportSheet(BuildContext context) {
-    String? selectedReason;
-    final List<String> reasons = ['스팸 또는 홍보', '부적절한 콘텐츠', '저작권 침해', '증오 표현 또는 괴롭힘', '허위 정보', '기타'];
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => SafeArea(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            decoration: const BoxDecoration(color: Color(0xFF121212), borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
-                const SizedBox(height: 25),
-                const Text('신고 사유 선택', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-                const SizedBox(height: 20),
-                // ignore: deprecated_member_use
-                Column(children: reasons.map((reason) => RadioListTile<String>(title: Text(reason, style: const TextStyle(color: Colors.white70, fontSize: 15)), value: reason, groupValue: selectedReason, activeColor: Colors.redAccent, 
-                  // ignore: deprecated_member_use
-                  onChanged: (val) => setSheetState(() => selectedReason = val), contentPadding: EdgeInsets.zero)).toList()),
-                const SizedBox(height: 20),
-                SizedBox(width: double.infinity, height: 54, child: ElevatedButton(onPressed: selectedReason == null ? null : () { Navigator.pop(context); widget.onReport(selectedReason!); }, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), child: const Text('신고하기', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)))),
-              ],
-            ),
+      builder: (context) => SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1C1C1C),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+            boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 5)],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 🎩 상단 바
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 25),
+              
+              // 📢 제목 및 설명
+              const Text('게시물 신고', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 8),
+              const Text('신고 사유를 선택해주세요. 검토 후 신속히 조치하겠습니다.', style: TextStyle(color: Colors.white38, fontSize: 12)),
+              const SizedBox(height: 25),
+
+              // 📋 신고 항목 리스트 (아이콘 탑재!)
+              _reportItem(context, Icons.copyright, '저작권 침해', Colors.amberAccent),
+              _reportItem(context, Icons.explicit_outlined, '부적절한 콘텐츠', Colors.redAccent),
+              _reportItem(context, Icons.campaign_outlined, '스팸 또는 홍보', Colors.blueAccent),
+              _reportItem(context, Icons.psychology_alt_outlined, '허위 정보 유포', Colors.purpleAccent),
+              _reportItem(context, Icons.sentiment_very_dissatisfied, '증오 표현 또는 괴롭힘', Colors.orangeAccent),
+              _reportItem(context, Icons.more_horiz, '기타', Colors.white54),
+              
+              const SizedBox(height: 20),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _reportItem(BuildContext context, IconData icon, String title, Color iconColor) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.1), shape: BoxShape.circle),
+        child: Icon(icon, color: iconColor, size: 20),
+      ),
+      title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+      trailing: const Icon(Icons.chevron_right, color: Colors.white10, size: 18),
+      onTap: () {
+        Navigator.pop(context);
+        widget.onReport(title); // 🚀 사유 전달!
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"$title" 사유로 신고가 접수되었습니다.'),
+            backgroundColor: Colors.cyanAccent.withValues(alpha: 0.9),
+          ),
+        );
+      },
     );
   }
 }
