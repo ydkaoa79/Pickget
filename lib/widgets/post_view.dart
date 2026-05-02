@@ -174,29 +174,41 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     }
   }
 
-  // 🎬 영상 재생 완료 시 처리
+  // 🎬 영상 재생 완료 시 처리 (무한 루프 로직)
   void _onVideoFinished(int side) {
     if (!mounted) return;
     
-    if (side == 1 && !_videoAFinished) {
-      _videoAFinished = true;
-      print('DEBUG [VIDEO v2]: A 영상 재생 완료 → B로 전환');
-      
-      // A 끝나면 → B 자동 재생
+    // 🎬 현재 어떤 사이드가 확장되어 있는지 체크
+    double ratioA = (_widthA ?? (MediaQuery.of(context).size.width * 0.5)) / MediaQuery.of(context).size.width;
+
+    if (side == 1) {
+      print('DEBUG [VIDEO v2]: A 영상 종료');
       _controllerA?.pause();
       _controllerA?.seekTo(Duration.zero);
       
-      if (_isInitializedB && _controllerB != null) {
+      if (ratioA >= 0.55) {
+        // A가 확장된 상태라면 A 무한 반복
+        _switchToSide(1);
+      } else if (ratioA <= 0.45) {
+        // B가 확장된 상태인데 A가 끝난 건 무시 (이미 B 재생 중일 것)
+      } else {
+        // 중앙 상태라면 B로 전환 (순차 루프)
         _switchToSide(2);
       }
-    } else if (side == 2 && !_videoBFinished) {
-      _videoBFinished = true;
-      print('DEBUG [VIDEO v2]: B 영상 재생 완료 → 전체 정지');
-      
-      // B 끝나면 → 전체 정지 (루프 없음)
+    } else if (side == 2) {
+      print('DEBUG [VIDEO v2]: B 영상 종료');
       _controllerB?.pause();
       _controllerB?.seekTo(Duration.zero);
-      setState(() => _playingSide = 0);
+
+      if (ratioA <= 0.45) {
+        // B가 확장된 상태라면 B 무한 반복
+        _switchToSide(2);
+      } else if (ratioA >= 0.55) {
+        // A가 확장된 상태인데 B가 끝난 건 무시
+      } else {
+        // 중앙 상태라면 다시 A로 전환 (순차 루프 A->B->A...)
+        _switchToSide(1);
+      }
     }
   }
 
@@ -205,15 +217,13 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     if (!mounted) return;
     
     if (side == 1 && _isInitializedA && _controllerA != null) {
-      _controllerB?.pause();
-      _videoAFinished = false;
-      _controllerA!.seekTo(Duration.zero);
+      _controllerB?.pause(); // B는 보던 위치에서 일시정지
+      // 🚀 보던 위치에서 Resume! (완전히 끝났을 때만 위에서 0초로 감)
       _controllerA!.play();
       setState(() => _playingSide = 1);
     } else if (side == 2 && _isInitializedB && _controllerB != null) {
-      _controllerA?.pause();
-      _videoBFinished = false;
-      _controllerB!.seekTo(Duration.zero);
+      _controllerA?.pause(); // A는 보던 위치에서 일시정지
+      // 🚀 보던 위치에서 Resume!
       _controllerB!.play();
       setState(() => _playingSide = 2);
     }
@@ -444,6 +454,14 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     setState(() { 
       _isDragging = true; 
       _widthA = ((_widthA ?? (sw * 0.5)) + details.delta.dx).clamp(sw * 0.2, sw * 0.8); 
+      
+      // 🎬 실시간 영상 전환 체크 (55% 이상 열리면 즉시 재생)
+      double ratioA = _widthA! / sw;
+      if (ratioA >= 0.55 && _playingSide != 1) {
+        _switchToSide(1);
+      } else if (ratioA <= 0.45 && _playingSide != 2) {
+        _switchToSide(2);
+      }
     });
   }
 
@@ -493,9 +511,17 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       }
     });
     HapticFeedback.lightImpact();
-    // 🎬 터치 시 해당 사이드 영상 즉시 전환!
-    if (_expandedSide == 1) _switchToSide(1);
-    else if (_expandedSide == 2) _switchToSide(2);
+    
+    // 🎬 터치 시에도 즉시 전환 체크 (55% 기준 적용)
+    double ratioA = (_widthA ?? (sw * 0.5)) / sw;
+    if (ratioA >= 0.55) {
+      _switchToSide(1);
+    } else if (ratioA <= 0.45) {
+      _switchToSide(2);
+    } else {
+      // 중앙 상태(0.5)일 때는 A→B 순차 재생 흐름을 따름 (이미 재생 중이면 유지)
+      if (_playingSide == 0) _switchToSide(1);
+    }
   }
 
   String _formatTimer(int seconds) {
@@ -1464,8 +1490,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       final isPlaying = (_playingSide == side);
 
       Widget content;
-      if (!forceThumb && isInitialized && controller != null && isPlaying && controller.value.isPlaying) {
-        // 🎬 영상이 실제로 재생 중일 때만 VideoPlayer 표시!
+      if (!forceThumb && isInitialized && controller != null) {
+        // 🎬 초기화만 되었다면 재생 여부와 상관없이 영상 화면 유지 (일시정지 포함)
         content = FittedBox(
           fit: BoxFit.cover,
           clipBehavior: Clip.hardEdge,
