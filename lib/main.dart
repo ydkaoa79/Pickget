@@ -262,6 +262,65 @@ class _MainScreenState extends State<MainScreen> {
 
     // 3. 로그인된 유저의 투표 내역이나 포인트 등을 새로고침
     await fetchPosts(); 
+
+    // 4. 프로필 정보가 비어있으면(신규 유저) 추가 정보 입력 팝업 띄우기
+    if (gIsLoggedIn && gUserInternalId != null) {
+      final profile = await SupabaseService.client
+          .from('user_profiles')
+          .select('age, gender, region')
+          .eq('id', gUserInternalId!)
+          .maybeSingle();
+
+      if (profile == null || profile['age'] == null) {
+        if (!_isProfileSetupOpen && mounted) {
+          _isProfileSetupOpen = true;
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
+          );
+          _isProfileSetupOpen = false;
+
+          if (result != null && result is Map) {
+            try {
+              await SupabaseService.client
+                  .from('user_profiles')
+                  .update({
+                    'age': result['age'],
+                    'gender': result['gender'],
+                    'region': result['region'],
+                    'agreed_tos': result['agreed_tos'],
+                    'agreed_privacy': result['agreed_privacy'],
+                    'agreed_third_party': result['agreed_third_party'],
+                    'agreed_marketing': result['agreed_marketing'],
+                  })
+                  .eq('id', gUserInternalId!);
+
+              // 포인트 지급 로직 (예: 필수 동의 1000 + 선택 동의 500)
+              int earnedPoints = 1000;
+              if (result['agreed_marketing'] == true) {
+                earnedPoints += 500;
+              }
+
+              setState(() {
+                gUserPoints = earnedPoints;
+              });
+
+              // 포인트 정보 서버 반영
+              await SupabaseService.client
+                  .from('user_profiles')
+                  .update({'points': gUserPoints})
+                  .eq('id', gUserInternalId!);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('가입 축하 포인트가 지급되었습니다! 🎁')),
+              );
+            } catch (e) {
+              print('DEBUG [AUTH]: Profile update error: $e');
+            }
+          }
+        }
+      }
+    }
   }
 
   @override
@@ -339,14 +398,14 @@ class _MainScreenState extends State<MainScreen> {
                 .insert({
                   'id': gUserInternalId, // ✅ Auth UUID를 프로필 ID로 사용!
                   'user_id': gIdText,
-                  'points': 5000,
+                  'points': 0, // 초기 포인트 0 (약관 동의 후 지급)
                   'nickname': gNameText,
                   'profile_image': gProfileImage,
                 })
                 .select()
                 .single();
             setState(() {
-              gUserPoints = 5000;
+              gUserPoints = 0;
             });
           }
 
@@ -808,12 +867,29 @@ class _MainScreenState extends State<MainScreen> {
                                   'age': result['age'],
                                   'gender': result['gender'],
                                   'region': result['region'],
+                                  'agreed_tos': result['agreed_tos'],
+                                  'agreed_privacy': result['agreed_privacy'],
+                                  'agreed_third_party': result['agreed_third_party'],
+                                  'agreed_marketing': result['agreed_marketing'],
                                 })
                                 .eq('id', gUserInternalId!);
 
+                            // 포인트 지급 로직 (예: 필수 동의 1000 + 선택 동의 500)
+                            int earnedPoints = 1000;
+                            if (result['agreed_marketing'] == true) {
+                              earnedPoints += 500;
+                            }
+
                             setState(() {
-                              gUserPoints += 100;
+                              gUserPoints += earnedPoints;
                             });
+
+                            // 포인트 정보도 서버에 반영
+                            await SupabaseService.client
+                                .from('user_profiles')
+                                .update({'points': gUserPoints})
+                                .eq('id', gUserInternalId!);
+
                             _showLoginSuccessSnackBar('네이버');
                           } catch (e) {
                             print(
@@ -854,12 +930,29 @@ class _MainScreenState extends State<MainScreen> {
                                   'age': result['age'],
                                   'gender': result['gender'],
                                   'region': result['region'],
+                                  'agreed_tos': result['agreed_tos'],
+                                  'agreed_privacy': result['agreed_privacy'],
+                                  'agreed_third_party': result['agreed_third_party'],
+                                  'agreed_marketing': result['agreed_marketing'],
                                 })
                                 .eq('id', gUserInternalId!);
 
+                            // 포인트 지급 로직
+                            int earnedPoints = 1000;
+                            if (result['agreed_marketing'] == true) {
+                              earnedPoints += 500;
+                            }
+
                             setState(() {
-                              gUserPoints += 100;
+                              gUserPoints += earnedPoints;
                             });
+
+                            // 포인트 정보도 서버에 반영
+                            await SupabaseService.client
+                                .from('user_profiles')
+                                .update({'points': gUserPoints})
+                                .eq('id', gUserInternalId!);
+
                             _showLoginSuccessSnackBar('Google');
                           } catch (e) {
                             print(

@@ -358,26 +358,29 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
         final post = widget.allPosts.firstWhere((p) => p.id == id);
         final dynamic targetId = int.tryParse(id) ?? id;
         
-        // Use tags to store hidden state since is_hidden column is missing
+        // Use isHidden property to get the true current state
+        bool currentlyHidden = post.isHidden;
         List<String> currentTags = List<String>.from(post.tags ?? []);
-        bool currentlyHidden = currentTags.contains('#hidden#');
         
         if (currentlyHidden) {
           currentTags.remove('#hidden#');
         } else {
-          currentTags.add('#hidden#');
+          if (!currentTags.contains('#hidden#')) {
+            currentTags.add('#hidden#');
+          }
         }
         
         await SupabaseService.client.from('posts').update({'tags': currentTags}).eq('id', targetId);
         
         setState(() {
           post.isHidden = !currentlyHidden;
-          // Also update the tags in the object to stay in sync
-          final index = widget.allPosts.indexWhere((p) => p.id == id);
-          if (index != -1) {
-            final List<String> updatedTags = List<String>.from(widget.allPosts[index].tags ?? []);
-            if (currentlyHidden) updatedTags.remove('#hidden#'); else updatedTags.add('#hidden#');
-            // We need a way to update tags in PostData, but for now let's use isHidden property
+          // Update the internal tags list content directly
+          if (post.tags != null) {
+            if (currentlyHidden) {
+              post.tags!.remove('#hidden#');
+            } else {
+              if (!post.tags!.contains('#hidden#')) post.tags!.add('#hidden#');
+            }
           }
         });
         count++;

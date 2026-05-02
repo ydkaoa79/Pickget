@@ -631,7 +631,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                 duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
                 curve: Curves.easeOutCubic, 
                 left: (currentWidthA - 24).clamp(-24.0, sw - 24.0), 
-                top: sh / 2 - 24,
+                top: (sh / 2 - 24) - 20,
                 child: IgnorePointer(
                   child: Container(
                     width: 48, height: 48, 
@@ -647,25 +647,25 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
               ),
               IgnorePointer(child: Container(color: Colors.black.withValues(alpha: 0.15))),
               Positioned(
-                top: sh * 0.28 - 20, left: 15, 
+                top: sh * 0.28 - 40, left: 15, 
                 child: _bgLabel('A', _votedSide == 1 ? Colors.cyanAccent.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.45), 
                   isWinner: isExpired && ((double.tryParse(widget.post.percentA.replaceAll('%', '')) ?? 0) > (double.tryParse(widget.post.percentB.replaceAll('%', '')) ?? 0)))
               ),
               Positioned(
-                top: sh * 0.28 - 20, right: 15, 
+                top: sh * 0.28 - 40, right: 15, 
                 child: _bgLabel('B', _votedSide == 2 ? Colors.redAccent.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.45), 
                   isWinner: isExpired && ((double.tryParse(widget.post.percentB.replaceAll('%', '')) ?? 0) > (double.tryParse(widget.post.percentA.replaceAll('%', '')) ?? 0)))
               ),
               Positioned(
-                top: 160, left: 0, right: 0,
+                top: 140, left: 0, right: 0,
                 child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20), 
+                      padding: const EdgeInsets.only(left: 20, right: 5), // 오른쪽 여백을 줄여서 점 3개를 우측으로 15px 이동 효과
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center, 
                         children: [
-                          const SizedBox(width: 40), 
+                          const SizedBox(width: 33), // 왼쪽 20 + 33 = 53 / 오른쪽 5 + 48(버튼크기) = 53 (완벽한 중앙 정렬)
                           Expanded(
                             child: Center(
                               child: FittedBox(
@@ -685,7 +685,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                             )
                           ), 
                           PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert, color: Colors.white70, size: 28),
+                            icon: const Icon(Icons.more_vert, color: Colors.white70, size: 30), // 터치하기 쉽도록 아이콘 크기를 살짝 키움
+                            padding: const EdgeInsets.all(12), // 순정 플러터 패딩으로 터치 영역 확보
                             color: const Color(0xFF1E1E1E),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                             onSelected: (value) {
@@ -706,83 +707,20 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                             itemBuilder: (BuildContext context) {
                               if (isMe) {
                                 return <PopupMenuEntry<String>>[
-                                  const PopupMenuItem<String>(
-                                    value: '설명',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.info_outline, color: Colors.white70, size: 20),
-                                        SizedBox(width: 12),
-                                        Text('설명', style: TextStyle(color: Colors.white, fontSize: 14)),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuItem<String>(
-                                    value: widget.post.isHidden ? '보이기' : '숨기기',
-                                    child: Row(
-                                      children: [
-                                        Icon(widget.post.isHidden ? Icons.visibility : Icons.visibility_off, color: Colors.white70, size: 20),
-                                        SizedBox(width: 12),
-                                        Text(widget.post.isHidden ? '보이기' : '숨기기', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem<String>(
-                                    value: '삭제',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                                        SizedBox(width: 12),
-                                        Text('삭제', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                  ),
+                                  const PopupMenuItem<String>(value: '설명', child: Row(children: [Icon(Icons.info_outline, color: Colors.white70, size: 20), SizedBox(width: 12), Text('설명', style: TextStyle(color: Colors.white, fontSize: 14))])),
+                                  PopupMenuItem<String>(value: widget.post.isHidden ? '보이기' : '숨기기', child: Row(children: [Icon(widget.post.isHidden ? Icons.visibility : Icons.visibility_off, color: Colors.white70, size: 20), SizedBox(width: 12), Text(widget.post.isHidden ? '보이기' : '숨기기', style: const TextStyle(color: Colors.white, fontSize: 14))])),
+                                  const PopupMenuItem<String>(value: '삭제', child: Row(children: [Icon(Icons.delete_outline, color: Colors.redAccent, size: 20), SizedBox(width: 12), Text('삭제', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold))])),
                                 ];
                               } else {
                                 return <PopupMenuEntry<String>>[
-                                  const PopupMenuItem<String>(
-                                    value: '설명',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.info_outline, color: Colors.white70, size: 20),
-                                        SizedBox(width: 12),
-                                        Text('설명', style: TextStyle(color: Colors.white, fontSize: 14)),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem<String>(
-                                    value: '관심없음',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.block, color: Colors.white70, size: 20),
-                                        SizedBox(width: 12),
-                                        Text('관심없음', style: TextStyle(color: Colors.white, fontSize: 14)),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem<String>(
-                                    value: '채널 추천 안함',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.person_off_outlined, color: Colors.white70, size: 20),
-                                        SizedBox(width: 12),
-                                        Text('채널 추천 안함', style: TextStyle(color: Colors.white, fontSize: 14)),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem<String>(
-                                    value: '신고',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.report_gmailerrorred, color: Colors.redAccent, size: 20),
-                                        SizedBox(width: 12),
-                                        Text('신고', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                  ),
+                                  const PopupMenuItem<String>(value: '설명', child: Row(children: [Icon(Icons.info_outline, color: Colors.white70, size: 20), SizedBox(width: 12), Text('설명', style: TextStyle(color: Colors.white, fontSize: 14))])),
+                                  const PopupMenuItem<String>(value: '관심없음', child: Row(children: [Icon(Icons.block, color: Colors.white70, size: 20), SizedBox(width: 12), Text('관심없음', style: TextStyle(color: Colors.white, fontSize: 14))])),
+                                  const PopupMenuItem<String>(value: '채널 추천 안함', child: Row(children: [Icon(Icons.person_off_outlined, color: Colors.white70, size: 20), SizedBox(width: 12), Text('채널 추천 안함', style: TextStyle(color: Colors.white, fontSize: 14))])),
+                                  const PopupMenuItem<String>(value: '신고', child: Row(children: [Icon(Icons.report_gmailerrorred, color: Colors.redAccent, size: 20), SizedBox(width: 12), Text('신고', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold))])),
                                 ];
                               }
                             },
-                          ),
+                          ), // PopupMenuButton
                         ]
                       )
                     ),
@@ -1581,7 +1519,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
   Widget _buildChart(PostData post) {
     bool isExpired = _remainingSeconds <= 0 || post.isExpired;
-    bool hasVoted = _votedSide != 0 || isExpired;
+    bool hasVoted = _votedSide != 0 || isExpired || isMe;
     return Positioned(
       bottom: 67 + MediaQuery.of(context).padding.bottom, right: 35,
       child: SizedBox(
