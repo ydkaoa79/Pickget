@@ -1778,7 +1778,7 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                       const SizedBox(height: 20),
                       const Text(
-                        '어제 인기 Pick (TOP 10)',
+                        '실시간 인기 Pick (TOP 10)',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -1787,8 +1787,8 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        '지난 24시간 동안 가장 뜨거웠던 Pick',
-                        style: TextStyle(color: Colors.white38, fontSize: 12),
+                        '지금 가장 뜨거운 실시간 랭킹',
+                        style: TextStyle(color: Colors.cyanAccent, fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                       const Divider(color: Colors.white10, height: 30),
                       Expanded(
@@ -1849,9 +1849,9 @@ class _MainScreenState extends State<MainScreen> {
           id: json['id'].toString(),
           title: json['title'] ?? '제목 없음',
           uploaderId: json['uploader_id']?.toString() ?? '익명',
-          uploaderName: json['uploader_id']?.toString() ?? '익명',
-          uploaderImage: json['uploader_image'] ?? 'assets/profiles/profile_11.jpg',
-          timeLocation: '어제',
+          uploaderName: json['uploader_name'] ?? json['uploader_id']?.toString() ?? '익명',
+          uploaderImage: toCdnUrl(json['uploader_image'] ?? 'assets/profiles/profile_11.jpg'),
+          timeLocation: '실시간',
           imageA: json['image_a'] ?? '',
           imageB: json['image_b'] ?? '',
           descriptionA: json['description_a'] ?? '',
