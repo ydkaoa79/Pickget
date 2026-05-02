@@ -321,25 +321,31 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              int deletedCount = 0;
+              List<String> successIds = [];
               for (var id in idsToDelete) {
                 try {
-                  // Try numeric ID first, then fallback to string
-                  final dynamic targetId = int.tryParse(id) ?? id;
-                  await SupabaseService.client.from('posts').delete().eq('id', targetId);
-                  deletedCount++;
+                  // 🔥 [핵심] 외래 키 제약 때문에 연관 데이터 먼저 삭제 후 게시물 삭제!
+                  await Future.wait([
+                    SupabaseService.client.from('votes').delete().eq('post_id', id),
+                    SupabaseService.client.from('comments').delete().eq('post_id', id),
+                    SupabaseService.client.from('likes').delete().eq('post_id', id),
+                    SupabaseService.client.from('bookmarks').delete().eq('post_id', id),
+                  ]);
+                  // 연관 데이터 삭제 완료 후 게시물 삭제
+                  await SupabaseService.client.from('posts').delete().eq('id', id);
+                  successIds.add(id);
                 } catch (e) {
                   debugPrint('Delete error for $id: $e');
                 }
               }
               
               setState(() {
-                widget.allPosts.removeWhere((p) => idsToDelete.contains(p.id));
+                widget.allPosts.removeWhere((p) => successIds.contains(p.id));
                 _loadPosts();
                 _selectedPostIds.clear();
                 _isSelectionMode = false;
               });
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$deletedCount개의 게시물이 삭제되었습니다.')));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${successIds.length}개의 게시물이 삭제되었습니다.')));
             },
             child: const Text('삭제', style: TextStyle(color: Colors.redAccent)),
           ),
@@ -581,7 +587,11 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
               if (isMe)
                 IconButton(icon: const Icon(Icons.settings_outlined, color: Colors.white), onPressed: _showSettingsMenu),
               if (!isMe)
-                IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: _showMoreMenu),
+                IconButton(
+                  icon: const Icon(Icons.more_vert, color: Colors.white), 
+                  padding: const EdgeInsets.all(12), // 터치 영역 확대를 위해 패딩 추가
+                  onPressed: _showMoreMenu
+                ),
             ],
           ),
           SliverToBoxAdapter(
@@ -594,12 +604,22 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      CircleAvatar(
-                        radius: 42,
-                        backgroundImage: (isMe ? gProfileImage : _dImg).trim().startsWith('http')
-                          ? NetworkImage((isMe ? gProfileImage : _dImg).trim())
-                          : AssetImage((isMe ? gProfileImage : _dImg).trim()) as ImageProvider,
-                      ),
+                      Builder(builder: (_) {
+                        final img = (isMe ? gProfileImage : _dImg).trim();
+                        return img.isEmpty
+                          ? const CircleAvatar(
+                              radius: 42,
+                              backgroundColor: Colors.black,
+                              child: Icon(Icons.person, color: Colors.white54, size: 40),
+                            )
+                          : CircleAvatar(
+                              radius: 42,
+                              backgroundColor: Colors.black,
+                              backgroundImage: img.startsWith('http')
+                                ? NetworkImage(img)
+                                : AssetImage(img) as ImageProvider,
+                            );
+                      }),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(

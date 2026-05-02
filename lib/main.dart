@@ -89,6 +89,7 @@ class _MainScreenState extends State<MainScreen> {
   bool _isProfileSetupOpen = false; // ✅ 추가 정보 입력 팝업 중복 방지용
   BuildContext? _loginDialogContext; // 추가
   bool _isInitialLoading = false; // 🛡️ 중복 로딩 방어막 추가!
+  bool _isDataLoading = true; // 🔄 데이터 로딩 중인지 (로딩 화면 표시용)
 
   @override
   void initState() {
@@ -117,7 +118,8 @@ class _MainScreenState extends State<MainScreen> {
           gUserInternalId = null; 
           gIdText = '테스트용';
           gNameText = '테스트용';
-          gProfileImage = 'assets/profiles/profile_11.jpg';
+          gProfileImage = '';
+
           gUserVotes.clear(); // 🗳️ 투표 내역 초기화 (로그아웃 시 VS 마크 복구용!)
           _hasNewNotifications = false;
           _notifications = [];
@@ -227,18 +229,22 @@ class _MainScreenState extends State<MainScreen> {
 
     print('DEBUG [AUTH]: Handling login success for ${user.id}');
 
-    // 1. 앱의 전역 상태를 '로그인 됨'으로 실제 변경 (setState 필수!)
+    // 1. 앱의 전역 상태를 '로그인 됨'으로만 변경 (프로필은 DB에서 가져올 때까지 기본값 유지!)
     setState(() {
       gIsLoggedIn = true;
       gUserInternalId = user.id; // 수파베이스의 유니크 ID 저장
       
-      // 유저 정보 세팅 (카카오/네이버 등에서 넘어온 정보)
-      gIdText = user.email?.split('@').first ?? user.id.substring(0, 8);
-      gNameText = user.userMetadata?['full_name'] ?? 
-                  user.userMetadata?['name'] ?? '픽겟 유저';
-      
-      // 프로필 이미지가 있다면 세팅, 없으면 기본값
-      gProfileImage = user.userMetadata?['avatar_url'] ?? 'assets/profiles/profile_11.jpg';
+      // 이름/아이디는 아직 없을 때만 임시값 세팅 (DB값이 우선)
+      if (gNameText.isEmpty || gNameText == '테스트용') {
+        gNameText = user.userMetadata?['full_name'] ??
+                    user.userMetadata?['name'] ?? '픽겟 유저';
+      }
+      if (gIdText.isEmpty || gIdText == '테스트용') {
+        gIdText = user.email?.split('@').first ?? user.id.substring(0, 8);
+      }
+      // ⚠️ 프로필 이미지: 카카오 avatar_url 바로 쓰지 않고 빈 문자열 유지
+      // → fetchPosts()가 DB에서 커스텀 프로필 가져와서 덮어씀 (깜빡임 방지!)
+      gProfileImage = '';
     });
 
     print('✅ [STATE UPDATE]: 전역 변수 업데이트 완료! (ID: ${user.id})');
@@ -360,10 +366,17 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> fetchPosts() async {
+    // 🔄 로딩 시작 표시
+    if (mounted && _isDataLoading == false) {
+      setState(() => _isDataLoading = true);
+    }
+
     try {
       Set<String> likedPostIds = {};
       Set<String> bookmarkedPostIds = {};
       Set<String> followedUserIds = {};
+      List<Map<String, dynamic>> loadedNotifications = [];
+      bool hasNewNotifs = false;
 
       if (gIsLoggedIn) {
         try {
@@ -380,20 +393,18 @@ class _MainScreenState extends State<MainScreen> {
           }
 
           if (profileData != null) {
-            setState(() {
-              // gUserInternalId는 이미 Auth 세션에서 설정되었으므로 덮어쓰지 않음
-              gUserPoints = profileData!['points'] ?? 0;
-              gIdText = profileData['user_id'] ?? gIdText;
-              gNameText = profileData['nickname'] ?? gNameText;
-              gProfileImage = profileData['profile_image'] ?? gProfileImage;
-              gBioText = profileData['bio'] ?? gBioText;
-            });
+            // setState 안 쓰고 변수만 세팅 (나중에 한 번에 갱신)
+            gUserPoints = profileData['points'] ?? 0;
+            gIdText = profileData['user_id'] ?? gIdText;
+            gNameText = profileData['nickname'] ?? gNameText;
+            gProfileImage = profileData['profile_image'] ?? gProfileImage;
+            gBioText = profileData['bio'] ?? gBioText;
           } else {
             // 프로필이 없으면 현재 Auth UUID를 사용하여 새로 생성
             print(
               'DEBUG [PROFILE]: No profile found, creating new one for $gUserInternalId',
             );
-            final newProfile = await SupabaseService.client
+            await SupabaseService.client
                 .from('user_profiles')
                 .insert({
                   'id': gUserInternalId, // ✅ Auth UUID를 프로필 ID로 사용!
@@ -404,99 +415,65 @@ class _MainScreenState extends State<MainScreen> {
                 })
                 .select()
                 .single();
-            setState(() {
-              gUserPoints = 0;
-            });
+            gUserPoints = 0;
           }
 
-          // 2. ID가 완벽히 준비된 지금, 하트/즐겨찾기/팔로우 소환
+          // 2. 🚀 [성능 최적화] 개인 데이터 5종을 동시에 가져오기 (병렬 실행!)
           if (gUserInternalId != null) {
-            // DEBUG: Check likes columns
-            try {
-              final debugLike = await SupabaseService.client
+            final results = await Future.wait([
+              // [0] 좋아요
+              SupabaseService.client
                   .from('likes')
+                  .select('post_id')
+                  .eq('user_id', gUserInternalId!),
+              // [1] 북마크
+              SupabaseService.client
+                  .from('bookmarks')
+                  .select('post_id')
+                  .eq('user_id', gUserInternalId!),
+              // [2] 팔로우
+              SupabaseService.client
+                  .from('follows')
+                  .select('following_internal_id')
+                  .eq('follower_internal_id', gUserInternalId!),
+              // [3] 투표
+              SupabaseService.client
+                  .from('votes')
+                  .select('post_id, side')
+                  .eq('user_internal_id', gUserInternalId!),
+              // [4] 알림
+              SupabaseService.client
+                  .from('notifications')
                   .select()
-                  .limit(1)
-                  .maybeSingle();
-              print('DEBUG [SCHEMA]: likes columns: ${debugLike?.keys}');
-            } catch (e) {
-              print('DEBUG [SCHEMA]: likes fetch failed: $e');
-            }
+                  .eq('user_id', gUserInternalId!)
+                  .order('created_at', ascending: false),
+            ]);
 
-            final List<dynamic> userLikes = await SupabaseService.client
-                .from('likes')
-                .select('post_id')
-                .eq('user_id', gUserInternalId!);
-            likedPostIds = userLikes
-                .map((l) => l['post_id'].toString())
-                .toSet();
+            final List<dynamic> userLikes = results[0];
+            final List<dynamic> userBookmarks = results[1];
+            final List<dynamic> userFollows = results[2];
+            final List<dynamic> userVotes = results[3];
+            final List<dynamic> notifs = results[4];
 
-            final List<dynamic> userBookmarks = await SupabaseService.client
-                .from('bookmarks')
-                .select('post_id')
-                .eq('user_id', gUserInternalId!);
-            bookmarkedPostIds = userBookmarks
-                .map((b) => b['post_id'].toString())
-                .toSet();
-
-             // 팔로우(follows) 가져오기
-            final List<dynamic> userFollows = await SupabaseService.client
-                .from('follows')
-                .select('following_internal_id')
-                .eq('follower_internal_id', gUserInternalId!);
-            followedUserIds = userFollows
-                .map((f) => f['following_internal_id'].toString())
-                .toSet();
-
-            // 투표(votes) 가져오기
-            final List<dynamic> userVotes = await SupabaseService.client
-                .from('votes')
-                .select('post_id, side')
-                .eq('user_internal_id', gUserInternalId!);
+            likedPostIds = userLikes.map((l) => l['post_id'].toString()).toSet();
+            bookmarkedPostIds = userBookmarks.map((b) => b['post_id'].toString()).toSet();
+            followedUserIds = userFollows.map((f) => f['following_internal_id'].toString()).toSet();
             gUserVotes = {
               for (var v in userVotes) v['post_id'].toString(): v['side'] as int
             };
+            loadedNotifications = List<Map<String, dynamic>>.from(notifs);
+            hasNewNotifs = loadedNotifications.any((n) => n['is_read'] == false);
 
             print('DEBUG [FETCH]: gUserInternalId=$gUserInternalId');
-            print('DEBUG [FETCH]: likedPostIds=$likedPostIds');
-            print('DEBUG [FETCH]: bookmarkedPostIds=$bookmarkedPostIds');
-            print('DEBUG [FETCH]: followedUserIds=$followedUserIds');
-
-            // 3. 알림 내역 가져오기
-            final List<dynamic> notifs = await SupabaseService.client
-                .from('notifications')
-                .select()
-                .eq('user_id', gUserInternalId!)
-                .order('created_at', ascending: false);
-
-            setState(() {
-              _notifications = List<Map<String, dynamic>>.from(notifs);
-              _hasNewNotifications = _notifications.any(
-                (n) => n['is_read'] == false,
-              );
-            });
+            print('DEBUG [FETCH]: likedPostIds=${likedPostIds.length}개, bookmarks=${bookmarkedPostIds.length}개, follows=${followedUserIds.length}개');
           }
         } catch (e) {
           print('개인 데이터 가져오기 실패: $e');
         }
       } else {
-        setState(() {
-          _notifications = [];
-          _hasNewNotifications = false;
-          gUserPoints = 0;
-        });
-      }
-
-      // DEBUG: Check posts columns
-      try {
-        final debugPost = await SupabaseService.client
-            .from('posts')
-            .select()
-            .limit(1)
-            .maybeSingle();
-        print('DEBUG [SCHEMA]: posts columns: ${debugPost?.keys}');
-      } catch (e) {
-        print('DEBUG [SCHEMA]: posts fetch failed: $e');
+        loadedNotifications = [];
+        hasNewNotifs = false;
+        gUserPoints = 0;
       }
 
       // 2. [최적화] 게시물을 가져올 때 작성자의 최신 프로필 정보를 '조인(Join)'해서 한 번에 가져옵니다.
@@ -628,10 +605,14 @@ class _MainScreenState extends State<MainScreen> {
               p.uploaderInternalId == gUserInternalId;
           return isMine || !p.isHidden;
         }).toList();
+        _notifications = loadedNotifications;
+        _hasNewNotifications = hasNewNotifs;
+        _isDataLoading = false; // 🔄 로딩 완료!
         _refreshRecommended();
       });
     } catch (e) {
       print('Error fetching posts: $e');
+      if (mounted) setState(() => _isDataLoading = false);
     }
   }
 
@@ -1004,7 +985,10 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          if (!gIsLoggedIn && _selectedTopTabIndex != 0)
+          // 🔄 데이터 로딩 중일 때 로딩 화면 표시 (프리징 방지!)
+          if (_isDataLoading && _posts.isEmpty)
+            _buildLoadingView()
+          else if (!gIsLoggedIn && _selectedTopTabIndex != 0)
             _buildLoginRequiredView()
           else
             PageView.builder(
@@ -1245,6 +1229,45 @@ class _MainScreenState extends State<MainScreen> {
           _buildTopBar(),
           _buildBottomNav(),
         ],
+      ),
+    );
+  }
+
+  // 🔄 데이터 로딩 중 표시 화면 (첫 실행 프리징 방지!)
+  Widget _buildLoadingView() {
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // PickGet 로고
+            SvgPicture.asset(
+              'assets/simbol.svg',
+              width: 80,
+              height: 80,
+            ),
+            const SizedBox(height: 32),
+            // 로딩 인디케이터
+            const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                color: Colors.cyanAccent,
+                strokeWidth: 2.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              '콘텐츠를 불러오는 중...',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1686,12 +1709,19 @@ class _MainScreenState extends State<MainScreen> {
               child: Container(
                 padding: const EdgeInsets.all(10), // 터치 마스크 영역 넉넉하게 확장
                 child: gIsLoggedIn
+                    ? (gProfileImage.isEmpty
                     ? CircleAvatar(
+                        radius: 12,
+                        backgroundColor: Colors.black,
+                        child: const Icon(Icons.person, color: Colors.white54, size: 16),
+                      )
+                    : CircleAvatar(
                         radius: 12,
                         backgroundImage: gProfileImage.startsWith('http')
                             ? NetworkImage(gProfileImage)
                             : AssetImage(gProfileImage) as ImageProvider,
-                      )
+                        backgroundColor: Colors.black,
+                      ))
                     : const Icon(
                         Icons.account_circle_outlined,
                         color: Colors.white54,

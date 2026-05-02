@@ -313,9 +313,20 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
     if (confirm == true) {
       try {
-        final dynamic targetId = int.tryParse(widget.post.id) ?? widget.post.id;
-        await SupabaseService.client.from('posts').delete().eq('id', targetId);
-        widget.onDelete(widget.post.id);
+        final String postId = widget.post.id; // UUID 문자열 그대로 사용
+
+        // 🔥 [핵심] 외래 키 제약 때문에 연관 데이터 먼저 삭제 후 게시물 삭제!
+        await Future.wait([
+          SupabaseService.client.from('votes').delete().eq('post_id', postId),
+          SupabaseService.client.from('comments').delete().eq('post_id', postId),
+          SupabaseService.client.from('likes').delete().eq('post_id', postId),
+          SupabaseService.client.from('bookmarks').delete().eq('post_id', postId),
+        ]);
+
+        // 연관 데이터 삭제 완료 후 게시물 삭제
+        await SupabaseService.client.from('posts').delete().eq('id', postId);
+
+        widget.onDelete(postId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('게시물이 삭제되었습니다.')));
         }
@@ -661,11 +672,11 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                 child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(left: 20, right: 5), // 오른쪽 여백을 줄여서 점 3개를 우측으로 15px 이동 효과
+                      padding: const EdgeInsets.only(left: 20, right: 0), // 우측 여백을 0으로 하고 버튼 내부에서 처리
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center, 
                         children: [
-                          const SizedBox(width: 33), // 왼쪽 20 + 33 = 53 / 오른쪽 5 + 48(버튼크기) = 53 (완벽한 중앙 정렬)
+                          const SizedBox(width: 40), // 좌우 밸런스를 맞춰 제목 중앙 정렬 유지 (20+40=60)
                           Expanded(
                             child: Center(
                               child: FittedBox(
@@ -685,8 +696,13 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                             )
                           ), 
                           PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_vert, color: Colors.white70, size: 30), // 터치하기 쉽도록 아이콘 크기를 살짝 키움
-                            padding: const EdgeInsets.all(12), // 순정 플러터 패딩으로 터치 영역 확보
+                            padding: EdgeInsets.zero,
+                            child: Container(
+                              width: 60, height: 60, // 터치 영역을 60x60으로 대폭 확장
+                              color: Colors.transparent, // 투명한 주변 영역 어디를 눌러도 터치되게 함
+                              alignment: Alignment.center,
+                              child: const Icon(Icons.more_vert, color: Colors.white70, size: 30),
+                            ),
                             color: const Color(0xFF1E1E1E),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                             onSelected: (value) {
@@ -1403,21 +1419,23 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   }
 
   Widget _bgLabel(String text, Color color, {bool isWinner = false}) { 
-    return Stack(
-      clipBehavior: Clip.none, alignment: Alignment.topCenter,
-      children: [
-        if (isWinner)
-          Positioned(
-            top: -18,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 800),
-              curve: Curves.elasticOut,
-              builder: (context, val, child) => Transform.scale(scale: val, child: const Icon(Icons.emoji_events, color: Colors.amberAccent, size: 24)),
+    return IgnorePointer( // 배경 글자가 터치 이벤트를 가로막지 않도록 설정 (중요!)
+      child: Stack(
+        clipBehavior: Clip.none, alignment: Alignment.topCenter,
+        children: [
+          if (isWinner)
+            Positioned(
+              top: -18,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 800),
+                curve: Curves.elasticOut,
+                builder: (context, val, child) => Transform.scale(scale: val, child: const Icon(Icons.emoji_events, color: Colors.amberAccent, size: 24)),
+              ),
             ),
-          ),
-        Text(text, style: TextStyle(color: color, fontSize: 45, fontWeight: FontWeight.w900, letterSpacing: -4)),
-      ],
+          Text(text, style: TextStyle(color: color, fontSize: 45, fontWeight: FontWeight.w900, letterSpacing: -4)),
+        ],
+      ),
     ); 
   }
 

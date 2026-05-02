@@ -6,7 +6,7 @@ String gIdText = '테스트용';
 // 로그인 후 세팅되는 진짜 고유 ID (로그아웃 시에는 null로 초기화)
 String? gUserInternalId; // ← 하드코딩 UUID 제거!
 String gBioText = '안녕하세요! 저는 PickGet 유저입니다.';
-String gProfileImage = 'assets/profiles/profile_11.jpg';
+String gProfileImage = ''; // 로딩 중에는 빈 문자열 → 검은 배경 person 아이콘 표시
 int gUserPoints = 0;
 bool gIsLoggedIn = false;
 VoidCallback? gShowLoginPopup;
