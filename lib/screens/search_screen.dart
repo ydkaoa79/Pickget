@@ -415,46 +415,70 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  final Map<String, List<String>> _categoryKeywords = {
+    '패션 & 스타일': ['패션', '스타일', '데일리룩', 'OOTD', '코디', '패션피플', '옷스타그램', '미니멀룩', '스트릿패션', '고프코어', '와이투케이', 'Y2K', '꾸안꾸', '오피스룩', '워크웨어', '하이엔드', '빈티지룩', '페미닌룩', '캐주얼', '아메카지', '룩북', '하객룩', '데이트룩', '캠퍼스룩', '운동복', '애슬레저룩', '바캉스룩', '원마일웨어', '셋업코디', '레이어드룩', '와이드팬츠', '슬랙스', '데님', '청바지', '셔츠', '블라우스', '티셔츠', '니트', '재킷', '코트', '패딩', '스니커즈', '운동화', '구두', '가방', '모자', '악세사리'],
+    '맛집 & 카페': ['맛집', '맛집추천', '카페', '카페추천', '먹스타그램', '맛스타그램', '카페투어', '핫플레이스', '핫플', '분위기맛집', '뷰맛집', '브런치', '스시', '초밥', '햄버거', '피자', '파스타', '스테이크', '마라탕', '삼겹살', '고기집', '빵지순례', '디저트', '케이크', '도넛', '커피', '라떼', '떡볶이', '치킨', '술집', '이자카야', '와인바'],
+    '연애 & 고민': ['연애', '고민', '사랑', '썸', '짝사랑', '소개팅', '연애상담', '고민상담', '인간관계', '심리', '마음건강', '힐링', '위로', '공감', '이별', '재회', '결혼', '육아', '직장고민', '진로고민', 'MBTI', '타로', '사주', '번아웃', '스트레스', '갓생', '습관', '자기계발'],
+    '여행 & 라이프': ['여행', '여행추천', '국내여행', '해외여행', '호캉스', '캠핑', '차박', '글램핑', '감성숙소', '호텔', '리조트', '비행기', '제주여행', '일본여행', '유럽여행', '일상', '라이프스타일', '취미', '운동', '오운완', '인테리어', '방꾸미기', '자취', '재테크', '주식', '코인', '코딩', '반려동물', '강아지', '고양이'],
+  };
+
+  void _filterByCategory(String category) {
+    List<String> keywords = _categoryKeywords[category] ?? [];
+    if (keywords.isEmpty) return;
+
+    setState(() {
+      _isSearching = true;
+      _searchController.text = category; // 검색창에 카테고리명 표시
+      _searchResults = widget.allPosts.where((post) {
+        final content = (post.title + (post.fullDescription ?? '') + (post.tags?.join(' ') ?? '')).toLowerCase();
+        return keywords.any((kw) => content.contains(kw.toLowerCase()));
+      }).toList();
+    });
+  }
+
   Widget _categoryTile(IconData icon, String title, String subtitle) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      onTap: () => _filterByCategory(title),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: Colors.white70, size: 24),
             ),
-            child: Icon(icon, color: Colors.white70, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: Colors.white38, fontSize: 12),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right, color: Colors.white10),
-        ],
+            const Icon(Icons.chevron_right, color: Colors.white10),
+          ],
+        ),
       ),
     );
   }
