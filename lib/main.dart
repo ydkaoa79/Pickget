@@ -179,6 +179,12 @@ class _MainScreenState extends State<MainScreen> {
           gProfileImage = '';
 
           gUserVotes.clear(); // 🗳️ 투표 내역 초기화 (로그아웃 시 VS 마크 복구용!)
+          gLikedPostIds.clear(); // ❤️ 좋아요 내역 초기화
+          gBookmarkedPostIds.clear(); // 🔖 즐겨찾기 내역 초기화
+          gFollowedUserIds.clear(); // 👤 팔로우 내역 초기화
+          gHasNewNotifs = false;
+          gBioText = '안녕하세요! 저는 PickGet 유저입니다.';
+          
           _hasNewNotifications = false;
           _notifications = [];
         });
