@@ -48,7 +48,7 @@ class _ActivityAnalysisScreenState extends State<ActivityAnalysisScreen> {
       final profileData = await SupabaseService.client
           .from('user_profiles')
           .select('points')
-          .eq('user_id', widget.targetInternalId)
+          .eq('id', widget.targetInternalId)
           .maybeSingle();
       
       if (profileData != null && profileData['points'] != null) {

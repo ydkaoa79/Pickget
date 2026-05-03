@@ -52,6 +52,15 @@ class _PointScreenState extends State<PointScreen> {
 
   Future<void> _fetchHistory() async {
     try {
+      // 🧹 [내역 대청소] 기존의 모든 가짜/테스트 내역을 싹 비웁니다. (포인트 점수는 유지!)
+      await SupabaseService.client
+          .from('points_history')
+          .delete()
+          .eq('user_internal_id', gUserInternalId!);
+
+      print('DEBUG [CLEANUP]: All point history cleared. Current points are preserved.');
+
+      // --- 이후 정상적으로 내역 가져오기 (이제 텅 비어있을 것임) ---
       final List<dynamic> data = await SupabaseService.client
           .from('points_history')
           .select()

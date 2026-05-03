@@ -1665,8 +1665,10 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
               ? ValueListenableBuilder(
                   valueListenable: controller,
                   builder: (context, VideoPlayerValue value, child) {
-                    // 🎬 웹 전용: 영상이 0.5초 이상 확실히 재생된 후에만 전환 (깜빡임 완벽 차단)
-                    final bool videoReady = value.position > const Duration(milliseconds: 500) && value.size.width > 0;
+                    // 🎬 웹 전용: 영상이 0.5초 이상 확실히 재생되고 + 실제로 플레이 중일 때만 전환 (깜빡임 완벽 차단)
+                    final bool videoReady = value.position > const Duration(milliseconds: 500) && 
+                                            value.size.width > 0 && 
+                                            value.isPlaying;
 
                     if (!videoReady) {
                       return (thumbUrl != null && thumbUrl.isNotEmpty)

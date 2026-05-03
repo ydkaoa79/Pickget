@@ -223,8 +223,8 @@ class _MainScreenState extends State<MainScreen> {
           }
         }
 
-        // 🚀 [Web 전용] 15초 뒤 앱 설치 유도 팝업 타이머 시작
-        _appDownloadTimer = Timer(const Duration(seconds: 15), () {
+        // 🚀 [Web 전용] 30초마다 앱 설치 유도 팝업 타이머 (주기적)
+        _appDownloadTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
           if (mounted) {
             setState(() => _showAppDownloadBanner = true);
           }
@@ -384,23 +384,9 @@ class _MainScreenState extends State<MainScreen> {
                   })
                   .eq('id', gUserInternalId!);
 
-              // 포인트 지급 로직 (예: 필수 동의 1000 + 선택 동의 500)
-              int earnedPoints = 1000;
-              if (result['agreed_marketing'] == true) {
-                earnedPoints += 500;
-              }
-
-              setState(() {
-                gUserPoints = earnedPoints;
-              });
-              // 포인트 정보 서버 반영
-              await SupabaseService.client
-                  .from('user_profiles')
-                  .update({'points': gUserPoints})
-                  .eq('id', gUserInternalId!);
-
+              // ✅ [수정] 가입 축하 포인트 지급 로직 제거 (이제 0P부터 시작)
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('가입 축하 포인트가 지급되었습니다! 🎁')),
+                const SnackBar(content: Text('회원가입이 완료되었습니다! 시작해 보세요. 🎉')),
               );
             } catch (e) {
               print('DEBUG [AUTH]: Profile update error: $e');
