@@ -1003,11 +1003,10 @@ class _MainScreenState extends State<MainScreen> {
     
     // 🖥️ PC 웹 레이아웃 최적화 (가운데 정렬 및 너비 제한)
     Widget mainContent = Scaffold(
-      backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 🔄 데이터 로딩 중일 때 로딩 화면 표시 (앱 시작부터 데이터 로딩 완료까지 통일!)
-          if (_isDataLoading)
+          // 🔄 데이터 로딩 중일 때 로딩 화면 표시 (프리징 방지!)
+          if (_isDataLoading && _posts.isEmpty)
             _buildLoadingView()
           else if (!gIsLoggedIn && _selectedTopTabIndex != 0)
             _buildLoginRequiredView()
@@ -1255,40 +1254,37 @@ class _MainScreenState extends State<MainScreen> {
     return mainContent;
   }
 
-  // 🔄 통합 로딩 화면 (앱 첫 시작부터 데이터 로딩까지 통일!)
+  // 🔄 데이터 로딩 중 표시 화면 (첫 실행 프리징 방지!)
   Widget _buildLoadingView() {
     return Container(
       color: Colors.black,
-      width: double.infinity,
-      height: double.infinity,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // 🚀 로고 크기를 더 시원하게 키움 (80 -> 120)
+            // PickGet 로고
             SvgPicture.asset(
               'assets/simbol.svg',
-              width: 120,
-              height: 120,
+              width: 80,
+              height: 80,
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 32),
             // 로딩 인디케이터
             const SizedBox(
-              width: 32,
-              height: 32,
+              width: 28,
+              height: 28,
               child: CircularProgressIndicator(
                 color: Colors.cyanAccent,
-                strokeWidth: 3,
+                strokeWidth: 2.5,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             Text(
-              'PickGet을 준비하고 있습니다',
+              '콘텐츠를 불러오는 중...',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
