@@ -127,14 +127,23 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       print('DEBUG [VIDEO v2]: Side $side 초기화 시작 - $url');
       
       // 🚀 주소가 http로 시작하면 웹/모바일 상관없이 네트워크 재생 방식을 사용 (웹 에러 방지)
+      // 🚀 영상 캐싱 적용 (모바일 전용)
       VideoPlayerController controller;
-      if (url.startsWith('http')) {
-        print('DEBUG [VIDEO v2]: 네트워크 URL 감지 - networkUrl 사용: $url');
+      if (!kIsWeb && url.startsWith('http')) {
+        print('DEBUG [VIDEO v2]: 캐시 매니저 가동 - $url');
+        try {
+          final file = await DefaultCacheManager().getSingleFile(url);
+          controller = VideoPlayerController.file(file);
+        } catch (e) {
+          print('DEBUG [VIDEO v2]: 캐싱 실패, 스트리밍으로 전환 - $e');
+          controller = VideoPlayerController.networkUrl(Uri.parse(url));
+        }
+      } else if (url.startsWith('http')) {
+        print('DEBUG [VIDEO v2]: 네트워크 URL 직접 재생 (Web/Streaming) - $url');
         controller = VideoPlayerController.networkUrl(Uri.parse(url));
       } else {
-        print('DEBUG [VIDEO v2]: 로컬 파일 감지 - file 사용');
-        final file = File(url);
-        controller = VideoPlayerController.file(file);
+        print('DEBUG [VIDEO v2]: 로컬 파일 직접 재생');
+        controller = VideoPlayerController.file(File(url));
       }
 
       await controller.initialize();

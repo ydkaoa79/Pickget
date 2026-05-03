@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/post_data.dart';
 import '../core/app_state.dart';
 import 'upload_screen.dart';
@@ -1004,11 +1005,27 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
             fit: StackFit.expand,
             children: [
               (post.thumbA != null && post.thumbA!.isNotEmpty)
-                ? Image.network(post.thumbA!.trim(), fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null)
+                ? Opacity(
+                    opacity: post.isHidden ? 0.5 : 1.0,
+                    child: CachedNetworkImage(
+                      imageUrl: post.thumbA!.trim(),
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(color: Colors.white10),
+                      errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white24),
+                    ),
+                  )
                 : (_isVideo(post.imageA)
                    ? Container(color: Colors.black26, child: const Center(child: Icon(Icons.play_circle_outline, color: Colors.white54)))
                    : (post.imageA.trim().contains('http')
-                        ? Image.network(post.imageA.trim(), fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null)
+                        ? Opacity(
+                            opacity: post.isHidden ? 0.5 : 1.0,
+                            child: CachedNetworkImage(
+                              imageUrl: post.imageA.trim(),
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(color: Colors.white10),
+                              errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white24),
+                            ),
+                          )
                         : Image.asset(post.imageA.trim(), fit: BoxFit.cover, opacity: post.isHidden ? const AlwaysStoppedAnimation(0.5) : null))),
               
               // Status Badge (Top Left)

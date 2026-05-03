@@ -54,7 +54,7 @@ class MediaCompressor {
       final thumbFile = await VideoCompress.getFileThumbnail(
         videoPath,
         quality: 50,
-        position: -1, // 첫 프레임
+        position: 0, // 🚀 0으로 고정하여 첫 프레임 추출!
       );
       return thumbFile;
     } catch (e) {
