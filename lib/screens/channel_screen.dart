@@ -720,7 +720,16 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                         child: ElevatedButton(
                           onPressed: () async {
                             if (isMe) {
-                              Navigator.push(context, MaterialPageRoute(builder: (context) => ActivityAnalysisScreen(userPosts: _channelPosts)));
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ActivityAnalysisScreen(
+                                    targetInternalId: gUserInternalId!,
+                                    targetNickname: gNameText,
+                                    targetProfileImage: gProfileImage,
+                                  ),
+                                ),
+                              );
                             } else {
                               if (!gIsLoggedIn) {
                                 gShowLoginPopup?.call();
@@ -791,27 +800,42 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                       const SizedBox(width: 10),
                       Expanded(
                         flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.cyanAccent.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.2)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.auto_awesome, color: Colors.cyanAccent, size: 16),
-                              const SizedBox(width: 6),
-                              Text(
-                                '공감도 ${_empathyRate.toInt()}%',
-                                style: const TextStyle(
-                                  color: Colors.cyanAccent, 
-                                  fontWeight: FontWeight.w900, 
-                                  fontSize: 15,
+                        child: GestureDetector(
+                          onTap: () {
+                            if (!isMe) return; // 🛡️ [보안] 내 채널이 아니면 상세 분석을 볼 수 없습니다!
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ActivityAnalysisScreen(
+                                  targetInternalId: widget.initialPost.uploaderInternalId!,
+                                  targetNickname: isMe ? gNameText : _dName,
+                                  targetProfileImage: isMe ? gProfileImage : _dImg,
                                 ),
                               ),
-                            ],
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.cyanAccent.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.auto_awesome, color: Colors.cyanAccent, size: 16),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '공감도 ${_empathyRate.toInt()}%',
+                                  style: const TextStyle(
+                                    color: Colors.cyanAccent, 
+                                    fontWeight: FontWeight.w900, 
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

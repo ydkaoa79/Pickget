@@ -19,6 +19,7 @@ import 'screens/search_screen.dart';
 import 'screens/profile_setup_screen.dart';
 import 'screens/channel_feed_screen.dart';
 import 'services/supabase_service.dart';
+import 'services/post_service.dart';
 import 'core/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -397,17 +398,12 @@ class _MainScreenState extends State<MainScreen> {
 
   // 🔄 게시물 및 알림 가져오기 (isRefresh: true면 처음부터, false면 이어서)
   Future<void> fetchPosts({bool isRefresh = true}) async {
+    List<Map<String, dynamic>> loadedNotifications = [];
     try {
       if (isRefresh) {
         if (mounted) setState(() => _isDataLoading = true);
         _hasMore = true;
       }
-
-      Set<String> likedPostIds = {};
-      Set<String> bookmarkedPostIds = {};
-      Set<String> followedUserIds = {};
-      List<Map<String, dynamic>> loadedNotifications = [];
-      bool hasNewNotifs = false;
 
       // 1. 개인 데이터 (팔로우 정보는 전역 관리가 필요하므로 별도 유지)
       if (gIsLoggedIn && gUserInternalId != null) {
@@ -463,23 +459,49 @@ class _MainScreenState extends State<MainScreen> {
           final List<dynamic> userBookmarks = results[3];
           final List<dynamic> userVotes = results[4];
 
-          followedUserIds = userFollows.map((f) => f['following_internal_id'].toString()).toSet();
-          likedPostIds = userLikes.map((l) => l['post_id'].toString()).toSet();
-          bookmarkedPostIds = userBookmarks.map((b) => b['post_id'].toString()).toSet();
+          gFollowedUserIds = userFollows.map((f) => f['following_internal_id'].toString()).toSet();
+          gLikedPostIds = userLikes.map((l) => l['post_id'].toString()).toSet();
+          gBookmarkedPostIds = userBookmarks.map((b) => b['post_id'].toString()).toSet();
           gUserVotes = {
             for (var v in userVotes) v['post_id'].toString(): v['side'] as int
           };
           loadedNotifications = List<Map<String, dynamic>>.from(notifs);
-          hasNewNotifs = loadedNotifications.any((n) => n['is_read'] == false);
+          gHasNewNotifs = loadedNotifications.any((n) => n['is_read'] == false);
         } catch (e) {
           print('개인 데이터 가져오기 실패: $e');
         }
       }
 
-      // 2. 🚀 [안정화] 게시물 20개씩 끊어서 가져오기 (가장 안정적인 쿼리로 복구)
+      // 2. 🚀 [알고리즘 복구] 탭에 따른 맞춤형 서버 쿼리
       var query = SupabaseService.client
           .from('posts')
           .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image)');
+
+      // 탭별 필터링 알고리즘 적용
+      if (_selectedTopTabIndex == 1) { // 팔로우 탭
+        if (gFollowedUserIds.isEmpty) {
+          if (mounted) setState(() { _posts = []; _isDataLoading = false; });
+          return;
+        }
+        query = query.inFilter('uploader_internal_id', gFollowedUserIds.toList());
+      } else if (_selectedTopTabIndex == 2) { // 북마크 탭
+        if (gBookmarkedPostIds.isEmpty) {
+          if (mounted) setState(() { _posts = []; _isDataLoading = false; });
+          return;
+        }
+        query = query.inFilter('id', gBookmarkedPostIds.toList());
+      } else if (_selectedTopTabIndex == 3) { // Pick (내가 참여한 것)
+        final voteResponse = await SupabaseService.client
+            .from('votes')
+            .select('post_id')
+            .eq('user_internal_id', gUserInternalId!);
+        final List<String> votedPostIds = (voteResponse as List).map((v) => v['post_id'].toString()).toList();
+        if (votedPostIds.isEmpty) {
+          if (mounted) setState(() { _posts = []; _isDataLoading = false; });
+          return;
+        }
+        query = query.inFilter('id', votedPostIds);
+      }
 
       // 📜 페이지네이션: refresh가 아니면 마지막 게시물 시간보다 이전 데이터 로드
       if (!isRefresh && _posts.isNotEmpty) {
@@ -500,7 +522,7 @@ class _MainScreenState extends State<MainScreen> {
       final List<PostData> loadedPosts = postsData.map((json) {
         final profile = json['profiles'];
         final String handle = json['uploader_id']?.toString() ?? '';
-        final String? internalId = json['uploader_internal_id']?.toString() ?? profile?['id']?.toString();
+        final String? internalId = json['uploader_internal_id']?.toString() ?? profile?['user_id']?.toString();
         
         final String latestId = (profile != null && profile['user_id'] != null)
             ? profile['user_id'].toString()
@@ -512,6 +534,10 @@ class _MainScreenState extends State<MainScreen> {
             (profile != null && profile['profile_image'] != null)
             ? profile['profile_image'].toString()
             : (json['user_image'] ?? 'assets/profiles/profile_11.jpg'));
+
+        final bool isPostLiked = gIsLoggedIn && gLikedPostIds.contains(json['id'].toString());
+        int initialLikesCount = json['likes_count'] ?? 0;
+        if (isPostLiked && initialLikesCount < 1) initialLikesCount = 1;
 
         final post = PostData(
           id: json['id'].toString(),
@@ -534,16 +560,16 @@ class _MainScreenState extends State<MainScreen> {
           descriptionA: json['description_a'] ?? '',
           descriptionB: json['description_b'] ?? '',
           fullDescription: json['full_description'] ?? '',
-          likesCount: json['likes_count'] ?? 0,
+          likesCount: initialLikesCount,
           commentsCount: json['comments_count'] ?? 0,
           voteCountA: json['vote_count_a']?.toString() ?? '0',
           voteCountB: json['vote_count_b']?.toString() ?? '0',
           totalVotesCount: json['total_votes_count'] ?? 0,
           percentA: json['percent_a']?.toString() ?? '50%',
           percentB: json['percent_b']?.toString() ?? '50%',
-          isFollowing: followedUserIds.contains(internalId),
-          isLiked: gIsLoggedIn && likedPostIds.contains(json['id'].toString()),
-          isBookmarked: gIsLoggedIn && bookmarkedPostIds.contains(json['id'].toString()),
+          isFollowing: gFollowedUserIds.contains(internalId),
+          isLiked: isPostLiked,
+          isBookmarked: gIsLoggedIn && gBookmarkedPostIds.contains(json['id'].toString()),
           userVotedSide: gUserVotes[json['id'].toString()] ?? 0,
           isExpired: () {
             bool exp = json['is_expired'] ?? false;
@@ -610,7 +636,7 @@ class _MainScreenState extends State<MainScreen> {
         
         if (isRefresh) {
           _notifications = loadedNotifications;
-          _hasNewNotifications = hasNewNotifs;
+          _hasNewNotifications = gHasNewNotifs;
           _isDataLoading = false;
           _refreshRecommended();
         }
@@ -873,21 +899,7 @@ class _MainScreenState extends State<MainScreen> {
                                 })
                                 .eq('id', gUserInternalId!);
 
-                            // 포인트 지급 로직 (예: 필수 동의 1000 + 선택 동의 500)
-                            int earnedPoints = 1000;
-                            if (result['agreed_marketing'] == true) {
-                              earnedPoints += 500;
-                            }
-
-                            setState(() {
-                              gUserPoints += earnedPoints;
-                            });
-
-                            // 포인트 정보도 서버에 반영
-                            await SupabaseService.client
-                                .from('user_profiles')
-                                .update({'points': gUserPoints})
-                                .eq('id', gUserInternalId!);
+                            _showLoginSuccessSnackBar('네이버');
 
                             _showLoginSuccessSnackBar('네이버');
                           } catch (e) {
@@ -936,21 +948,7 @@ class _MainScreenState extends State<MainScreen> {
                                 })
                                 .eq('id', gUserInternalId!);
 
-                            // 포인트 지급 로직
-                            int earnedPoints = 1000;
-                            if (result['agreed_marketing'] == true) {
-                              earnedPoints += 500;
-                            }
-
-                            setState(() {
-                              gUserPoints += earnedPoints;
-                            });
-
-                            // 포인트 정보도 서버에 반영
-                            await SupabaseService.client
-                                .from('user_profiles')
-                                .update({'points': gUserPoints})
-                                .eq('id', gUserInternalId!);
+                            _showLoginSuccessSnackBar('Google');
 
                             _showLoginSuccessSnackBar('Google');
                           } catch (e) {
@@ -1015,6 +1013,13 @@ class _MainScreenState extends State<MainScreen> {
               controller: _pageController,
               scrollDirection: Axis.vertical,
               itemCount: filteredList.length,
+              onPageChanged: (index) {
+                // 🔄 무한 스크롤: 마지막에서 5개 전쯤 왔을 때 미리 다음 페이지 로드!
+                if (index >= filteredList.length - 5 && _hasMore && !_isDataLoading) {
+                  print('DEBUG [PAGING]: 끝에 도달 중... 다음 페이지 로드 시작 (index: $index)');
+                  fetchPosts(isRefresh: false);
+                }
+              },
               itemBuilder: (context, index) {
                 final post = filteredList[index];
                 return PostView(
@@ -1022,138 +1027,6 @@ class _MainScreenState extends State<MainScreen> {
                     '${post.id}_$gIsLoggedIn',
                   ), // Force rebuild on login/logout!
                   post: post,
-                  onLike: () async {
-                    if (!gIsLoggedIn) {
-                      _showLoginPopup();
-                      return;
-                    }
-                    final bool nowLiked = !post.isLiked;
-
-                    // 1. UI 즉시 반영 (선체감)
-                    setState(() {
-                      post.isLiked = nowLiked;
-                      if (nowLiked) {
-                        post.likesCount++;
-                        gUserPoints += 1; // 포인트 UI 즉시 반영
-                      } else {
-                        post.likesCount--;
-                      }
-                      HapticFeedback.lightImpact();
-                    });
-
-                    // 2. 서버 연동 (주민번호 기준!)
-                    try {
-                      print(
-                        'DEBUG [LIKE]: Attempting to sync heart. user_internal_id=$gUserInternalId, post_id=${post.id}, nowLiked=$nowLiked',
-                      );
-                      if (nowLiked) {
-                        // 하트 기록
-                        final res = await SupabaseService.client
-                            .from('likes')
-                            .insert({
-                              'user_id': gUserInternalId, // 🆔 진짜 컬럼명으로 교체!
-                              'post_id': post.id,
-                            });
-                        print('DEBUG [LIKE]: Insert success!');
-
-                        // 포인트 내역 기록 (+1P)
-                        await SupabaseService.client
-                            .from('points_history')
-                            .insert({
-                              'user_id': gUserInternalId,
-                              'amount': 1,
-                              'description': '게시물 좋아요 보너스',
-                            });
-                      } else {
-                        // 하트 취소
-                        await SupabaseService.client
-                            .from('likes')
-                            .delete()
-                            .match({
-                              'user_id': gUserInternalId!,
-                              'post_id': post.id,
-                            });
-                        print('DEBUG [LIKE]: Delete success!');
-                      }
-
-                      // 3. 게시물 테이블의 하트 수 실시간 동기화
-                      await SupabaseService.client
-                          .from('posts')
-                          .update({'likes_count': post.likesCount})
-                          .eq('id', post.id);
-
-                      setState(() {}); // UI 갱신만 수행
-                    } catch (e) {
-                      print('DEBUG [LIKE]: ERROR 상세 -> $e');
-                    }
-                  },
-                  onFollow: () async {
-                    if (!gIsLoggedIn) {
-                      _showLoginPopup();
-                      return;
-                    }
-                    final bool nowFollowing = !post.isFollowing;
-                    String normalized(String s) => s.replaceAll(' ', '').trim();
-                    final String targetUploader = normalized(post.uploaderId);
-
-                    setState(() {
-                      for (var p in _posts) {
-                        if (normalized(p.uploaderId) == targetUploader) {
-                          p.isFollowing = nowFollowing;
-                        }
-                      }
-                      HapticFeedback.mediumImpact();
-                    });
-
-                    try {
-                      if (nowFollowing) {
-                        await SupabaseService.client.from('follows').insert({
-                          'follower_internal_id': gUserInternalId!,
-                          'following_internal_id': post.uploaderInternalId!,
-                        });
-                      } else {
-                        await SupabaseService.client
-                            .from('follows')
-                            .delete()
-                            .match({
-                              'follower_internal_id': gUserInternalId!,
-                              'following_internal_id': post.uploaderInternalId!,
-                            });
-                      }
-                    } catch (e) {
-                      print('팔로우 서버 동기화 에러: $e');
-                    }
-                  },
-                  onBookmark: () async {
-                    if (!gIsLoggedIn) {
-                      _showLoginPopup();
-                      return;
-                    }
-                    final bool nowBookmarked = !post.isBookmarked;
-                    setState(() {
-                      post.isBookmarked = nowBookmarked;
-                      HapticFeedback.selectionClick();
-                    });
-
-                    try {
-                      if (nowBookmarked) {
-                        await SupabaseService.client.from('bookmarks').insert({
-                          'user_id': gUserInternalId!,
-                          'post_id': post.id,
-                        });
-                      } else {
-                        await SupabaseService.client
-                            .from('bookmarks')
-                            .delete()
-                            .match({
-                              'user_id': gUserInternalId!,
-                              'post_id': post.id,
-                            });
-                      }
-                    } catch (e) {
-                      print('즐겨찾기 동기화 에러: $e');
-                    }
-                  },
                   onNotInterested: () {
                     setState(() {
                       _posts.removeWhere((p) => p.id == post.id);
@@ -1177,48 +1050,22 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     );
                   },
-                  onReport: (reason) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('신고가 접수되었습니다: $reason'),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                  },
-                  onVote: (side) {
-                    if (!gIsLoggedIn) {
-                      _showLoginPopup();
-                      return;
-                    }
-                    setState(() {
-                      post.userVotedSide = side;
-                    });
-                  },
                   onDelete: (postId) {
                     setState(() {
                       _posts.removeWhere((p) => p.id == postId);
                       _refreshRecommended();
                     });
                   },
-                  onToggleHide: (postId) async {
+                  onToggleHide: (postId) {
+                    PostService.toggleHide(post);
                     setState(() {
-                      post.isHidden = !post.isHidden;
                       _refreshRecommended();
                     });
-                    try {
-                      await SupabaseService.client
-                          .from('posts')
-                          .update({
-                            'tags': post.isHidden
-                                ? [...(post.tags ?? []), '#hidden#']
-                                : (post.tags ?? [])
-                                      .where((t) => t != '#hidden#')
-                                      .toList(),
-                          })
-                          .eq('id', postId);
-                    } catch (e) {
-                      print('숨기기 동기화 에러: $e');
-                    }
+                  },
+                  onVote: (side) {
+                    setState(() {
+                      post.userVotedSide = side;
+                    });
                   },
                   onProfileTap: () {
                     if (!gIsLoggedIn) {
@@ -1497,6 +1344,8 @@ class _MainScreenState extends State<MainScreen> {
         setState(() {
           _selectedTopTabIndex = index;
         });
+        // 🚀 [알고리즘 가동] 탭이 바뀌었으니 해당 탭에 맞는 데이터를 서버에서 새로 가져옵니다!
+        fetchPosts(isRefresh: true);
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1981,7 +1830,7 @@ class _MainScreenState extends State<MainScreen> {
       // 서버에서 직접 최신 투표 데이터가 포함된 게시물 조회
       var query = SupabaseService.client
           .from('posts')
-          .select('*, total_votes');
+          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image)');
 
       // 🔞 비로그인 시 성인 게시물 제외
       if (!gIsLoggedIn) {
@@ -1993,19 +1842,34 @@ class _MainScreenState extends State<MainScreen> {
           .limit(50);
 
       List<PostData> loadedPosts = data.map<PostData>((json) {
-        // [수정] 데이터 타입을 명확히 하고, null 처리를 더 견고하게 함
+        // [수정] 최신 프로필 정보 반영 (조인된 데이터 사용)
+        final profile = json['profiles'];
+        final String nickname = (profile != null && profile['nickname'] != null)
+            ? profile['nickname'].toString()
+            : (json['uploader_name'] ?? json['uploader_id'] ?? '익명');
+            
+        final String uploaderImage = toCdnUrl((profile != null && profile['profile_image'] != null)
+            ? profile['profile_image'].toString()
+            : (json['uploader_image'] ?? 'assets/profiles/profile_11.jpg'));
+
         String vA = (json['vote_count_a'] ?? '0').toString();
         String vB = (json['vote_count_b'] ?? '0').toString();
+
+        final bool isPostLiked = gIsLoggedIn && gLikedPostIds.contains(json['id'].toString());
+        final String? internalId = json['uploader_internal_id']?.toString();
 
         return PostData(
           id: json['id'].toString(),
           title: json['title'] ?? '제목 없음',
           uploaderId: json['uploader_id']?.toString() ?? '익명',
-          uploaderName: json['uploader_name'] ?? json['uploader_id']?.toString() ?? '익명',
-          uploaderImage: toCdnUrl(json['uploader_image'] ?? 'assets/profiles/profile_11.jpg'),
+          uploaderInternalId: internalId,
+          uploaderName: nickname,
+          uploaderImage: uploaderImage,
           timeLocation: '실시간',
-          imageA: json['image_a'] ?? '',
-          imageB: json['image_b'] ?? '',
+          imageA: toCdnUrl(json['image_a'] ?? ''),
+          imageB: toCdnUrl(json['image_b'] ?? ''),
+          thumbA: toCdnUrl(json['thumb_a'] ?? ''),
+          thumbB: toCdnUrl(json['thumb_b'] ?? ''),
           descriptionA: json['description_a'] ?? '',
           descriptionB: json['description_b'] ?? '',
           fullDescription: json['full_description'] ?? '',
@@ -2026,13 +1890,27 @@ class _MainScreenState extends State<MainScreen> {
             if (a + b == 0) return '50%';
             return '${(b / (a + b) * 100).round()}%';
           })(),
+          isFollowing: gFollowedUserIds.contains(internalId),
+          isLiked: isPostLiked,
+          isBookmarked: gIsLoggedIn && gBookmarkedPostIds.contains(json['id'].toString()),
+          userVotedSide: gUserVotes[json['id'].toString()] ?? 0,
           tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+          durationMinutes: () {
+            for (var tag in (json['tags'] as List? ?? [])) {
+              String t = tag.toString();
+              if (t.startsWith('duration:')) {
+                return int.tryParse(t.split(':')[1]);
+              }
+            }
+            return null;
+          }(),
           isAdult: json['is_adult'] ?? false,
           isAi: json['is_ai'] ?? false,
           isAd: json['is_ad'] ?? false,
           createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
           isExpired: () {
-            // 종료 여부 계산 로직 (메인과 동일)
+            bool exp = json['is_expired'] ?? false;
+            if (exp) return true;
             final String? createdAtStr = json['created_at'];
             final List<dynamic> tags = json['tags'] as List? ?? [];
             if (createdAtStr != null) {

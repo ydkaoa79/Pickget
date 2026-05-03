@@ -15,8 +15,8 @@ class MediaCompressor {
         file.absolute.path,
         targetPath,
         quality: 80,
-        minWidth: 1080,
-        minHeight: 1080,
+        minWidth: 720,
+        minHeight: 720,
         format: CompressFormat.jpeg,
       );
 

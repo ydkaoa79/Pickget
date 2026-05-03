@@ -12,33 +12,34 @@ import '../models/post_data.dart';
 import '../models/comment_data.dart';
 import '../core/app_state.dart';
 import '../services/supabase_service.dart';
+import '../services/post_service.dart';
 import '../screens/channel_screen.dart';
 
 class PostView extends StatefulWidget {
   final PostData post;
-  final VoidCallback onLike;
-  final VoidCallback onFollow;
-  final VoidCallback onBookmark;
-  final VoidCallback onNotInterested;
-  final VoidCallback onDontRecommendChannel;
-  final Function(String reason) onReport;
-  final Function(int side) onVote;
-  final Function(String postId) onDelete;
-  final Function(String postId) onToggleHide;
+  final VoidCallback? onLike;
+  final VoidCallback? onFollow;
+  final VoidCallback? onBookmark;
+  final VoidCallback? onNotInterested;
+  final VoidCallback? onDontRecommendChannel;
+  final Function(String reason)? onReport;
+  final Function(int side)? onVote;
+  final Function(String postId)? onDelete;
+  final Function(String postId)? onToggleHide;
   final VoidCallback? onProfileTap;
 
   const PostView({
     super.key, 
     required this.post, 
-    required this.onLike, 
-    required this.onFollow, 
-    required this.onBookmark, 
-    required this.onNotInterested, 
-    required this.onDontRecommendChannel, 
-    required this.onReport, 
-    required this.onVote, 
-    required this.onDelete,
-    required this.onToggleHide,
+    this.onLike, 
+    this.onFollow, 
+    this.onBookmark, 
+    this.onNotInterested, 
+    this.onDontRecommendChannel, 
+    this.onReport, 
+    this.onVote, 
+    this.onDelete,
+    this.onToggleHide,
     this.onProfileTap
   });
   @override
@@ -70,6 +71,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   bool _isVisible = false;
   bool _videoAFinished = false;
   bool _videoBFinished = false;
+  DateTime? _viewStartTime; // ⏱️ [신규] 6초 정독 체크를 위한 입성 시간 기록
 
   @override
   bool get wantKeepAlive => true;
@@ -249,6 +251,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
   // 🎬 화면 진입 시 영상 시작
   void _onBecomeVisible() {
+    _viewStartTime = DateTime.now(); // ⏱️ 화면에 보이기 시작한 시간 기록!
     if (_isVideo(widget.post.imageA)) {
       _initVideo(widget.post.imageA, 1);
     }
@@ -343,7 +346,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
         // 연관 데이터 삭제 완료 후 게시물 삭제
         await SupabaseService.client.from('posts').delete().eq('id', postId);
 
-        widget.onDelete(postId);
+        widget.onDelete?.call(postId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('게시물이 삭제되었습니다.')));
         }
@@ -413,29 +416,65 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       return;
     }
 
-    // 💾 진짜 투표 및 포인트 적립 로직 (정석!)
+    // 💾 진짜 투표 및 포인트 적립 로직 (새로운 정책!)
     try {
-      // 1. 투표 기록 저장
+      // 1. 투표 기록 저장 (언제든지 가능!)
       await SupabaseService.client.from('votes').insert({
         'post_id': widget.post.id,
-        'user_internal_id': gUserInternalId, // 🆔 주민번호 기록!
+        'user_internal_id': gUserInternalId,
         'side': side,
       });
 
-      // 2. 포인트 적립 (+10P)
-      await SupabaseService.client.from('points_history').insert({
-        'user_internal_id': gUserInternalId, // 🆔 주민번호 기록!
-        'amount': 10,
-        'description': '질문 참여 보너스',
-      });
+      // ⏱️ [신규 규칙] 6초 이상 정독했을 때만 포인트 혜택 적용!
+      final elapsed = _viewStartTime != null 
+          ? DateTime.now().difference(_viewStartTime!).inSeconds 
+          : 0;
 
-      // 3. 앱 내 점수 즉시 반영
-      if (mounted) {
-        setState(() {
-          gUserPoints += 10;
-        });
+      if (elapsed >= 6) {
+        // 🎁 [규칙 1] 게시글 작성자에게 1포인트 지급!
+        if (widget.post.uploaderInternalId != null) {
+          await SupabaseService.client.from('points_history').insert({
+            'user_internal_id': widget.post.uploaderInternalId,
+            'amount': 1,
+            'description': '내 게시글 투표 받음 보너스',
+          });
+          try {
+            await SupabaseService.client.rpc('increment_points', params: {
+              'target_id': widget.post.uploaderInternalId,
+              'amount': 1
+            });
+          } catch(e) {}
+        }
+
+        // 🏆 [규칙 2] 내가 투표 10번 할 때마다 1포인트 지급!
+        final voteCountRes = await SupabaseService.client
+            .from('votes')
+            .select('id')
+            .eq('user_internal_id', gUserInternalId!);
+        
+        final int totalVotes = (voteCountRes as List).length;
+        if (totalVotes > 0 && totalVotes % 10 == 0) {
+          await SupabaseService.client.from('points_history').insert({
+            'user_internal_id': gUserInternalId,
+            'amount': 1,
+            'description': '투표 10회 달성 보너스',
+          });
+          try {
+            await SupabaseService.client.rpc('increment_points', params: {
+              'target_id': gUserInternalId,
+              'amount': 1
+            });
+          } catch(e) {}
+
+          if (mounted) {
+            setState(() => gUserPoints += 1);
+            _triggerPointToast(); // 6초 정독 시에만 포인트 알림!
+          }
+        }
+        print('DEBUG [VOTE]: 6s+ read. Points awarded. (Uploader +1, Voter 1/10)');
+      } else {
+        print('DEBUG [VOTE]: Under 6s. Vote recorded but NO points awarded.');
       }
-      print('DEBUG [VOTE]: Real vote and 10P recorded. DB trigger will handle counts.');
     } catch (e) {
       print('DEBUG [VOTE]: Error recording vote: $e');
     }
@@ -471,8 +510,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       widget.post.percentB = "${perB.toStringAsFixed(0)}%";
     });
 
-    widget.onVote(side);
-    _triggerPointToast();
+    widget.onVote?.call(side);
     HapticFeedback.heavyImpact();
   }
 
@@ -576,11 +614,31 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     return "${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}";
   }
 
+  void _syncWithGlobalState() {
+    // 🌍 전역 상태(gLikedPostIds 등)와 개별 포스트 데이터 동기화
+    // 이 작업은 빌드 시점에 수행되어 여러 화면에 흩어진 동일 포스트들의 상태를 맞춥니다.
+    final String postId = widget.post.id;
+    final String? uploaderId = widget.post.uploaderInternalId;
+
+    widget.post.isLiked = gLikedPostIds.contains(postId);
+    widget.post.isBookmarked = gBookmarkedPostIds.contains(postId);
+    if (uploaderId != null) {
+      widget.post.isFollowing = gFollowedUserIds.contains(uploaderId);
+    }
+    
+    // 투표 상태는 로컬 변수 _votedSide와 전역 상태 gUserVotes를 우선함
+    if (gUserVotes.containsKey(postId)) {
+      _votedSide = gUserVotes[postId]!;
+      widget.post.userVotedSide = _votedSide;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    _syncWithGlobalState(); // 🔄 빌드할 때마다 최신 전역 상태 주입!
     return VisibilityDetector(
-      key: Key('post_view_${widget.post.id}'),
+      key: ValueKey('vd_${widget.key ?? widget.post.id}'),
       onVisibilityChanged: (info) {
         if (!mounted) return;
         final visible = info.visibleFraction > 0.5;
@@ -834,7 +892,18 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                                     const SizedBox(width: 8),
                                     if (!isMe) 
                                       GestureDetector(
-                                        onTap: widget.onFollow,
+                                        onTap: () {
+                                          if (!gIsLoggedIn) {
+                                            gShowLoginPopup?.call();
+                                            return;
+                                          }
+                                          if (widget.onFollow != null) {
+                                            widget.onFollow!();
+                                          } else {
+                                            PostService.toggleFollow(widget.post);
+                                            setState(() {});
+                                          }
+                                        },
                                         child: _followBtn(widget.post.isFollowing),
                                       ),
                                   ],
@@ -855,7 +924,18 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           Icons.favorite, 
                           formatCount(widget.post.likesCount),
                           color: widget.post.isLiked ? Colors.redAccent : Colors.white,
-                          onTap: widget.onLike,
+                          onTap: () {
+                            if (!gIsLoggedIn) {
+                              gShowLoginPopup?.call();
+                              return;
+                            }
+                            if (widget.onLike != null) {
+                              widget.onLike!();
+                            } else {
+                              PostService.toggleLike(widget.post);
+                              setState(() {});
+                            }
+                          },
                         ),
                         const SizedBox(width: 20),
                         _statIcon(
@@ -875,7 +955,18 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           Icons.bookmark, 
                           '',
                           color: widget.post.isBookmarked ? Colors.amberAccent : Colors.white,
-                          onTap: widget.onBookmark,
+                          onTap: () {
+                            if (!gIsLoggedIn) {
+                              gShowLoginPopup?.call();
+                              return;
+                            }
+                            if (widget.onBookmark != null) {
+                              widget.onBookmark!();
+                            } else {
+                              PostService.toggleBookmark(widget.post);
+                              setState(() {});
+                            }
+                          },
                         ),
                         const SizedBox(width: 20),
                         _statIcon(Icons.share, '', onTap: () {
@@ -905,15 +996,20 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                     if (value == '설명') {
                       _showDescriptionSheet(context);
                     } else if (value == '관심없음') {
-                      widget.onNotInterested();
+                      widget.onNotInterested?.call();
                     } else if (value == '채널 추천 안함') {
-                      widget.onDontRecommendChannel();
+                      widget.onDontRecommendChannel?.call();
                     } else if (value == '신고') {
                       _showReportSheet(context);
                     } else if (value == '삭제') {
                       _deletePost();
                     } else if (value == '숨기기' || value == '보이기') {
-                      widget.onToggleHide(widget.post.id);
+                      if (widget.onToggleHide != null) {
+                        widget.onToggleHide!(widget.post.id);
+                      } else {
+                        PostService.toggleHide(widget.post);
+                        setState(() {});
+                      }
                     }
                   },
                   itemBuilder: (BuildContext context) {
@@ -954,7 +1050,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         child: Opacity(
                           opacity: (1.0 - val).clamp(0.0, 1.0),
                           child: Text(
-                            '+10P', 
+                            '+1P', 
                             style: TextStyle(
                               color: Colors.cyanAccent, 
                               fontSize: 36, 
@@ -967,6 +1063,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                     },
                   ),
                 ),
+
 
               if (_showAlreadySelectedToast && !isExpired)
                 Positioned(
@@ -2067,7 +2164,9 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       trailing: const Icon(Icons.chevron_right, color: Colors.white10, size: 18),
       onTap: () {
         Navigator.pop(context);
-        widget.onReport(title); // 🚀 사유 전달!
+        if (widget.onReport != null) {
+          widget.onReport!(title);
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('"$title" 사유로 신고가 접수되었습니다.'),
