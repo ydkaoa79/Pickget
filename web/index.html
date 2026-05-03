@@ -19,6 +19,11 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">
+  
+  <!-- 캐시 방지 메타 태그 -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -41,6 +46,24 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <script src="flutter_bootstrap.js" async></script>
+  <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.0/kakao.min.js"></script>
+  <script>
+    // 카카오 SDK 초기화 - JavaScript 키를 사용하세요. 
+    // 만약 JavaScript 키가 다르다면 아래 키를 수정해야 합니다.
+    Kakao.init('c4f30c6f5fd4c09548c843ebe0e10074'); 
+    console.log('Kakao SDK initialized:', Kakao.isInitialized());
+    
+    // 🚀 서비스 워커 강제 업데이트 및 캐시 방지 로직
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.getRegistrations().then(function (registrations) {
+          for (let registration of registrations) {
+            registration.update(); // 새 버전이 있는지 체크
+          }
+        });
+      });
+    }
+  </script>
+  <script src="flutter_bootstrap.js?v=1.7" async></script>
 </body>
 </html>

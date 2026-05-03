@@ -170,24 +170,33 @@ class _ActivityAnalysisScreenState extends State<ActivityAnalysisScreen> {
   Widget _buildProfileHeader() {
     return Row(
       children: [
-        Container(
-          width: 60, height: 60,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            image: DecorationImage(
-              image: gProfileImage.startsWith('http') 
-                ? NetworkImage(gProfileImage) 
-                : AssetImage(gProfileImage) as ImageProvider, 
-              fit: BoxFit.cover
+        gProfileImage.isEmpty
+          ? Container(
+              width: 60, height: 60,
+              decoration: const BoxDecoration(
+                color: Colors.black,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person, color: Colors.white54, size: 30),
+            )
+          : Container(
+              width: 60, height: 60,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                image: DecorationImage(
+                  image: gProfileImage.startsWith('http') 
+                    ? NetworkImage(gProfileImage) 
+                    : AssetImage(gProfileImage) as ImageProvider, 
+                  fit: BoxFit.cover
+                ),
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.3), width: 2),
+                ),
+              ),
             ),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.3), width: 2),
-            ),
-          ),
-        ),
         const SizedBox(width: 15),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'package:app_links/app_links.dart';
 
@@ -20,13 +22,32 @@ import 'services/supabase_service.dart';
 import 'core/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+// 🚀 CDN 주소 변환 유틸리티
+String toCdnUrl(String url) {
+  if (url.isEmpty) return url;
+  if (url.startsWith('http')) {
+    // 이미 http로 시작하면 그대로 반환하되, 특정 도메인 변환이 필요하면 여기서 처리 가능
+    return url;
+  }
+  if (url.startsWith('assets/')) return url;
+  
+  // Supabase Storage 주소를 CDN 주소로 변환 (예시)
+  if (url.contains('supabase.co/storage/v1/object/public/')) {
+    return url.replaceFirst(
+      RegExp(r'https://.*\.supabase\.co/storage/v1/object/public/'),
+      'https://cdn.pickget.net/',
+    );
+  }
+  return url;
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ✅ 카카오 SDK 초기화 (네이티브 앱 키 적용)
   KakaoSdk.init(nativeAppKey: 'c4f30c6f5fd4c09548c843ebe0e10074');
 
-  print('DEBUG: App starting with latest comment system code! (Ver. 1.0)');
+  print('DEBUG: App starting with latest comment system code! (Ver. 2.3)');
 
   // 세로모드 고정
   await SystemChrome.setPreferredOrientations([
@@ -60,6 +81,14 @@ class PickGetApp extends StatelessWidget {
           selectionColor: Colors.cyanAccent,
           selectionHandleColor: Colors.cyanAccent,
         ),
+      ),
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        dragDevices: {
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.touch,
+          PointerDeviceKind.stylus,
+          PointerDeviceKind.unknown,
+        },
       ),
       home: const MainScreen(),
     );
@@ -135,27 +164,29 @@ class _MainScreenState extends State<MainScreen> {
     _pageController = PageController();
     _pageController.addListener(_onScroll);
 
-    // [보강] 시스템 레벨 딥링크 탐지기
-    final appLinks = AppLinks();
-    appLinks.uriLinkStream.listen((uri) {
-      print('DEBUG [SYSTEM_LINK]: Received link: $uri');
+    // [보강] 시스템 레벨 딥링크 탐지기 (웹에서는 브라우저가 직접 처리하므로 제외)
+    if (!kIsWeb) {
+      final appLinks = AppLinks();
+      appLinks.uriLinkStream.listen((uri) {
+        print('DEBUG [SYSTEM_LINK]: Received link: $uri');
 
-      // 딥링크가 들어오면 수파베이스가 세션을 파싱할 시간을 주고 체크
-      Future.delayed(const Duration(seconds: 1), () async {
-        final session = SupabaseService.client.auth.currentSession;
-        if (session != null) {
-          print('DEBUG [SYSTEM_LINK]: Session found after deep link!');
-          _handleLoginSuccess(session);
-        } else {
-          print('DEBUG [SYSTEM_LINK]: Session still null. Waiting more...');
-          // 1초 더 기다려보고 체크
-          Future.delayed(const Duration(seconds: 1), () {
-            final session2 = SupabaseService.client.auth.currentSession;
-            if (session2 != null) _handleLoginSuccess(session2);
-          });
-        }
+        // 딥링크가 들어오면 수파베이스가 세션을 파싱할 시간을 주고 체크
+        Future.delayed(const Duration(seconds: 1), () async {
+          final session = SupabaseService.client.auth.currentSession;
+          if (session != null) {
+            print('DEBUG [SYSTEM_LINK]: Session found after deep link!');
+            _handleLoginSuccess(session);
+          } else {
+            print('DEBUG [SYSTEM_LINK]: Session still null. Waiting more...');
+            // 1초 더 기다려보고 체크
+            Future.delayed(const Duration(seconds: 1), () {
+              final session2 = SupabaseService.client.auth.currentSession;
+              if (session2 != null) _handleLoginSuccess(session2);
+            });
+          }
+        });
       });
-    });
+    }
 
     // 앱이 켜져 있을 때 resume 상태에서도 체크하도록 추가
     SystemChannels.lifecycle.setMessageHandler((msg) async {
@@ -203,14 +234,17 @@ class _MainScreenState extends State<MainScreen> {
     print('DEBUG [INIT]: Preparing initial session check...');
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       print('DEBUG [INIT]: Inside postFrameCallback');
-      // 앱이 딥링크로 열렸을 때의 초기 주소 확인
-      try {
-        final initialUri = await appLinks.getInitialLink();
-        if (initialUri != null) {
-          print('DEBUG [SYSTEM_LINK]: Initial link on cold start: $initialUri');
+      // 앱이 딥링크로 열렸을 때의 초기 주소 확인 (웹 제외)
+      if (!kIsWeb) {
+        try {
+          final appLinks = AppLinks();
+          final initialUri = await appLinks.getInitialLink();
+          if (initialUri != null) {
+            print('DEBUG [SYSTEM_LINK]: Initial link on cold start: $initialUri');
+          }
+        } catch (e) {
+          print('DEBUG [SYSTEM_LINK]: Error getting initial link: $e');
         }
-      } catch (e) {
-        print('DEBUG [SYSTEM_LINK]: Error getting initial link: $e');
       }
 
       final session = SupabaseService.client.auth.currentSession;
@@ -342,33 +376,7 @@ class _MainScreenState extends State<MainScreen> {
     super.dispose();
   }
 
-  // 🌐 [CDN 무적 연동] 모든 저장소 주소를 최종 CDN 주소로 단축 및 통합
-  String toCdnUrl(String? url) {
-    if (url == null || url.isEmpty) return '';
-    if (url.startsWith('assets/')) return url; // 로컬 에셋은 통과
 
-    final cdnBase = CloudflareConfig.cdnUrl;
-
-    // 1. 이미 CDN 주소면 그대로 반환
-    if (url.contains('cdn.pickget.net')) {
-      return url;
-    }
-
-    // 2. Worker, Supabase, R2 직항 주소 등 모든 케이스를 CDN으로 통합
-    if (url.contains('workers.dev') || 
-        url.contains('supabase.co') || 
-        url.contains('r2.cloudflarestorage.com')) {
-      
-      // 파일명만 추출 (마지막 / 이후의 문자열)
-      final fileName = url.split('/').last;
-      // 쿼리 스트링(?...)이 붙어있을 경우 제거하여 깔끔한 파일명만 추출
-      final cleanFileName = fileName.split('?').first;
-      
-      return '$cdnBase$cleanFileName';
-    }
-
-    return url;
-  }
 
   void _onScroll() {
     if (_pageController.hasClients) {
@@ -804,10 +812,17 @@ class _MainScreenState extends State<MainScreen> {
                         }
 
                         try {
-                          // 1. 수파베이스 카카오 로그인 실행
+                          // 🚀 [정석] 현재 브라우저의 주소창 주소를 그대로 가져옵니다.
+                          // 이렇게 하면 pickget.net이든 테스트 주소든 자동으로 맞춰집니다.
+                          final String redirectUrl = kIsWeb 
+                              ? Uri.base.origin 
+                              : 'pickget://login-callback';
+                          
+                          print('DEBUG [AUTH]: Kakao login start! redirectTo -> $redirectUrl');
+
                           await SupabaseService.client.auth.signInWithOAuth(
                             OAuthProvider.kakao,
-                            redirectTo: 'pickget://login-callback',
+                            redirectTo: redirectUrl,
                             authScreenLaunchMode: LaunchMode.inAppBrowserView,
                           );
                         } catch (e) {
@@ -985,7 +1000,9 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredList = _filteredPosts;
-    return Scaffold(
+    
+    // 🖥️ PC 웹 레이아웃 최적화 (가운데 정렬 및 너비 제한)
+    Widget mainContent = Scaffold(
       body: Stack(
         children: [
           // 🔄 데이터 로딩 중일 때 로딩 화면 표시 (프리징 방지!)
@@ -1234,6 +1251,7 @@ class _MainScreenState extends State<MainScreen> {
         ],
       ),
     );
+    return mainContent;
   }
 
   // 🔄 데이터 로딩 중 표시 화면 (첫 실행 프리징 방지!)
@@ -1674,13 +1692,14 @@ class _MainScreenState extends State<MainScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => ChannelScreen(
-                      uploaderId: '나의픽겟',
+                      uploaderId: gIdText,
                       allPosts: _posts,
                       initialPost:
                           firstPost ??
                           PostData(
                             id: 'dummy',
-                            uploaderId: '나의픽겟',
+                            uploaderId: gIdText,
+                            uploaderInternalId: gUserInternalId,
                             uploaderName: gNameText,
                             uploaderImage: gProfileImage,
                             title: '첫 포스트를 올려보세요!',

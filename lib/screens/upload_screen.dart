@@ -249,7 +249,7 @@ class _UploadScreenState extends State<UploadScreen> {
       finalTags.add('duration:$totalMinutes');
       if (targetCount != null) finalTags.add('target:$targetCount');
       
-      final bool isAdmin = (gNameText == '나의픽겟' || gNameText == 'admin');
+      final bool isAdmin = (gNameText == 'admin');
 
       final response = await SupabaseService.client.from('posts').insert({
         'title': _titleController.text,
@@ -648,7 +648,7 @@ class _UploadScreenState extends State<UploadScreen> {
           ],
         ),
         // 📢 [신규] 관리자 전용 스폰서 토글
-        if (gNameText == '나의픽겟' || gNameText == 'admin')
+        if (gNameText == 'admin')
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Row(

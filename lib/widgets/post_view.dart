@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'dart:async';
@@ -125,9 +126,17 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     try {
       print('DEBUG [VIDEO v2]: Side $side 초기화 시작 - $url');
       
-      // 🚀 캐시 매니저로 먼저 다운로드 후 로컬 파일로 재생 (안정성 UP)
-      final file = await DefaultCacheManager().getSingleFile(url);
-      final controller = VideoPlayerController.file(file);
+      // 🚀 주소가 http로 시작하면 웹/모바일 상관없이 네트워크 재생 방식을 사용 (웹 에러 방지)
+      VideoPlayerController controller;
+      if (url.startsWith('http')) {
+        print('DEBUG [VIDEO v2]: 네트워크 URL 감지 - networkUrl 사용: $url');
+        controller = VideoPlayerController.networkUrl(Uri.parse(url));
+      } else {
+        print('DEBUG [VIDEO v2]: 로컬 파일 감지 - file 사용');
+        final file = File(url);
+        controller = VideoPlayerController.file(file);
+      }
+
       await controller.initialize();
       await controller.setLooping(false);
       await controller.setVolume(0); // 🔇 음소거 (소리는 업로드 시 이미 삭제됨)
@@ -511,28 +520,45 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     if (_isDragging) return;
     double tapX = details.localPosition.dx;
     double currentWidthA = _widthA ?? (sw * 0.5);
+    
+
+
     setState(() {
       if (tapX < currentWidthA) {
-        if (_expandedSide == 1) { _expandedSide = 0; _widthA = sw * 0.5; }
-        else { _expandedSide = 1; _widthA = sw * 0.8; }
+        // 왼쪽(A) 영역 클릭
+        if (_expandedSide == 1) { 
+          _expandedSide = 0; 
+          _widthA = sw * 0.5; 
+        } else { 
+          _expandedSide = 1; 
+          _widthA = sw * 0.8; // 🔙 0.85에서 0.8로 원복
+        }
       } else {
-        if (_expandedSide == 2) { _expandedSide = 0; _widthA = sw * 0.5; }
-        else { _expandedSide = 2; _widthA = sw * 0.2; }
+        // 오른쪽(B) 영역 클릭
+        if (_expandedSide == 2) { 
+          _expandedSide = 0; 
+          _widthA = sw * 0.5; 
+        } else { 
+          _expandedSide = 2; 
+          _widthA = sw * 0.2; // 🔙 0.15에서 0.2로 원복
+        }
       }
     });
+    
     HapticFeedback.lightImpact();
     
-    // 🎬 터치 시에도 즉시 전환 체크 (55% 기준 적용)
+    // 🎬 터치 시에도 즉시 전환 체크
     double ratioA = (_widthA ?? (sw * 0.5)) / sw;
     if (ratioA >= 0.55) {
       _switchToSide(1);
     } else if (ratioA <= 0.45) {
       _switchToSide(2);
     } else {
-      // 중앙 상태(0.5)일 때는 A→B 순차 재생 흐름을 따름 (이미 재생 중이면 유지)
       if (_playingSide == 0) _switchToSide(1);
     }
   }
+
+
 
   String _formatTimer(int seconds) {
     int h = seconds ~/ 3600;
@@ -597,8 +623,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         // 전경 이미지 (창문 너비에 상관없이 80% 크기로 고정되어 있음)
                         Center(
                           child: OverflowBox(
-                            maxWidth: sw * 0.8, // 이미지는 항상 화면의 80% 크기!
-                            minWidth: sw * 0.8,
+                            maxWidth: sw, // 🚀 80%에서 100%로 키워서 여백 없앰!
+                            minWidth: sw,
                             child: _buildMedia(1, widget.post.imageA, sw, thumbUrl: widget.post.thumbA),
                           ),
                         ),
@@ -626,8 +652,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         // 전경 이미지 (80% 크기로 고정)
                         Center(
                           child: OverflowBox(
-                            maxWidth: sw * 0.8, // 이미지는 항상 화면의 80% 크기!
-                            minWidth: sw * 0.8,
+                            maxWidth: sw, // 🚀 80%에서 100%로 키워서 여백 없앰!
+                            minWidth: sw,
                             child: _buildMedia(2, widget.post.imageB, sw, thumbUrl: widget.post.thumbB),
                           ),
                         ),
@@ -809,12 +835,19 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                       onTap: widget.onProfileTap,
                       child: Row(
                         children: [
-                          CircleAvatar(
-                            radius: 28, 
-                            backgroundImage: widget.post.uploaderImage.startsWith('http')
-                              ? CachedNetworkImageProvider(widget.post.uploaderImage)
-                              : AssetImage(widget.post.uploaderImage) as ImageProvider,
-                          ),
+                          widget.post.uploaderImage.isEmpty
+                            ? const CircleAvatar(
+                                radius: 28,
+                                backgroundColor: Colors.black,
+                                child: Icon(Icons.person, color: Colors.white54, size: 30),
+                              )
+                            : CircleAvatar(
+                                radius: 28, 
+                                backgroundColor: Colors.black,
+                                backgroundImage: widget.post.uploaderImage.startsWith('http')
+                                  ? CachedNetworkImageProvider(widget.post.uploaderImage)
+                                  : AssetImage(widget.post.uploaderImage) as ImageProvider,
+                              ),
                           const SizedBox(width: 12),
                           Flexible(
                             child: Column(
@@ -1475,6 +1508,9 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
       return content;
     } else {
+      if (url.trim().isEmpty) {
+        return const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2));
+      }
       // 🖼️ 이미지일 때 (기존 로직 그대로 캐싱 적용!)
       // 블러 배경용(forceThumb)이라면 썸네일을 우선 사용해서 성능 최적화!
       final String effectiveUrl = (forceThumb && thumbUrl != null && thumbUrl.isNotEmpty) 
@@ -1695,12 +1731,19 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                     width: 2,
                   ),
                 ),
-                child: CircleAvatar(
-                  radius: depth > 0 ? 14 : 18, 
-                  backgroundImage: c.image.startsWith('http') 
-                    ? CachedNetworkImageProvider(c.image) 
-                    : AssetImage(c.image) as ImageProvider
-                ),
+                child: c.image.isEmpty 
+                  ? CircleAvatar(
+                      radius: depth > 0 ? 14 : 18,
+                      backgroundColor: Colors.black,
+                      child: Icon(Icons.person, color: Colors.white54, size: depth > 0 ? 16 : 20),
+                    )
+                  : CircleAvatar(
+                      radius: depth > 0 ? 14 : 18, 
+                      backgroundColor: Colors.black,
+                      backgroundImage: c.image.startsWith('http') 
+                        ? CachedNetworkImageProvider(c.image) 
+                        : AssetImage(c.image) as ImageProvider
+                    ),
               ),
               const SizedBox(width: 12),
               Expanded(

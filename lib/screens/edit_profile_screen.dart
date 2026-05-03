@@ -133,13 +133,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         shape: BoxShape.circle,
                         color: const Color(0xFF151515),
                         border: Border.all(color: Colors.white10, width: 2),
-                        image: DecorationImage(
-                          image: _img.startsWith('http') 
-                            ? NetworkImage(_img) 
-                            : AssetImage(_img) as ImageProvider, 
-                          fit: BoxFit.cover, 
-                          opacity: _isUploading ? 0.3 : 0.8
-                        ),
+                        image: _img.isEmpty 
+                          ? null 
+                          : DecorationImage(
+                              image: _img.startsWith('http') 
+                                ? NetworkImage(_img) 
+                                : AssetImage(_img) as ImageProvider, 
+                              fit: BoxFit.cover, 
+                              opacity: _isUploading ? 0.3 : 0.8
+                            ),
                       ),
                     ),
                     if (_isUploading)
