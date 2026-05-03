@@ -516,7 +516,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
   bool get isExpired => _remainingSeconds <= 0 || widget.post.isExpired;
 
-  void _onPanUpdate(DragUpdateDetails details, double sw) {
+  void _onHorizontalDragUpdate(DragUpdateDetails details, double sw) {
     setState(() { 
       _isDragging = true; 
       _widthA = ((_widthA ?? (sw * 0.5)) + details.delta.dx).clamp(sw * 0.2, sw * 0.8); 
@@ -531,7 +531,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     });
   }
 
-  void _onPanEnd(DragEndDetails details, double sw) {
+  void _onHorizontalDragEnd(DragEndDetails details, double sw) {
     setState(() {
       _isDragging = false;
       double currentWidthA = _widthA ?? (sw * 0.5);
@@ -560,6 +560,14 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
       _widthA = sw * 0.5; 
       _expandedSide = 0; 
+    });
+  }
+
+  void _onHorizontalDragCancel(double sw) {
+    setState(() {
+      _isDragging = false;
+      _widthA = sw * 0.5;
+      _expandedSide = 0;
     });
   }
 
@@ -663,8 +671,9 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
         return GestureDetector(
           onTapUp: (d) => _handleTap(d, sw),
-          onPanUpdate: (d) => _onPanUpdate(d, sw),
-          onPanEnd: (d) => _onPanEnd(d, sw),
+          onHorizontalDragUpdate: (d) => _onHorizontalDragUpdate(d, sw),
+          onHorizontalDragEnd: (d) => _onHorizontalDragEnd(d, sw),
+          onHorizontalDragCancel: () => _onHorizontalDragCancel(sw),
           child: Stack(
             children: [
               Row(

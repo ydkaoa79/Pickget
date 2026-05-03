@@ -92,6 +92,27 @@ class PickGetApp extends StatelessWidget {
         },
       ),
       home: const MainScreen(),
+      builder: (context, child) {
+        if (!kIsWeb) return child!;
+        
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            // 화면 넓이가 600px 이하(모바일/태블릿 세로)라면 전체 화면 사용
+            if (constraints.maxWidth <= 600) return child!;
+            
+            // 그보다 넓은 환경(PC/태블릿 가로)에서만 넓이 고정 및 중앙 정렬
+            return Container(
+              color: const Color(0xFF0A0A0A), // PC 배경색
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  child: ClipRRect(child: child),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
