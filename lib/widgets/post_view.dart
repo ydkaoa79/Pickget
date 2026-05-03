@@ -1511,10 +1511,10 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
             width: 175, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), 
             decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white.withValues(alpha: 0.15))), 
             child: Column(
-              mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Expanded(child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.4, fontWeight: FontWeight.w600), maxLines: isExpanded ? 10 : 2, overflow: isExpanded ? TextOverflow.visible : TextOverflow.ellipsis)),
+                  Expanded(child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 11, height: 1.4, fontWeight: FontWeight.w600), maxLines: isExpanded ? 10 : 2, overflow: isExpanded ? TextOverflow.visible : TextOverflow.ellipsis)),
                   if (needsExpansion && !isExpanded) const Padding(padding: EdgeInsets.only(left: 4, bottom: 2), child: Icon(Icons.keyboard_arrow_up, color: Colors.white, size: 14)),
                 ]),
                 if (needsExpansion && isExpanded) const Padding(padding: EdgeInsets.only(top: 4), child: Center(child: Icon(Icons.keyboard_arrow_down, color: Colors.white54, size: 14))),
