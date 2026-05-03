@@ -191,6 +191,11 @@ class _MainScreenState extends State<MainScreen> {
       final appLinks = AppLinks();
       appLinks.uriLinkStream.listen((uri) {
         print('DEBUG [SYSTEM_LINK]: Received link: $uri');
+        
+        // 만약 특정 포스트 ID가 포함되어 있다면 처리 (모바일 딥링크용)
+        if (uri.queryParameters.containsKey('id')) {
+          _handleSharedPost(uri.queryParameters['id']!);
+        }
 
         // 딥링크가 들어오면 수파베이스가 세션을 파싱할 시간을 주고 체크
         Future.delayed(const Duration(seconds: 1), () async {
@@ -198,15 +203,20 @@ class _MainScreenState extends State<MainScreen> {
           if (session != null) {
             print('DEBUG [SYSTEM_LINK]: Session found after deep link!');
             _handleLoginSuccess(session);
-          } else {
-            print('DEBUG [SYSTEM_LINK]: Session still null. Waiting more...');
-            // 1초 더 기다려보고 체크
-            Future.delayed(const Duration(seconds: 1), () {
-              final session2 = SupabaseService.client.auth.currentSession;
-              if (session2 != null) _handleLoginSuccess(session2);
-            });
           }
         });
+      });
+    } else {
+      // 🚀 [웹 전용] 접속 주소에 포스트 ID가 포함되어 있는지 확인 (공유하기 대응)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final uri = Uri.base;
+        if (uri.queryParameters.containsKey('id')) {
+          final sharedPostId = uri.queryParameters['id'];
+          print('DEBUG [WEB_SHARE]: Shared Post ID detected -> $sharedPostId');
+          if (sharedPostId != null) {
+            _handleSharedPost(sharedPostId);
+          }
+        }
       });
     }
 
@@ -415,6 +425,104 @@ class _MainScreenState extends State<MainScreen> {
     setState(() => _isLoadingMore = true);
     await fetchPosts(isRefresh: false);
     setState(() => _isLoadingMore = false);
+  }
+
+  // 🔗 [신규] 공유받은 특정 포스트를 최상단에 로드하는 함수
+  Future<void> _handleSharedPost(String postId) async {
+    try {
+      final response = await SupabaseService.client
+          .from('posts')
+          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image)')
+          .eq('id', postId)
+          .maybeSingle();
+
+      if (response != null) {
+        // 🔞 성인용 게시물인데 비로그인 상태면 거부
+        if (response['is_adult'] == true && !gIsLoggedIn) {
+          print('DEBUG [SHARE]: Adult content blocked for guest user');
+          return;
+        }
+
+        final profile = response['profiles'];
+        final String nickname = (profile != null && profile['nickname'] != null)
+            ? profile['nickname'].toString()
+            : (response['uploader_name'] ?? response['uploader_id'] ?? '익명');
+            
+        final String profileImg = toCdnUrl((profile != null && profile['profile_image'] != null)
+            ? profile['profile_image'].toString()
+            : (response['uploader_image'] ?? 'assets/profiles/profile_11.jpg'));
+
+        final bool isPostLiked = gIsLoggedIn && gLikedPostIds.contains(response['id'].toString());
+        
+        final sharedPost = PostData(
+          id: response['id'].toString(),
+          title: response['title'] ?? '',
+          uploaderId: response['uploader_id']?.toString() ?? '익명',
+          uploaderInternalId: response['uploader_internal_id']?.toString(),
+          uploaderName: nickname,
+          uploaderImage: profileImg,
+          timeLocation: '공유됨',
+          imageA: toCdnUrl(response['image_a'] ?? ''),
+          imageB: toCdnUrl(response['image_b'] ?? ''),
+          thumbA: toCdnUrl(response['thumb_a'] ?? ''),
+          thumbB: toCdnUrl(response['thumb_b'] ?? ''),
+          descriptionA: response['description_a'] ?? '',
+          descriptionB: response['description_b'] ?? '',
+          likesCount: response['likes_count'] ?? 0,
+          commentsCount: response['comments_count'] ?? 0,
+          voteCountA: response['vote_count_a']?.toString() ?? '0',
+          voteCountB: response['vote_count_b']?.toString() ?? '0',
+          percentA: response['percent_a']?.toString() ?? '50%',
+          percentB: response['percent_b']?.toString() ?? '50%',
+          isLiked: isPostLiked,
+          isBookmarked: gIsLoggedIn && gBookmarkedPostIds.contains(response['id'].toString()),
+          userVotedSide: gUserVotes[response['id'].toString()] ?? 0,
+          tags: (response['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+          isAdult: response['is_adult'] ?? false,
+          isAi: response['is_ai'] ?? false,
+          isAd: response['is_ad'] ?? false,
+          createdAt: response['created_at'] != null ? DateTime.parse(response['created_at']) : DateTime.now(),
+          durationMinutes: () {
+            for (var tag in (response['tags'] as List? ?? [])) {
+              if (tag.toString().startsWith('duration:')) return int.tryParse(tag.toString().split(':')[1]);
+            }
+            return null;
+          }(),
+          isExpired: () {
+            if (response['is_expired'] == true) return true;
+            final String? caStr = response['created_at'];
+            if (caStr != null) {
+              final ca = DateTime.tryParse(caStr);
+              for (var tag in (response['tags'] as List? ?? [])) {
+                if (tag.toString().startsWith('duration:')) {
+                  final mins = int.tryParse(tag.toString().split(':')[1]);
+                  if (ca != null && mins != null && DateTime.now().isAfter(ca.add(Duration(minutes: mins)))) return true;
+                }
+              }
+            }
+            return false;
+          }(),
+        );
+
+        if (mounted) {
+          setState(() {
+            // 이미 목록에 있다면 제거하고 맨 앞으로
+            _posts.removeWhere((p) => p.id == sharedPost.id);
+            _posts.insert(0, sharedPost);
+            
+            // 추천 목록도 갱신
+            _recommendedPosts = _posts.where((p) => !p.isHidden).toList();
+            
+            // 0번 페이지로 이동 (공유된 게시물이 보이게 함)
+            if (_pageController.hasClients) {
+              _pageController.jumpToPage(0);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      print('DEBUG [SHARE]: Error loading shared post -> $e');
+    }
   }
 
   // 🔄 게시물 및 알림 가져오기 (isRefresh: true면 처음부터, false면 이어서)
