@@ -288,9 +288,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     }
     // 예외/안전장치 (아이디 기반)
     String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
-    return normalized(widget.post.uploaderId) == normalized('나의 픽겟') || 
-           widget.post.uploaderId == 'me' || 
-           normalized(widget.post.uploaderId) == normalized(gIdText);
+    return normalized(widget.post.uploaderId) == normalized(gIdText) || 
+           widget.post.uploaderId == 'me';
   }
 
   Future<void> _deletePost() async {
@@ -804,6 +803,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    _buildTypeTags(),
+                    const SizedBox(height: 8),
                     GestureDetector(
                       onTap: widget.onProfileTap,
                       child: Row(
@@ -1637,6 +1638,26 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     );
   }
 
+  Widget _buildTypeTags() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.post.isAd) _tagChip('Sponsor', Colors.amber),
+        if (widget.post.isAdult) _tagChip('19+', Colors.redAccent),
+        if (widget.post.isAi) _tagChip('AI컨텐츠', Colors.cyanAccent),
+      ],
+    );
+  }
+
+  Widget _tagChip(String label, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(right: 6, bottom: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: color)),
+      child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
+    );
+  }
+
   Widget _myPickLabel() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -1696,7 +1717,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                             bool isPostAuthorTag = (c.userInternalId != null && widget.post.uploaderInternalId != null && c.userInternalId == widget.post.uploaderInternalId);
                             
                             if (isPostAuthorTag) {
-                              String displayName = isMe ? '나의 픽겟' : widget.post.uploaderId;
+                              String displayName = isMe ? gNameText : widget.post.uploaderName;
                               String badge = isMe ? '(본인)' : '(작성자)';
                               
                               return Container(

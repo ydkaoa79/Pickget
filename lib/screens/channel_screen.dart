@@ -47,9 +47,8 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
     
     // 예외/안전장치 (아이디 기반)
     String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
-    return normalized(widget.uploaderId) == normalized('나의 픽겟') || 
-           widget.uploaderId == 'me' || 
-           normalized(widget.uploaderId) == normalized(gIdText);
+    return normalized(widget.uploaderId) == normalized(gIdText) || 
+           widget.uploaderId == 'me';
   }
 
   @override
@@ -192,7 +191,6 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
   void _loadPosts() {
     String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
     String currentChannelId = normalized(widget.uploaderId);
-    String myId = normalized('나의 픽겟');
 
     setState(() {
       _channelPosts = widget.allPosts.where((p) {

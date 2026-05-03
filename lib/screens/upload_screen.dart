@@ -37,7 +37,8 @@ class _UploadScreenState extends State<UploadScreen> {
   
   bool _isAdult = false; // 🔞 성인 콘텐츠 여부
   bool _isAI = false;    // 🤖 AI 생성 여부
-  
+  bool _isAd = false;    // 📢 스폰서 게시물 여부
+
   final ImagePicker _picker = ImagePicker();
   final CloudflareService _cloudflareService = CloudflareService();
   bool _isUploading = false;
@@ -247,8 +248,8 @@ class _UploadScreenState extends State<UploadScreen> {
       // Trick: Store duration and target count in tags since columns are missing
       finalTags.add('duration:$totalMinutes');
       if (targetCount != null) finalTags.add('target:$targetCount');
-      if (_isAdult) finalTags.add('adult:true'); // 🔞 성인 태그 추가
-      if (_isAI) finalTags.add('ai:true');       // 🤖 AI 태그 추가
+      
+      final bool isAdmin = (gNameText == '나의픽겟' || gNameText == 'admin');
 
       final response = await SupabaseService.client.from('posts').insert({
         'title': _titleController.text,
@@ -261,6 +262,9 @@ class _UploadScreenState extends State<UploadScreen> {
         'description_a': _descAController.text.isEmpty ? '선택지 A' : _descAController.text,
         'description_b': _descBController.text.isEmpty ? '선택지 B' : _descBController.text,
         'tags': finalTags,
+        'is_adult': _isAdult,
+        'is_ai': _isAI,
+        'is_ad': isAdmin ? _isAd : false,
       }).select().single();
 
       final newPost = PostData(
@@ -287,6 +291,10 @@ class _UploadScreenState extends State<UploadScreen> {
         voteCountB: '0',
         percentA: '0%',
         percentB: '0%',
+        isAdult: _isAdult,
+        isAi: _isAI,
+        isAd: isAdmin ? _isAd : false,
+        createdAt: DateTime.now(),
       );
 
       if (mounted) {
@@ -639,6 +647,29 @@ class _UploadScreenState extends State<UploadScreen> {
             ),
           ],
         ),
+        // 📢 [신규] 관리자 전용 스폰서 토글
+        if (gNameText == '나의픽겟' || gNameText == 'admin')
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.campaign_outlined, color: Colors.amber, size: 20),
+                    SizedBox(width: 8),
+                    Text('스폰서 게시물(광고)로 설정', style: TextStyle(color: Colors.white, fontSize: 14)),
+                  ],
+                ),
+                Switch(
+                  value: _isAd, 
+                  onChanged: (v) => setState(() => _isAd = v),
+                  activeTrackColor: Colors.amber.withValues(alpha: 0.3),
+                  activeThumbColor: Colors.amber,
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }

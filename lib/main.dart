@@ -569,9 +569,12 @@ class _MainScreenState extends State<MainScreen> {
             }
             return null;
           }(),
+          isAdult: json['is_adult'] ?? false,
+          isAi: json['is_ai'] ?? false,
+          isAd: json['is_ad'] ?? false,
           createdAt: json['created_at'] != null
               ? DateTime.parse(json['created_at'])
-              : null,
+              : DateTime.now(),
           isHidden: (json['tags'] as List?)?.contains('#hidden#') ?? false,
         );
 
@@ -661,8 +664,11 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   List<PostData> get _filteredPosts {
-    // 기본 필터: 숨김 처리되지 않은 게시물
-    List<PostData> visiblePosts = _posts.where((p) => !p.isHidden).toList();
+    // 🔞 성인 콘텐츠 필터링 (비로그인 상태) + 기본 숨김 처리
+    List<PostData> visiblePosts = _posts.where((p) {
+      if (p.isAdult && !gIsLoggedIn) return false;
+      return !p.isHidden;
+    }).toList();
 
     switch (_selectedTopTabIndex) {
       case 0: // 추천
@@ -1954,13 +1960,20 @@ class _MainScreenState extends State<MainScreen> {
   Future<List<PostData>> _fetchTopRankings() async {
     try {
       // 서버에서 직접 최신 투표 데이터가 포함된 게시물 조회
-      final List<dynamic> data = await SupabaseService.client
+      var query = SupabaseService.client
           .from('posts')
-          .select('*, total_votes') // 필요한 필드를 모두 포함하되 누락 방지
+          .select('*, total_votes');
+
+      // 🔞 비로그인 시 성인 게시물 제외
+      if (!gIsLoggedIn) {
+        query = query.eq('is_adult', false);
+      }
+
+      final List<dynamic> data = await query
           .order('total_votes', ascending: false)
           .limit(50);
 
-      List<PostData> loadedPosts = data.map((json) {
+      List<PostData> loadedPosts = data.map<PostData>((json) {
         // [수정] 데이터 타입을 명확히 하고, null 처리를 더 견고하게 함
         String vA = (json['vote_count_a'] ?? '0').toString();
         String vB = (json['vote_count_b'] ?? '0').toString();
@@ -1976,6 +1989,7 @@ class _MainScreenState extends State<MainScreen> {
           imageB: json['image_b'] ?? '',
           descriptionA: json['description_a'] ?? '',
           descriptionB: json['description_b'] ?? '',
+          fullDescription: json['full_description'] ?? '',
           likesCount: json['likes_count'] ?? 0,
           commentsCount: json['comments_count'] ?? 0,
           voteCountA: vA,
@@ -1994,6 +2008,10 @@ class _MainScreenState extends State<MainScreen> {
             return '${(b / (a + b) * 100).round()}%';
           })(),
           tags: (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+          isAdult: json['is_adult'] ?? false,
+          isAi: json['is_ai'] ?? false,
+          isAd: json['is_ad'] ?? false,
+          createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
           isExpired: () {
             // 종료 여부 계산 로직 (메인과 동일)
             final String? createdAtStr = json['created_at'];

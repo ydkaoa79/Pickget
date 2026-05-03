@@ -34,7 +34,10 @@ class PostData {
   final int? durationMinutes;
   final int? targetPickCount;
   final DateTime createdAt;
-  int totalVotesCount; // 🗳️ 서버에서 가져온 진짜 총 투표수 추가
+  int totalVotesCount;
+  final bool isAdult;
+  final bool isAi;
+  final bool isAd;
   
   DateTime get endTime => createdAt.add(Duration(minutes: durationMinutes ?? 1440));
   
@@ -85,6 +88,9 @@ class PostData {
     this.isHidden = false,
     this.fullDescription = "이 포스트에 대한 상세 설명이 여기에 표시됩니다.",
     this.isExpired = false,
+    this.isAdult = false,
+    this.isAi = false,
+    this.isAd = false,
     this.userVotedSide = 0,
     this.totalVotesCount = 0, // 기본값 추가
     List<CommentData>? comments,
