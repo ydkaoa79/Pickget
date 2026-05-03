@@ -135,8 +135,13 @@ class _MainScreenState extends State<MainScreen> {
   late PageController _pageController;
   int _userPoints = 0;
   int _selectedTopTabIndex = 0;
-  bool _hasNewNotifications = true;
+  bool _hasNewNotifications = false;
   List<Map<String, dynamic>> _notifications = [];
+  
+  // 🚀 [Web 전용] 앱 설치 유도 팝업 관련 상태
+  bool _showAppDownloadBanner = false;
+  Timer? _appDownloadTimer;
+
   StreamSubscription<AuthState>? _authSubscription;
   bool _isLoginPopupOpen = false;
   bool _isProfileSetupOpen = false; // ✅ 추가 정보 입력 팝업 중복 방지용
@@ -217,6 +222,13 @@ class _MainScreenState extends State<MainScreen> {
             _handleSharedPost(sharedPostId);
           }
         }
+
+        // 🚀 [Web 전용] 15초 뒤 앱 설치 유도 팝업 타이머 시작
+        _appDownloadTimer = Timer(const Duration(seconds: 15), () {
+          if (mounted) {
+            setState(() => _showAppDownloadBanner = true);
+          }
+        });
       });
     }
 
@@ -1224,6 +1236,92 @@ class _MainScreenState extends State<MainScreen> {
             ),
           _buildTopBar(),
           _buildBottomNav(),
+
+          // 🚀 [Web 전용] 앱 설치 유도 팝업 (15초 뒤 하단에서 등장)
+          // 로그인 여부와 상관없이 웹 유저라면 보여주되, 로그인 팝업이 열려있을 때만 숨깁니다.
+          if (kIsWeb)
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.fastOutSlowIn,
+              bottom: (_showAppDownloadBanner && !_isLoginPopupOpen) ? 20 : -300,
+              left: 20,
+              right: 20,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 500),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(25),
+                          border: Border.all(color: Colors.white12, width: 1),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 44, height: 44,
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.cyanAccent.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(Icons.phone_android, color: Colors.cyanAccent, size: 24),
+                                    ),
+                                    const SizedBox(width: 15),
+                                    const Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('PickGet 앱 설치하기', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                        SizedBox(height: 2),
+                                        Text('앱에서 더 빠르고 부드럽게!', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                IconButton(
+                                  onPressed: () => setState(() => _showAppDownloadBanner = false),
+                                  icon: const Icon(Icons.close, color: Colors.white54, size: 22),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.cyanAccent,
+                                  foregroundColor: Colors.black,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                  elevation: 0,
+                                ),
+                                onPressed: () {
+                                  // 🚀 추후 실제 앱스토어/플레이스토어 주소로 연결
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('곧 앱스토어에서 만나보실 수 있습니다!')),
+                                  );
+                                },
+                                child: const Text('무료로 다운로드', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

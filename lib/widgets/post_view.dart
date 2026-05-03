@@ -253,16 +253,22 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     }
   }
 
-  // 🎬 화면 진입 시 영상 시작
+  // 🎬 화면 진입 시 영상 시작 (스마트 시차 로딩 적용)
   void _onBecomeVisible() {
     _viewStartTime = DateTime.now(); // ⏱️ 화면에 보이기 시작한 시간 기록!
     
+    // 1️⃣ 우선순위: 메인 영상(A) 즉시 로딩 시작
     if (_isVideo(widget.post.imageA)) {
       _initVideo(widget.post.imageA, 1);
     }
-    if (_isVideo(widget.post.imageB)) {
-      _initVideo(widget.post.imageB, 2);
-    }
+
+    // 2️⃣ 시차 로딩: 반대편 영상(B)은 0.15초 뒤에 로딩 시작 (CPU 부하 분산)
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (!mounted || !_isVisible) return;
+      if (_isVideo(widget.post.imageB)) {
+        _initVideo(widget.post.imageB, 2);
+      }
+    });
   }
 
   bool _isVideo(String url) {
@@ -1639,29 +1645,43 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       // 🎬 초기화가 완료되었을 때의 처리
       if (!forceThumb && isInitialized && controller != null) {
         if (kIsWeb) {
-          // 🌐 [Web 전용] 흰색 번쩍임 방지를 위해 배경에 썸네일을 깔아줌
-          content = Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.black,
-              image: (thumbUrl != null && thumbUrl.isNotEmpty)
-                  ? DecorationImage(
-                      image: CachedNetworkImageProvider(thumbUrl.trim()),
+          // 🌐 [Web 전용] 모든 지저분한 로직을 걷어낸 '클린 슬레이트' 버전
+          content = isPlaying
+              ? ValueListenableBuilder(
+                  valueListenable: controller,
+                  builder: (context, VideoPlayerValue value, child) {
+                    // 영상이 실제 재생되기 전까지는 썸네일 노출 (가장 단순한 스위칭)
+                    if (value.position <= Duration.zero || value.size.width <= 0) {
+                      return (thumbUrl != null && thumbUrl.isNotEmpty)
+                          ? CachedNetworkImage(
+                              imageUrl: thumbUrl.trim(),
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2)),
+                              errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white24),
+                            )
+                          : const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2));
+                    }
+
+                    // 준비 완료 시 앱과 동일한 가장 표준적인 비디오 구조 사용
+                    return FittedBox(
                       fit: BoxFit.cover,
+                      clipBehavior: Clip.hardEdge,
+                      child: SizedBox(
+                        width: value.size.width,
+                        height: value.size.height,
+                        child: VideoPlayer(controller),
+                      ),
+                    );
+                  },
+                )
+              : (thumbUrl != null && thumbUrl.isNotEmpty)
+                  ? CachedNetworkImage(
+                      imageUrl: thumbUrl.trim(),
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2)),
+                      errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white24),
                     )
-                  : null,
-            ),
-            child: FittedBox(
-              fit: BoxFit.cover,
-              clipBehavior: Clip.hardEdge,
-              child: SizedBox(
-                width: controller.value.size.width,
-                height: controller.value.size.height,
-                child: VideoPlayer(controller),
-              ),
-            ),
-          );
+                  : const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2));
         } else {
           // 📱 [App 전용] 사용자 요청대로 절대 건드리지 않는 순수 오리지널 구조 유지
           content = FittedBox(
