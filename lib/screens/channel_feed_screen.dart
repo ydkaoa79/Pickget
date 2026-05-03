@@ -52,45 +52,105 @@ class _ChannelFeedScreenState extends State<ChannelFeedScreen> {
               return PostView(
                 key: ValueKey('channel_feed_${post.id}'),
                 post: post,
-                onLike: () {
+                onLike: () async {
                   if (!gIsLoggedIn) {
                     gShowLoginPopup?.call();
                     return;
                   }
+                  final bool nowLiked = !post.isLiked;
                   setState(() {
-                    post.isLiked = !post.isLiked;
-                    if (post.isLiked) {
+                    post.isLiked = nowLiked;
+                    if (nowLiked) {
                       post.likesCount++;
                     } else {
                       post.likesCount--;
                     }
                   });
                   HapticFeedback.lightImpact();
+
+                  try {
+                    if (nowLiked) {
+                      await SupabaseService.client.from('likes').insert({
+                        'user_id': gUserInternalId,
+                        'post_id': post.id,
+                      });
+                      // 포인트 적립 (+1P)
+                      await SupabaseService.client.from('points_history').insert({
+                        'user_id': gUserInternalId,
+                        'amount': 1,
+                        'description': '게시물 좋아요 보너스',
+                      });
+                    } else {
+                      await SupabaseService.client.from('likes').delete().match({
+                        'user_id': gUserInternalId!,
+                        'post_id': post.id,
+                      });
+                    }
+                    // 게시물 테이블의 좋아요 수 업데이트
+                    await SupabaseService.client.from('posts').update({
+                      'likes_count': post.likesCount
+                    }).eq('id', post.id);
+                  } catch (e) {
+                    print('좋아요 동기화 에러: $e');
+                  }
                 },
-                onFollow: () {
+                onFollow: () async {
                   if (!gIsLoggedIn) {
                     gShowLoginPopup?.call();
                     return;
                   }
+                  final bool nowFollowing = !post.isFollowing;
                   setState(() {
-                    bool newStatus = !post.isFollowing;
                     for (var p in widget.allPosts) {
                       if (p.uploaderId == post.uploaderId) {
-                        p.isFollowing = newStatus;
+                        p.isFollowing = nowFollowing;
                       }
                     }
                   });
                   HapticFeedback.mediumImpact();
+
+                  try {
+                    if (nowFollowing) {
+                      await SupabaseService.client.from('follows').insert({
+                        'follower_internal_id': gUserInternalId!,
+                        'following_internal_id': post.uploaderInternalId!,
+                      });
+                    } else {
+                      await SupabaseService.client.from('follows').delete().match({
+                        'follower_internal_id': gUserInternalId!,
+                        'following_internal_id': post.uploaderInternalId!,
+                      });
+                    }
+                  } catch (e) {
+                    print('팔로우 동기화 에러: $e');
+                  }
                 },
-                onBookmark: () {
+                onBookmark: () async {
                   if (!gIsLoggedIn) {
                     gShowLoginPopup?.call();
                     return;
                   }
+                  final bool nowBookmarked = !post.isBookmarked;
                   setState(() {
-                    post.isBookmarked = !post.isBookmarked;
+                    post.isBookmarked = nowBookmarked;
                   });
                   HapticFeedback.selectionClick();
+
+                  try {
+                    if (nowBookmarked) {
+                      await SupabaseService.client.from('bookmarks').insert({
+                        'user_id': gUserInternalId!,
+                        'post_id': post.id,
+                      });
+                    } else {
+                      await SupabaseService.client.from('bookmarks').delete().match({
+                        'user_id': gUserInternalId!,
+                        'post_id': post.id,
+                      });
+                    }
+                  } catch (e) {
+                    print('즐겨찾기 동기화 에러: $e');
+                  }
                 },
                 onNotInterested: () {
                   setState(() {

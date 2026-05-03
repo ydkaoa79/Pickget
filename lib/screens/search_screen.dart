@@ -619,17 +619,13 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildSearchResults() {
-    final displayList = _searchResults.isEmpty
-        ? widget.allPosts.take(4).toList()
-        : _searchResults;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Text(
-            _searchResults.isEmpty ? '추천 콘텐츠' : '검색 결과',
+            _searchResults.isEmpty ? '검색 결과 없음' : '검색 결과 (${_searchResults.length})',
             style: const TextStyle(
               color: Colors.white38,
               fontSize: 12,
@@ -638,106 +634,44 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
         ),
         Expanded(
-          child: GestureDetector(
-            onTap: () => FocusScope.of(context).unfocus(),
-            child: GridView.builder(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.55,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-              ),
-              itemCount: displayList.length,
-              itemBuilder: (context, index) {
-                final post = displayList[index];
-                return Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
+          child: _searchResults.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off, color: Colors.white10, size: 80),
+                      const SizedBox(height: 16),
+                      Text(
+                        '일치하는 게시물이 없습니다.\n다른 키워드로 검색해보세요!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white24, fontSize: 14, height: 1.5),
+                      ),
+                    ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Stack(
-                      children: [
-                        // 1. 영상 피드로 이동 (썸네일 + 그라데이션 영역)
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ChannelFeedScreen(
-                                  initialIndex: index,
-                                  channelPosts: displayList,
-                                  allPosts: widget.allPosts,
-                                ),
-                              ),
-                            );
-                          },
+                )
+              : GestureDetector(
+                  onTap: () => FocusScope.of(context).unfocus(),
+                  child: GridView.builder(
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.55,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: _searchResults.length,
+                    itemBuilder: (context, index) {
+                      final post = _searchResults[index];
+                      return Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
                           child: Stack(
                             children: [
-                              Positioned.fill(
-                                child: (post.thumbA != null && post.thumbA!.isNotEmpty)
-                                  ? Image.network(post.thumbA!.trim(), fit: BoxFit.cover)
-                                  : (_isVideo(post.imageA)
-                                      ? Container(color: Colors.black26, child: const Center(child: Icon(Icons.play_circle_outline, color: Colors.white54)))
-                                      : (post.imageA.trim().contains('http')
-                                          ? Image.network(post.imageA.trim(), fit: BoxFit.cover)
-                                          : Image.asset(post.imageA.trim(), fit: BoxFit.cover))),
-                              ),
-                              Positioned.fill(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        Colors.transparent,
-                                        Colors.black.withValues(alpha: 0.3),
-                                        Colors.black.withValues(alpha: 0.8),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // 2. 상태 배지 (단순 표시)
-                        Positioned(
-                          top: 10,
-                          left: 10,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: post.isExpired
-                                  ? Colors.black54
-                                  : Colors.cyanAccent.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              post.isExpired ? '선택종료' : '선택중',
-                              style: TextStyle(
-                                color: post.isExpired
-                                    ? Colors.white70
-                                    : Colors.black,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // 3. 하단 정보 (제목 클릭 시에도 피드 이동)
-                        Positioned(
-                          bottom: 12,
-                          left: 12,
-                          right: 12,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                              // 1. 영상 피드로 이동
                               GestureDetector(
                                 onTap: () {
                                   Navigator.push(
@@ -745,86 +679,132 @@ class _SearchScreenState extends State<SearchScreen> {
                                     MaterialPageRoute(
                                       builder: (context) => ChannelFeedScreen(
                                         initialIndex: index,
-                                        channelPosts: displayList,
+                                        channelPosts: _searchResults,
                                         allPosts: widget.allPosts,
                                       ),
                                     ),
                                   );
                                 },
-                                child: Text(
-                                  post.title,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.3,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Text(
-                                    '${post.totalVotes} picks',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.4,
-                                      ),
-                                      fontSize: 9,
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: (post.thumbA != null && post.thumbA!.isNotEmpty)
+                                        ? Image.network(post.thumbA!.trim(), fit: BoxFit.cover)
+                                        : (_isVideo(post.imageA)
+                                            ? Container(color: Colors.black26, child: const Center(child: Icon(Icons.play_circle_outline, color: Colors.white54)))
+                                            : (post.imageA.trim().contains('http')
+                                                ? Image.network(post.imageA.trim(), fit: BoxFit.cover)
+                                                : Image.asset(post.imageA.trim(), fit: BoxFit.cover))),
                                     ),
-                                  ),
-                                  const Spacer(),
-                                  // 4. 아이디 클릭 시에만 유저 채널 이동 (독립적 클릭 영역)
-                                  GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => ChannelScreen(
-                                            uploaderId: post.uploaderId,
-                                            allPosts: widget.allPosts,
-                                            initialPost: post,
+                                    Positioned.fill(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              Colors.transparent,
+                                              Colors.black.withValues(alpha: 0.3),
+                                              Colors.black.withValues(alpha: 0.8),
+                                            ],
                                           ),
                                         ),
-                                      ).then((_) {
-                                        if (mounted) setState(() {});
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.cyanAccent.withValues(
-                                          alpha: 0.1,
-                                        ),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        post.uploaderName,
-                                        style: const TextStyle(
-                                          color: Colors.cyanAccent,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
                                       ),
                                     ),
+                                  ],
+                                ),
+                              ),
+                              // 2. 상태 배지
+                              Positioned(
+                                top: 10,
+                                left: 10,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
                                   ),
-                                ],
+                                  decoration: BoxDecoration(
+                                    color: post.isExpired
+                                        ? Colors.black54
+                                        : Colors.cyanAccent.withValues(alpha: 0.8),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    post.isExpired ? '선택종료' : '선택중',
+                                    style: TextStyle(
+                                      color: post.isExpired
+                                          ? Colors.white70
+                                          : Colors.black,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // 3. 하단 정보
+                              Positioned(
+                                bottom: 12,
+                                left: 12,
+                                right: 12,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      post.title,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        height: 1.3,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '${post.totalVotes} picks',
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.4,
+                                            ),
+                                            fontSize: 9,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.cyanAccent.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            post.uploaderName,
+                                            style: const TextStyle(
+                                              color: Colors.cyanAccent,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
-          ),
+                ),
         ),
       ],
     );
