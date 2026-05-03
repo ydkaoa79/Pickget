@@ -701,7 +701,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center, 
                         children: [
-                          const SizedBox(width: 40), // 좌우 밸런스를 맞춰 제목 중앙 정렬 유지 (20+40=60)
+                          const SizedBox(width: 20), // 좌측 여백 (대칭용)
                           Expanded(
                             child: Center(
                               child: FittedBox(
@@ -720,48 +720,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                               )
                             )
                           ), 
-                          PopupMenuButton<String>(
-                            padding: EdgeInsets.zero,
-                            child: Container(
-                              width: 60, height: 60, // 터치 영역을 60x60으로 대폭 확장
-                              color: Colors.transparent, // 투명한 주변 영역 어디를 눌러도 터치되게 함
-                              alignment: Alignment.center,
-                              child: const Icon(Icons.more_vert, color: Colors.white70, size: 30),
-                            ),
-                            color: const Color(0xFF1E1E1E),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                            onSelected: (value) {
-                              if (value == '설명') {
-                                _showDescriptionSheet(context);
-                              } else if (value == '관심없음') {
-                                widget.onNotInterested();
-                              } else if (value == '채널 추천 안함') {
-                                widget.onDontRecommendChannel();
-                              } else if (value == '신고') {
-                                _showReportSheet(context);
-                              } else if (value == '삭제') {
-                                _deletePost();
-                              } else if (value == '숨기기' || value == '보이기') {
-                                widget.onToggleHide(widget.post.id);
-                              }
-                            },
-                            itemBuilder: (BuildContext context) {
-                              if (isMe) {
-                                return <PopupMenuEntry<String>>[
-                                  const PopupMenuItem<String>(value: '설명', child: Row(children: [Icon(Icons.info_outline, color: Colors.white70, size: 20), SizedBox(width: 12), Text('설명', style: TextStyle(color: Colors.white, fontSize: 14))])),
-                                  PopupMenuItem<String>(value: widget.post.isHidden ? '보이기' : '숨기기', child: Row(children: [Icon(widget.post.isHidden ? Icons.visibility : Icons.visibility_off, color: Colors.white70, size: 20), SizedBox(width: 12), Text(widget.post.isHidden ? '보이기' : '숨기기', style: const TextStyle(color: Colors.white, fontSize: 14))])),
-                                  const PopupMenuItem<String>(value: '삭제', child: Row(children: [Icon(Icons.delete_outline, color: Colors.redAccent, size: 20), SizedBox(width: 12), Text('삭제', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold))])),
-                                ];
-                              } else {
-                                return <PopupMenuEntry<String>>[
-                                  const PopupMenuItem<String>(value: '설명', child: Row(children: [Icon(Icons.info_outline, color: Colors.white70, size: 20), SizedBox(width: 12), Text('설명', style: TextStyle(color: Colors.white, fontSize: 14))])),
-                                  const PopupMenuItem<String>(value: '관심없음', child: Row(children: [Icon(Icons.block, color: Colors.white70, size: 20), SizedBox(width: 12), Text('관심없음', style: TextStyle(color: Colors.white, fontSize: 14))])),
-                                  const PopupMenuItem<String>(value: '채널 추천 안함', child: Row(children: [Icon(Icons.person_off_outlined, color: Colors.white70, size: 20), SizedBox(width: 12), Text('채널 추천 안함', style: TextStyle(color: Colors.white, fontSize: 14))])),
-                                  const PopupMenuItem<String>(value: '신고', child: Row(children: [Icon(Icons.report_gmailerrorred, color: Colors.redAccent, size: 20), SizedBox(width: 12), Text('신고', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold))])),
-                                ];
-                              }
-                            },
-                          ), // PopupMenuButton
+                          const SizedBox(width: 20), // 우측 여백 (대칭용)
                         ]
                       )
                     ),
@@ -919,6 +878,61 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                 ),
               ),
               _buildChart(widget.post),
+              // 🚀 [신규 위치] 점 세 개 메뉴 버튼을 그래프 옆 벽면으로 이동
+              Positioned(
+                bottom: 125 + MediaQuery.of(context).padding.bottom, 
+                right: 8, // 벽에 더 바짝 붙임
+                child: PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
+                  child: Container(
+                    width: 44, height: 44,
+                    color: Colors.transparent,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.more_vert, color: Colors.white54, size: 26),
+                  ),
+                  color: const Color(0xFF1E1E1E),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  onSelected: (value) {
+                    if (value == '설명') {
+                      _showDescriptionSheet(context);
+                    } else if (value == '관심없음') {
+                      widget.onNotInterested();
+                    } else if (value == '채널 추천 안함') {
+                      widget.onDontRecommendChannel();
+                    } else if (value == '신고') {
+                      _showReportSheet(context);
+                    } else if (value == '삭제') {
+                      _deletePost();
+                    } else if (value == '숨기기' || value == '보이기') {
+                      widget.onToggleHide(widget.post.id);
+                    }
+                  },
+                  itemBuilder: (BuildContext context) {
+                    // 🔒 [추가] 비로그인 상태면 '설명'만 노출
+                    if (!gIsLoggedIn) {
+                      return <PopupMenuEntry<String>>[
+                        const PopupMenuItem<String>(value: '설명', child: Row(children: [Icon(Icons.info_outline, color: Colors.white70, size: 20), SizedBox(width: 12), Text('설명', style: TextStyle(color: Colors.white, fontSize: 14))])),
+                      ];
+                    }
+
+                    bool isMe = (widget.post.uploaderInternalId != null && widget.post.uploaderInternalId == gUserInternalId);
+                    if (isMe) {
+                      return <PopupMenuEntry<String>>[
+                        const PopupMenuItem<String>(value: '설명', child: Row(children: [Icon(Icons.info_outline, color: Colors.white70, size: 20), SizedBox(width: 12), Text('설명', style: TextStyle(color: Colors.white, fontSize: 14))])),
+                        PopupMenuItem<String>(value: widget.post.isHidden ? '보이기' : '숨기기', child: Row(children: [Icon(widget.post.isHidden ? Icons.visibility : Icons.visibility_off, color: Colors.white70, size: 20), SizedBox(width: 12), Text(widget.post.isHidden ? '보이기' : '숨기기', style: const TextStyle(color: Colors.white, fontSize: 14))])),
+                        const PopupMenuItem<String>(value: '삭제', child: Row(children: [Icon(Icons.delete_outline, color: Colors.redAccent, size: 20), SizedBox(width: 12), Text('삭제', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold))])),
+                      ];
+                    } else {
+                      return <PopupMenuEntry<String>>[
+                        const PopupMenuItem<String>(value: '설명', child: Row(children: [Icon(Icons.info_outline, color: Colors.white70, size: 20), SizedBox(width: 12), Text('설명', style: TextStyle(color: Colors.white, fontSize: 14))])),
+                        const PopupMenuItem<String>(value: '관심없음', child: Row(children: [Icon(Icons.block, color: Colors.white70, size: 20), SizedBox(width: 12), Text('관심없음', style: TextStyle(color: Colors.white, fontSize: 14))])),
+                        const PopupMenuItem<String>(value: '채널 추천 안함', child: Row(children: [Icon(Icons.person_off_outlined, color: Colors.white70, size: 20), SizedBox(width: 12), Text('채널 추천 안함', style: TextStyle(color: Colors.white, fontSize: 14))])),
+                        const PopupMenuItem<String>(value: '신고', child: Row(children: [Icon(Icons.report_gmailerrorred, color: Colors.redAccent, size: 20), SizedBox(width: 12), Text('신고', style: TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold))])),
+                      ];
+                    }
+                  },
+                ),
+              ),
               if (_showPointToast)
                 Center(
                   child: TweenAnimationBuilder<double>(
@@ -1015,44 +1029,45 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => SafeArea(
-        child: Container(
-          height: MediaQuery.of(context).size.height,
-          decoration: const BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-          ),
-          child: Column(
-            children: [
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const SizedBox(width: 48),
-                      const Text('상세 설명', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-                      IconButton(icon: const Icon(Icons.close, color: Colors.white, size: 28), onPressed: () => Navigator.pop(context)),
-                    ],
-                  ),
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85, // 🚀 100%에서 85%로 줄여서 상단 여백 확보!
+        decoration: const BoxDecoration(
+          color: Color(0xFF121212), // 조금 더 깊이감 있는 블랙
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 5)],
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            // 🎩 상단 핸들 바 (드래그 유도 및 디자인 포인트)
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const SizedBox(width: 48),
+                  const Text('상세 설명', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                  IconButton(icon: const Icon(Icons.close, color: Colors.white70, size: 28), onPressed: () => Navigator.pop(context)),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.white10, height: 1),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.post.title, style: const TextStyle(color: Colors.cyanAccent, fontSize: 22, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 20),
+                    Text(widget.post.fullDescription, style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.8, fontWeight: FontWeight.w400)),
+                  ],
                 ),
               ),
-              const Divider(color: Colors.white10, height: 1),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(widget.post.title, style: const TextStyle(color: Colors.cyanAccent, fontSize: 22, fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 20),
-                      Text(widget.post.fullDescription, style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.8, fontWeight: FontWeight.w400)),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1203,9 +1218,22 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                 children: [
                   const SizedBox(height: 12),
                   Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
-                  const SizedBox(height: 20),
-                  const Text('댓글', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-                  const Divider(color: Colors.white10, height: 30),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const SizedBox(width: 48), // 좌측 균형용
+                        const Text('댓글', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white70, size: 28),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(color: Colors.white10, height: 1),
                   Expanded(
                     child: ListView.builder(
                       controller: scrollController,
@@ -1985,12 +2013,20 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 🎩 상단 바
+              // 🎩 상단 바 및 닫기 버튼
               Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(2))),
-              const SizedBox(height: 25),
-              
-              // 📢 제목 및 설명
-              const Text('게시물 신고', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const SizedBox(width: 48),
+                  const Text('게시물 신고', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70, size: 28),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               const Text('신고 사유를 선택해주세요. 검토 후 신속히 조치하겠습니다.', style: TextStyle(color: Colors.white38, fontSize: 12)),
               const SizedBox(height: 25),
