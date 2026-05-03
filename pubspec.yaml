@@ -55,6 +55,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: "^0.13.1"
+  flutter_native_splash: ^2.4.4
 
 flutter_launcher_icons:
   android: "ic_launcher"
@@ -112,3 +113,12 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_native_splash:
+  color: "#000000"
+  image: assets/splash_logo.png
+  android_12:
+    image: assets/splash_logo.png
+    color: "#000000"
+    icon_background_color: "#000000"
+
