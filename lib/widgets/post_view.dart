@@ -1474,17 +1474,22 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
       return content;
     } else {
-      // 이미지일 때 (기존 로직 그대로 캐싱 적용!)
-      return url.trim().contains('http')
+      // 🖼️ 이미지일 때 (기존 로직 그대로 캐싱 적용!)
+      // 블러 배경용(forceThumb)이라면 썸네일을 우선 사용해서 성능 최적화!
+      final String effectiveUrl = (forceThumb && thumbUrl != null && thumbUrl.isNotEmpty) 
+          ? thumbUrl.trim() 
+          : url.trim();
+
+      return effectiveUrl.contains('http')
           ? CachedNetworkImage(
-              imageUrl: url.trim(),
+              imageUrl: effectiveUrl,
               fit: BoxFit.cover,
               fadeInDuration: const Duration(milliseconds: 200),
               fadeOutDuration: const Duration(milliseconds: 200),
               placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2)),
               errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white24),
             )
-          : Image.asset(url.trim(), fit: BoxFit.cover);
+          : Image.asset(effectiveUrl, fit: BoxFit.cover);
     }
   }
 
@@ -1722,16 +1727,27 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           constraints: const BoxConstraints(),
                           color: const Color(0xFF1E1E1E),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          onSelected: (value) {
+                          onSelected: (value) async {
                             if (value == '고정' || value == '고정해제') {
+                              final bool newPinned = !c.isPinned;
                               setSheetState(() {
-                                c.isPinned = !c.isPinned;
+                                c.isPinned = newPinned;
                                 if (c.isPinned) {
                                   widget.post.comments.removeAt(index);
                                   widget.post.comments.insert(0, c);
                                 }
                               });
+                              // DB 고정 상태 업데이트
+                              try {
+                                await SupabaseService.client
+                                  .from('comments')
+                                  .update({'is_pinned': newPinned})
+                                  .eq('id', c.id!);
+                              } catch (e) {
+                                print('댓글 고정 에러: $e');
+                              }
                             } else if (value == '삭제') {
+                              final String? commentId = c.id;
                               setSheetState(() {
                                 widget.post.comments.removeAt(index);
                                 widget.post.commentsCount--;
@@ -1740,7 +1756,15 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                                 setState(() {});
                               }
                               try {
-                                SupabaseService.client
+                                // 1. DB에서 실제 삭제
+                                if (commentId != null) {
+                                  await SupabaseService.client
+                                    .from('comments')
+                                    .delete()
+                                    .eq('id', commentId);
+                                }
+                                // 2. 게시물 댓글 수 업데이트
+                                await SupabaseService.client
                                   .from('posts')
                                   .update({'comments_count': widget.post.commentsCount})
                                   .eq('id', widget.post.id);
@@ -1748,9 +1772,19 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                                 print('댓글삭제 에러: $e');
                               }
                             } else if (value == '숨기기' || value == '숨김해제') {
+                              final bool newHidden = !c.isHidden;
                               setSheetState(() {
-                                c.isHidden = !c.isHidden;
+                                c.isHidden = newHidden;
                               });
+                              // DB 숨김 상태 업데이트
+                              try {
+                                await SupabaseService.client
+                                  .from('comments')
+                                  .update({'is_hidden': newHidden})
+                                  .eq('id', c.id!);
+                              } catch (e) {
+                                print('댓글숨김 에러: $e');
+                              }
                             } else if (value == '신고') {
                               _showReportSheet(context);
                             } else if (value == '수정') {
@@ -1847,11 +1881,22 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소', style: TextStyle(color: Colors.white54))),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
+              final newText = controller.text.trim();
+              if (newText.isEmpty) return;
               setSheetState(() {
-                c.text = controller.text;
+                c.text = newText;
               });
               Navigator.pop(context);
+              // DB에 댓글 수정 내용 저장
+              try {
+                await SupabaseService.client
+                    .from('comments')
+                    .update({'text': newText})
+                    .eq('id', c.id!);
+              } catch (e) {
+                print('댓글 수정 DB 저장 오류: $e');
+              }
             }, 
             child: const Text('수정', style: TextStyle(color: Colors.cyanAccent))
           ),

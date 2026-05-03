@@ -79,7 +79,9 @@ class _MainScreenState extends State<MainScreen> {
   List<PostData> _recommendedPosts = [];
   final Set<String> _forcedVisibleIds =
       {}; // To show expired posts clicked from ranking
-  final PageController _pageController = PageController();
+  bool _isLoadingMore = false; // 🔄 추가 로딩 상태
+  bool _hasMore = true; // 🔄 더 가져올 데이터가 있는지 여부
+  late PageController _pageController;
   int _userPoints = 0;
   int _selectedTopTabIndex = 0;
   bool _hasNewNotifications = true;
@@ -129,6 +131,9 @@ class _MainScreenState extends State<MainScreen> {
     };
     gRefreshFeed = fetchPosts;
     _startLoginTimer();
+
+    _pageController = PageController();
+    _pageController.addListener(_onScroll);
 
     // [보강] 시스템 레벨 딥링크 탐지기
     final appLinks = AppLinks();
@@ -310,7 +315,6 @@ class _MainScreenState extends State<MainScreen> {
               setState(() {
                 gUserPoints = earnedPoints;
               });
-
               // 포인트 정보 서버 반영
               await SupabaseService.client
                   .from('user_profiles')
@@ -333,6 +337,7 @@ class _MainScreenState extends State<MainScreen> {
   void dispose() {
     _authSubscription?.cancel();
     _loginTimer?.cancel();
+    _pageController.removeListener(_onScroll);
     _pageController.dispose();
     super.dispose();
   }
@@ -365,130 +370,130 @@ class _MainScreenState extends State<MainScreen> {
     return url;
   }
 
-  Future<void> fetchPosts() async {
-    // 🔄 로딩 시작 표시
-    if (mounted && _isDataLoading == false) {
-      setState(() => _isDataLoading = true);
+  void _onScroll() {
+    if (_pageController.hasClients) {
+      final page = _pageController.page ?? 0;
+      // 현재 페이지가 전체 게시물 리스트의 끝에서 3번째 이하로 남았을 때 다음 페이지 로드
+      if (page >= _posts.length - 3 && !_isLoadingMore && _hasMore) {
+        _fetchMorePosts();
+      }
     }
+  }
 
+  Future<void> _fetchMorePosts() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() => _isLoadingMore = true);
+    await fetchPosts(isRefresh: false);
+    setState(() => _isLoadingMore = false);
+  }
+
+  // 🔄 게시물 및 알림 가져오기 (isRefresh: true면 처음부터, false면 이어서)
+  Future<void> fetchPosts({bool isRefresh = true}) async {
     try {
+      if (isRefresh) {
+        if (mounted) setState(() => _isDataLoading = true);
+        _hasMore = true;
+      }
+
       Set<String> likedPostIds = {};
       Set<String> bookmarkedPostIds = {};
       Set<String> followedUserIds = {};
       List<Map<String, dynamic>> loadedNotifications = [];
       bool hasNewNotifs = false;
 
-      if (gIsLoggedIn) {
+      // 1. 개인 데이터 (팔로우 정보는 전역 관리가 필요하므로 별도 유지)
+      if (gIsLoggedIn && gUserInternalId != null) {
         try {
-          // 1. 프로필 정보 확정 (Auth UUID 기반)
-          Map<String, dynamic>? profileData;
-          if (gUserInternalId != null) {
-            profileData = await SupabaseService.client
-                .from('user_profiles')
-                .select(
-                  'id, points, user_id, nickname, profile_image, bio, age, gender, region',
-                )
-                .eq('id', gUserInternalId!)
-                .maybeSingle();
-          }
+          // 프로필 정보 확정 (포인트 등 갱신)
+          final profileData = await SupabaseService.client
+              .from('user_profiles')
+              .select('id, points, user_id, nickname, profile_image, bio')
+              .eq('id', gUserInternalId!)
+              .maybeSingle();
 
           if (profileData != null) {
-            // setState 안 쓰고 변수만 세팅 (나중에 한 번에 갱신)
             gUserPoints = profileData['points'] ?? 0;
             gIdText = profileData['user_id'] ?? gIdText;
             gNameText = profileData['nickname'] ?? gNameText;
             gProfileImage = profileData['profile_image'] ?? gProfileImage;
             gBioText = profileData['bio'] ?? gBioText;
-          } else {
-            // 프로필이 없으면 현재 Auth UUID를 사용하여 새로 생성
-            print(
-              'DEBUG [PROFILE]: No profile found, creating new one for $gUserInternalId',
-            );
-            await SupabaseService.client
-                .from('user_profiles')
-                .insert({
-                  'id': gUserInternalId, // ✅ Auth UUID를 프로필 ID로 사용!
-                  'user_id': gIdText,
-                  'points': 0, // 초기 포인트 0 (약관 동의 후 지급)
-                  'nickname': gNameText,
-                  'profile_image': gProfileImage,
-                })
+          }
+
+          final results = await Future.wait([
+            // [0] 팔로우 정보
+            SupabaseService.client
+                .from('follows')
+                .select('following_internal_id')
+                .eq('follower_internal_id', gUserInternalId!),
+            // [1] 알림
+            SupabaseService.client
+                .from('notifications')
                 .select()
-                .single();
-            gUserPoints = 0;
-          }
+                .eq('user_id', gUserInternalId!)
+                .order('created_at', ascending: false)
+                .limit(20),
+            // [2] 좋아요 (임시 복구: 안정성 확보를 위해 다시 전체 리스트 사용)
+            SupabaseService.client
+                .from('likes')
+                .select('post_id')
+                .eq('user_id', gUserInternalId!),
+            // [3] 북마크
+            SupabaseService.client
+                .from('bookmarks')
+                .select('post_id')
+                .eq('user_id', gUserInternalId!),
+            // [4] 투표
+            SupabaseService.client
+                .from('votes')
+                .select('post_id, side')
+                .eq('user_internal_id', gUserInternalId!),
+          ]);
 
-          // 2. 🚀 [성능 최적화] 개인 데이터 5종을 동시에 가져오기 (병렬 실행!)
-          if (gUserInternalId != null) {
-            final results = await Future.wait([
-              // [0] 좋아요
-              SupabaseService.client
-                  .from('likes')
-                  .select('post_id')
-                  .eq('user_id', gUserInternalId!),
-              // [1] 북마크
-              SupabaseService.client
-                  .from('bookmarks')
-                  .select('post_id')
-                  .eq('user_id', gUserInternalId!),
-              // [2] 팔로우
-              SupabaseService.client
-                  .from('follows')
-                  .select('following_internal_id')
-                  .eq('follower_internal_id', gUserInternalId!),
-              // [3] 투표
-              SupabaseService.client
-                  .from('votes')
-                  .select('post_id, side')
-                  .eq('user_internal_id', gUserInternalId!),
-              // [4] 알림
-              SupabaseService.client
-                  .from('notifications')
-                  .select()
-                  .eq('user_id', gUserInternalId!)
-                  .order('created_at', ascending: false),
-            ]);
+          final List<dynamic> userFollows = results[0];
+          final List<dynamic> notifs = results[1];
+          final List<dynamic> userLikes = results[2];
+          final List<dynamic> userBookmarks = results[3];
+          final List<dynamic> userVotes = results[4];
 
-            final List<dynamic> userLikes = results[0];
-            final List<dynamic> userBookmarks = results[1];
-            final List<dynamic> userFollows = results[2];
-            final List<dynamic> userVotes = results[3];
-            final List<dynamic> notifs = results[4];
-
-            likedPostIds = userLikes.map((l) => l['post_id'].toString()).toSet();
-            bookmarkedPostIds = userBookmarks.map((b) => b['post_id'].toString()).toSet();
-            followedUserIds = userFollows.map((f) => f['following_internal_id'].toString()).toSet();
-            gUserVotes = {
-              for (var v in userVotes) v['post_id'].toString(): v['side'] as int
-            };
-            loadedNotifications = List<Map<String, dynamic>>.from(notifs);
-            hasNewNotifs = loadedNotifications.any((n) => n['is_read'] == false);
-
-            print('DEBUG [FETCH]: gUserInternalId=$gUserInternalId');
-            print('DEBUG [FETCH]: likedPostIds=${likedPostIds.length}개, bookmarks=${bookmarkedPostIds.length}개, follows=${followedUserIds.length}개');
-          }
+          followedUserIds = userFollows.map((f) => f['following_internal_id'].toString()).toSet();
+          likedPostIds = userLikes.map((l) => l['post_id'].toString()).toSet();
+          bookmarkedPostIds = userBookmarks.map((b) => b['post_id'].toString()).toSet();
+          gUserVotes = {
+            for (var v in userVotes) v['post_id'].toString(): v['side'] as int
+          };
+          loadedNotifications = List<Map<String, dynamic>>.from(notifs);
+          hasNewNotifs = loadedNotifications.any((n) => n['is_read'] == false);
         } catch (e) {
           print('개인 데이터 가져오기 실패: $e');
         }
-      } else {
-        loadedNotifications = [];
-        hasNewNotifs = false;
-        gUserPoints = 0;
       }
 
-      // 2. [최적화] 게시물을 가져올 때 작성자의 최신 프로필 정보를 '조인(Join)'해서 한 번에 가져옵니다.
-      // uploader_internal_id를 기준으로 user_profiles 테이블의 정보를 함께 긁어옵니다.
-      final List<dynamic> postsData = await SupabaseService.client
+      // 2. 🚀 [안정화] 게시물 20개씩 끊어서 가져오기 (가장 안정적인 쿼리로 복구)
+      var query = SupabaseService.client
           .from('posts')
-          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image)')
-          .order('created_at', ascending: false);
+          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image)');
 
-      final loadedPosts = postsData.map((json) {
-        final profile = json['profiles']; // 조인된 프로필 데이터
+      // 📜 페이지네이션: refresh가 아니면 마지막 게시물 시간보다 이전 데이터 로드
+      if (!isRefresh && _posts.isNotEmpty) {
+        final lastCreatedAt = _posts.last.createdAt;
+        if (lastCreatedAt != null) {
+          query = query.lt('created_at', lastCreatedAt.toIso8601String());
+        }
+      }
+
+      final List<dynamic> postsData = await query
+          .order('created_at', ascending: false)
+          .limit(20);
+
+      if (postsData.length < 20) {
+        _hasMore = false;
+      }
+
+      final List<PostData> loadedPosts = postsData.map((json) {
+        final profile = json['profiles'];
         final String handle = json['uploader_id']?.toString() ?? '';
-        final String? internalId = json['uploader_internal_id']?.toString();
-
-        // 최신 프로필 정보가 있으면 그것을 쓰고, 없으면 게시물의 기본 정보를 사용합니다 (방어 로직)
+        final String? internalId = json['uploader_internal_id']?.toString() ?? profile?['id']?.toString();
+        
         final String latestId = (profile != null && profile['user_id'] != null)
             ? profile['user_id'].toString()
             : handle;
@@ -498,59 +503,44 @@ class _MainScreenState extends State<MainScreen> {
         final String profileImg = toCdnUrl(
             (profile != null && profile['profile_image'] != null)
             ? profile['profile_image'].toString()
-            : (json['uploader_image'] ?? 'assets/profiles/profile_11.jpg'));
-
-        final String? finalInternalId =
-            internalId ?? profile?['id']?.toString();
+            : (json['user_image'] ?? 'assets/profiles/profile_11.jpg'));
 
         final post = PostData(
           id: json['id'].toString(),
-          title: json['title'] ?? '제목 없음',
-          uploaderId: latestId, // Use the latest handle!
-          uploaderInternalId: finalInternalId, // 🆔 비어있으면 프로필에서 가져온 진짜 주민번호 이식!
+          title: json['title'] ?? '',
+          uploaderId: latestId,
+          uploaderInternalId: internalId,
           uploaderName: nickname,
           uploaderImage: profileImg,
-          timeLocation: '방금 전',
+          timeLocation: () {
+            final ca = json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now();
+            final diff = DateTime.now().difference(ca);
+            if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
+            if (diff.inHours < 24) return '${diff.inHours}시간 전';
+            return '${ca.month}월 ${ca.day}일';
+          }(),
           imageA: toCdnUrl(json['image_a'] ?? ''),
           imageB: toCdnUrl(json['image_b'] ?? ''),
-          thumbA: json['thumb_a'] != null ? toCdnUrl(json['thumb_a']) : null,
-          thumbB: json['thumb_b'] != null ? toCdnUrl(json['thumb_b']) : null,
-          descriptionA: json['description_a'] ?? '선택지 A',
-          descriptionB: json['description_b'] ?? '선택지 B',
+          thumbA: toCdnUrl(json['thumb_a'] ?? ''),
+          thumbB: toCdnUrl(json['thumb_b'] ?? ''),
+          descriptionA: json['description_a'] ?? '',
+          descriptionB: json['description_b'] ?? '',
           fullDescription: json['full_description'] ?? '',
           likesCount: json['likes_count'] ?? 0,
           commentsCount: json['comments_count'] ?? 0,
-          voteCountA: (json['vote_count_a'] ?? 0).toString(),
-          voteCountB: (json['vote_count_b'] ?? 0).toString(),
-          totalVotesCount: json['total_votes'] ?? 0,
-          percentA: (() {
-            int a = json['vote_count_a'] ?? 0;
-            int b = json['vote_count_b'] ?? 0;
-            if (a + b == 0) return '50%';
-            return '${(a / (a + b) * 100).round()}%';
-          })(),
-          percentB: (() {
-            int a = json['vote_count_a'] ?? 0;
-            int b = json['vote_count_b'] ?? 0;
-            if (a + b == 0) return '50%';
-            return '${(b / (a + b) * 100).round()}%';
-          })(),
+          voteCountA: json['vote_count_a']?.toString() ?? '0',
+          voteCountB: json['vote_count_b']?.toString() ?? '0',
+          totalVotesCount: json['total_votes_count'] ?? 0,
+          percentA: json['percent_a']?.toString() ?? '50%',
+          percentB: json['percent_b']?.toString() ?? '50%',
+          isFollowing: followedUserIds.contains(internalId),
           isLiked: gIsLoggedIn && likedPostIds.contains(json['id'].toString()),
-          isBookmarked:
-              gIsLoggedIn && bookmarkedPostIds.contains(json['id'].toString()),
-          isFollowing:
-              gIsLoggedIn &&
-              followedUserIds.contains(
-                json['uploader_internal_id']?.toString() ?? '',
-              ),
-          tags:
-              (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [],
+          isBookmarked: gIsLoggedIn && bookmarkedPostIds.contains(json['id'].toString()),
+          userVotedSide: gUserVotes[json['id'].toString()] ?? 0,
           isExpired: () {
             bool exp = json['is_expired'] ?? false;
             if (exp) return true;
-            final tags =
-                (json['tags'] as List?)?.map((e) => e.toString()).toList() ??
-                [];
+            final tags = (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [];
             final createdAtStr = json['created_at'];
             if (createdAtStr != null) {
               final createdAt = DateTime.tryParse(createdAtStr);
@@ -558,10 +548,7 @@ class _MainScreenState extends State<MainScreen> {
                 for (var tag in tags) {
                   if (tag.startsWith('duration:')) {
                     final mins = int.tryParse(tag.split(':')[1]);
-                    if (mins != null &&
-                        DateTime.now().isAfter(
-                          createdAt.add(Duration(minutes: mins)),
-                        )) {
+                    if (mins != null && DateTime.now().isAfter(createdAt.add(Duration(minutes: mins)))) {
                       return true;
                     }
                   }
@@ -597,22 +584,32 @@ class _MainScreenState extends State<MainScreen> {
       }).toList();
 
       setState(() {
-        _posts = loadedPosts.where((p) {
-          // 🆔 진짜 고유 번호(UUID)로 내 글인지 확인!
-          bool isMine =
-              gIsLoggedIn &&
-              p.uploaderInternalId != null &&
-              p.uploaderInternalId == gUserInternalId;
-          return isMine || !p.isHidden;
-        }).toList();
-        _notifications = loadedNotifications;
-        _hasNewNotifications = hasNewNotifs;
-        _isDataLoading = false; // 🔄 로딩 완료!
-        _refreshRecommended();
+        if (isRefresh) {
+          _posts = loadedPosts.where((p) {
+            bool isMine = gIsLoggedIn && p.uploaderInternalId != null && p.uploaderInternalId == gUserInternalId;
+            return isMine || !p.isHidden;
+          }).toList();
+        } else {
+          final newItems = loadedPosts.where((p) {
+            bool isMine = gIsLoggedIn && p.uploaderInternalId != null && p.uploaderInternalId == gUserInternalId;
+            return isMine || !p.isHidden;
+          }).toList();
+          _posts.addAll(newItems);
+        }
+        
+        if (isRefresh) {
+          _notifications = loadedNotifications;
+          _hasNewNotifications = hasNewNotifs;
+          _isDataLoading = false;
+          _refreshRecommended();
+        }
       });
     } catch (e) {
       print('Error fetching posts: $e');
-      if (mounted) setState(() => _isDataLoading = false);
+      if (mounted) setState(() {
+        _isDataLoading = false;
+        _isLoadingMore = false;
+      });
     }
   }
 

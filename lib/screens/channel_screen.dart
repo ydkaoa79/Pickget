@@ -843,7 +843,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                               const SizedBox(width: 30),
                               _profileTab('픽순', 1),
                               const SizedBox(width: 30),
-                              _profileTab('시간순', 2),
+                              _profileTab('댓글순', 2),
                             ],
                           ),
                           if (isMe)
@@ -924,6 +924,21 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
   }
 
   Widget _buildPostGrid() {
+    // 탭 인덱스에 따라 리스트 정렬
+    List<PostData> sortedPosts = List.from(_channelPosts);
+    int tabIndex = _tabController.index;
+
+    if (tabIndex == 0) {
+      // 최신순
+      sortedPosts.sort((a, b) => (b.createdAt).compareTo(a.createdAt));
+    } else if (tabIndex == 1) {
+      // 픽순
+      sortedPosts.sort((a, b) => b.totalVotes.compareTo(a.totalVotes));
+    } else if (tabIndex == 2) {
+      // 댓글순
+      sortedPosts.sort((a, b) => b.commentsCount.compareTo(a.commentsCount));
+    }
+
     return GridView.builder(
       padding: const EdgeInsets.only(top: 2),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -932,9 +947,9 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
         crossAxisSpacing: 1,
         mainAxisSpacing: 1,
       ),
-      itemCount: _channelPosts.length,
+      itemCount: sortedPosts.length,
       itemBuilder: (context, index) {
-        final post = _channelPosts[index];
+        final post = sortedPosts[index];
         final totalVotes = _parseTotalVotes(post);
         bool isSelected = _selectedPostIds.contains(post.id);
 
@@ -977,7 +992,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
             } else {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => ChannelFeedScreen(initialIndex: index, channelPosts: _channelPosts, allPosts: widget.allPosts,)),
+                MaterialPageRoute(builder: (context) => ChannelFeedScreen(initialIndex: index, channelPosts: sortedPosts, allPosts: widget.allPosts,)),
               ).then((_) {
                 if (mounted) {
                   setState(() {
