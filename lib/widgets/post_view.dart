@@ -73,6 +73,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   bool _videoAFinished = false;
   bool _videoBFinished = false;
   DateTime? _viewStartTime; // ⏱️ [신규] 6초 정독 체크를 위한 입성 시간 기록
+  DateTime? _lastSwitchTime; // ⏱️ [신규] 드래그 시 급격한 영상 전환 방지용 쿨타임
 
   @override
   bool get wantKeepAlive => true;
@@ -123,26 +124,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   // 🎬 영상 초기화 (네트워크 URL 직접 사용, 6초 영상이라 빠름)
   Future<void> _initVideo(String url, int side) async {
     if (!_isVideo(url)) return;
-
-    // 🚀 [사용자 제안 로직] 새로운 컨트롤러 생성 전에 기존 리소스 강제 정리 (모바일 브라우저 자원 확보)
-    try {
-      if (side == 1 && _controllerA != null) {
-        await _controllerA!.pause();
-        await _controllerA!.dispose();
-        _controllerA = null;
-        _isInitializedA = false;
-        print('DEBUG [VIDEO v2]: Side 1 기존 리소스 선제적 정리 완료');
-      } else if (side == 2 && _controllerB != null) {
-        await _controllerB!.pause();
-        await _controllerB!.dispose();
-        _controllerB = null;
-        _isInitializedB = false;
-        print('DEBUG [VIDEO v2]: Side 2 기존 리소스 선제적 정리 완료');
-      }
-    } catch (e) {
-      print('DEBUG [VIDEO v2]: 선제적 정리 중 에러 (무시) - $e');
-    }
-
     if (side == 1 && (_isInitializedA || _isInitializingA)) return;
     if (side == 2 && (_isInitializedB || _isInitializingB)) return;
 
@@ -173,18 +154,21 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       }
 
       await controller.initialize();
-      await controller.setLooping(false);
+      await controller.setLooping(false); // 🎬 루핑은 수동 리스너(_onVideoFinished)에서 관리 (A->B 전환 등 지능적 루프를 위해)
       await controller.setVolume(0); // 🔇 음소거 (소리는 업로드 시 이미 삭제됨)
       
       // 🎬 영상 끝 감지 리스너
-      controller.addListener(() {
+      void listener() {
         if (!mounted) return;
+        if (side == 1 && _controllerA != controller) return;
+        if (side == 2 && _controllerB != controller) return;
         final pos = controller.value.position;
         final dur = controller.value.duration;
         if (dur > Duration.zero && pos >= dur) {
           _onVideoFinished(side);
         }
-      });
+      }
+      controller.addListener(listener);
 
       if (!mounted || !_isVisible) {
         controller.dispose();
@@ -221,6 +205,10 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   // 🎬 영상 재생 완료 시 처리 (무한 루프 로직)
   void _onVideoFinished(int side) {
     if (!mounted) return;
+    if (side == 1 && _videoAFinished) return;
+    if (side == 2 && _videoBFinished) return;
+    if (side == 1) _videoAFinished = true;
+    if (side == 2) _videoBFinished = true;
     
     // 🎬 현재 어떤 사이드가 확장되어 있는지 체크
     double ratioA = (_widthA ?? (MediaQuery.of(context).size.width * 0.5)) / MediaQuery.of(context).size.width;
@@ -263,11 +251,13 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     if (side == 1 && _isInitializedA && _controllerA != null) {
       _controllerB?.pause(); // B는 보던 위치에서 일시정지
       // 🚀 보던 위치에서 Resume! (완전히 끝났을 때만 위에서 0초로 감)
+      _videoAFinished = false;
       _controllerA!.play();
       setState(() => _playingSide = 1);
     } else if (side == 2 && _isInitializedB && _controllerB != null) {
       _controllerA?.pause(); // A는 보던 위치에서 일시정지
       // 🚀 보던 위치에서 Resume!
+      _videoBFinished = false;
       _controllerB!.play();
       setState(() => _playingSide = 2);
     }
@@ -554,10 +544,15 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       
       // 🎬 실시간 영상 전환 체크 (55% 이상 열리면 즉시 재생)
       double ratioA = _widthA! / sw;
-      if (ratioA >= 0.55 && _playingSide != 1) {
-        _switchToSide(1);
-      } else if (ratioA <= 0.45 && _playingSide != 2) {
-        _switchToSide(2);
+      final now = DateTime.now();
+      if (_lastSwitchTime == null || now.difference(_lastSwitchTime!) > const Duration(milliseconds: 300)) {
+        if (ratioA >= 0.55 && _playingSide != 1) {
+          _lastSwitchTime = now;
+          _switchToSide(1);
+        } else if (ratioA <= 0.45 && _playingSide != 2) {
+          _lastSwitchTime = now;
+          _switchToSide(2);
+        }
       }
     });
   }
@@ -1670,8 +1665,10 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
               ? ValueListenableBuilder(
                   valueListenable: controller,
                   builder: (context, VideoPlayerValue value, child) {
-                    // 영상이 실제 재생되기 전까지는 썸네일 노출 (가장 단순한 스위칭)
-                    if (value.position <= Duration.zero || value.size.width <= 0) {
+                    // 🎬 웹 전용: 영상이 0.5초 이상 확실히 재생된 후에만 전환 (깜빡임 완벽 차단)
+                    final bool videoReady = value.position > const Duration(milliseconds: 500) && value.size.width > 0;
+
+                    if (!videoReady) {
                       return (thumbUrl != null && thumbUrl.isNotEmpty)
                           ? CachedNetworkImage(
                               imageUrl: thumbUrl.trim(),
