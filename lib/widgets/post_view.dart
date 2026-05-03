@@ -8,6 +8,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:visibility_detector/visibility_detector.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/post_data.dart';
 import '../models/comment_data.dart';
 import '../core/app_state.dart';
@@ -85,6 +86,9 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     }
   }
 
+  double _dragDistance = 0; // 📏 미세 드래그 방지용 변수 추가
+  Timer? _initTimer; // ⏱️ 영상 초기화 딜레이용 타이머
+  
   @override
   void initState() {
     super.initState();
@@ -252,6 +256,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   // 🎬 화면 진입 시 영상 시작
   void _onBecomeVisible() {
     _viewStartTime = DateTime.now(); // ⏱️ 화면에 보이기 시작한 시간 기록!
+    
     if (_isVideo(widget.post.imageA)) {
       _initVideo(widget.post.imageA, 1);
     }
@@ -516,7 +521,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
   bool get isExpired => _remainingSeconds <= 0 || widget.post.isExpired;
 
-  void _onHorizontalDragUpdate(DragUpdateDetails details, double sw) {
+  void _onPanUpdate(DragUpdateDetails details, double sw) {
     setState(() { 
       _isDragging = true; 
       _widthA = ((_widthA ?? (sw * 0.5)) + details.delta.dx).clamp(sw * 0.2, sw * 0.8); 
@@ -531,9 +536,12 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     });
   }
 
-  void _onHorizontalDragEnd(DragEndDetails details, double sw) {
+  void _onPanEnd(DragEndDetails details, double sw) {
+    if (!_isDragging) return; // 🚫 드래그가 실제로 일어나지 않았다면(단순 클릭) 무시!
+
     setState(() {
       _isDragging = false;
+      _dragDistance = 0; // 리셋
       double currentWidthA = _widthA ?? (sw * 0.5);
       
       if (currentWidthA > sw * 0.65) {
@@ -563,39 +571,35 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     });
   }
 
-  void _onHorizontalDragCancel(double sw) {
+  void _onPanCancel(double sw) {
+    if (!_isDragging) return; // 🚫 드래그 중이 아니었다면 무시
+
     setState(() {
       _isDragging = false;
+      _dragDistance = 0; // 리셋
       _widthA = sw * 0.5;
       _expandedSide = 0;
     });
   }
 
-  void _handleTap(TapUpDetails details, double sw) {
-    if (_isDragging) return;
+  void _handleTap(TapDownDetails details, double sw) {
+    _dragDistance = 0; // 클릭하는 순간 거리 리셋
     double tapX = details.localPosition.dx;
     double currentWidthA = _widthA ?? (sw * 0.5);
-    
-
 
     setState(() {
-      if (tapX < currentWidthA) {
-        // 왼쪽(A) 영역 클릭
-        if (_expandedSide == 1) { 
-          _expandedSide = 0; 
-          _widthA = sw * 0.5; 
-        } else { 
-          _expandedSide = 1; 
-          _widthA = sw * 0.8; // 🔙 0.85에서 0.8로 원복
-        }
+      if (_expandedSide != 0) {
+        // 🔙 이미 한쪽이 확장되어 있다면, 어디를 누르든 다시 중앙(50:50)으로 복귀!
+        _expandedSide = 0;
+        _widthA = sw * 0.5;
       } else {
-        // 오른쪽(B) 영역 클릭
-        if (_expandedSide == 2) { 
-          _expandedSide = 0; 
-          _widthA = sw * 0.5; 
-        } else { 
-          _expandedSide = 2; 
-          _widthA = sw * 0.2; // 🔙 0.15에서 0.2로 원복
+        // 🔍 중앙 상태일 때만 클릭한 쪽을 확장
+        if (tapX < currentWidthA) {
+          _expandedSide = 1;
+          _widthA = sw * 0.8;
+        } else {
+          _expandedSide = 2;
+          _widthA = sw * 0.2;
         }
       }
     });
@@ -670,10 +674,10 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
         // UI update for remaining time
 
         return GestureDetector(
-          onTapUp: (d) => _handleTap(d, sw),
-          onHorizontalDragUpdate: (d) => _onHorizontalDragUpdate(d, sw),
-          onHorizontalDragEnd: (d) => _onHorizontalDragEnd(d, sw),
-          onHorizontalDragCancel: () => _onHorizontalDragCancel(sw),
+          onTapDown: (d) => _handleTap(d, sw),
+          onPanUpdate: (d) => _onPanUpdate(d, sw),
+          onPanEnd: (d) => _onPanEnd(d, sw),
+          onPanCancel: () => _onPanCancel(sw),
           child: Stack(
             children: [
               Row(
@@ -979,7 +983,16 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         ),
                         const SizedBox(width: 20),
                         _statIcon(Icons.share, '', onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('공유 링크가 복사되었습니다!'), duration: Duration(seconds: 1)));
+                          final String shareUrl = 'https://pickget.net/?id=${widget.post.id}';
+                          
+                          // 🚀 통합 공유하기 (Native Share Sheet) 호출
+                          Share.share(
+                            '지금 PickGet에서 이 게시물을 확인해보세요!\n$shareUrl',
+                            subject: 'PickGet 게시물 공유',
+                          );
+
+                          // 클립보드 복사도 동시에 진행 (편의용)
+                          Clipboard.setData(ClipboardData(text: shareUrl));
                         }),
                       ],
                     ),
@@ -1623,17 +1636,44 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       final isPlaying = (_playingSide == side);
 
       Widget content;
+      // 🎬 초기화가 완료되었을 때의 처리
       if (!forceThumb && isInitialized && controller != null) {
-        // 🎬 초기화만 되었다면 재생 여부와 상관없이 영상 화면 유지 (일시정지 포함)
-        content = FittedBox(
-          fit: BoxFit.cover,
-          clipBehavior: Clip.hardEdge,
-          child: SizedBox(
-            width: controller.value.size.width,
-            height: controller.value.size.height,
-            child: VideoPlayer(controller),
-          ),
-        );
+        if (kIsWeb) {
+          // 🌐 [Web 전용] 흰색 번쩍임 방지를 위해 배경에 썸네일을 깔아줌
+          content = Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.black,
+              image: (thumbUrl != null && thumbUrl.isNotEmpty)
+                  ? DecorationImage(
+                      image: CachedNetworkImageProvider(thumbUrl.trim()),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: FittedBox(
+              fit: BoxFit.cover,
+              clipBehavior: Clip.hardEdge,
+              child: SizedBox(
+                width: controller.value.size.width,
+                height: controller.value.size.height,
+                child: VideoPlayer(controller),
+              ),
+            ),
+          );
+        } else {
+          // 📱 [App 전용] 사용자 요청대로 절대 건드리지 않는 순수 오리지널 구조 유지
+          content = FittedBox(
+            fit: BoxFit.cover,
+            clipBehavior: Clip.hardEdge,
+            child: SizedBox(
+              width: controller.value.size.width,
+              height: controller.value.size.height,
+              child: VideoPlayer(controller),
+            ),
+          );
+        }
       } else {
         if (thumbUrl != null && thumbUrl.isNotEmpty) {
           content = CachedNetworkImage(
