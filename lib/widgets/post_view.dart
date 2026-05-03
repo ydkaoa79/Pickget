@@ -123,6 +123,26 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   // 🎬 영상 초기화 (네트워크 URL 직접 사용, 6초 영상이라 빠름)
   Future<void> _initVideo(String url, int side) async {
     if (!_isVideo(url)) return;
+
+    // 🚀 [사용자 제안 로직] 새로운 컨트롤러 생성 전에 기존 리소스 강제 정리 (모바일 브라우저 자원 확보)
+    try {
+      if (side == 1 && _controllerA != null) {
+        await _controllerA!.pause();
+        await _controllerA!.dispose();
+        _controllerA = null;
+        _isInitializedA = false;
+        print('DEBUG [VIDEO v2]: Side 1 기존 리소스 선제적 정리 완료');
+      } else if (side == 2 && _controllerB != null) {
+        await _controllerB!.pause();
+        await _controllerB!.dispose();
+        _controllerB = null;
+        _isInitializedB = false;
+        print('DEBUG [VIDEO v2]: Side 2 기존 리소스 선제적 정리 완료');
+      }
+    } catch (e) {
+      print('DEBUG [VIDEO v2]: 선제적 정리 중 에러 (무시) - $e');
+    }
+
     if (side == 1 && (_isInitializedA || _isInitializingA)) return;
     if (side == 2 && (_isInitializedB || _isInitializingB)) return;
 
