@@ -7,6 +7,7 @@ import 'upload_screen.dart';
 import 'activity_analysis_screen.dart';
 import 'edit_profile_screen.dart';
 import 'channel_feed_screen.dart';
+import 'admin_screen.dart';
 import '../services/supabase_service.dart';
 
 class ChannelScreen extends StatefulWidget {
