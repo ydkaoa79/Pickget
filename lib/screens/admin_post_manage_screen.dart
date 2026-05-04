@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../core/app_state.dart';
-import 'channel_feed_screen.dart';
 
 class AdminPostManageScreen extends StatefulWidget {
   const AdminPostManageScreen({super.key});
@@ -11,12 +10,12 @@ class AdminPostManageScreen extends StatefulWidget {
 }
 
 class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
-  List<dynamic> posts = [];
+  List<dynamic> allFetchedPosts = []; // 전체 원본 데이터
+  List<dynamic> filteredPosts = []; // 필터/검색 적용 데이터
   bool _isLoading = true;
   int currentPage = 0;
-  int totalPostCount = 0;
   String searchQuery = '';
-  String sortBy = 'updated_at'; // created_at 대신 updated_at 사용
+  String sortBy = 'updated_at'; 
   bool isAscending = false;
   String statusFilter = 'all'; // 'all', 'active', 'expired'
   String _errorMessage = '';
@@ -42,73 +41,50 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
       _errorMessage = '';
     });
     try {
-      // 1. 전체 포스트 수 가져오기
-      var countQuery = SupabaseService.client.from('posts').select('id');
-      if (searchQuery.isNotEmpty) {
-        countQuery = countQuery.or('title.ilike.%$searchQuery%,uploader_id.ilike.%$searchQuery%');
-      }
-      if (statusFilter == 'active') {
-        countQuery = countQuery.eq('is_expired', false);
-      } else if (statusFilter == 'expired') {
-        countQuery = countQuery.eq('is_expired', true);
-      }
-      
-      final countRes = await countQuery;
-      totalPostCount = (countRes as List).length;
-
-      // 2. 실제 데이터 가져오기
+      // 1. 실제 데이터 가져오기 (is_expired 제외, tags/updated_at 포함)
       dynamic query = SupabaseService.client
           .from('posts')
-          .select('id, title, uploader_id, vote_count_a, vote_count_b, is_expired, updated_at'); // updated_at 사용
+          .select('id, title, uploader_id, vote_count_a, vote_count_b, updated_at, tags'); 
 
-      if (searchQuery.isNotEmpty) {
-        query = query.or('title.ilike.%$searchQuery%,uploader_id.ilike.%$searchQuery%');
-      }
-
-      if (statusFilter == 'active') {
-        query = query.eq('is_expired', false);
-      } else if (statusFilter == 'expired') {
-        query = query.eq('is_expired', true);
-      }
-
-      // 정렬 적용
       if (sortBy == 'updated_at') {
         query = query.order('updated_at', ascending: isAscending);
       }
 
       final List<dynamic> fetchedData = await query;
 
-      // 3. 데이터 가공
-      List<dynamic> enrichedPosts = fetchedData.map((p) {
+      // 2. 📊 데이터 가공 (앱 내에서 만료 여부 계산)
+      allFetchedPosts = fetchedData.map((p) {
         int a = _parseCount(p['vote_count_a']);
         int b = _parseCount(p['vote_count_b']);
+        
+        // 유효기간 계산 로직
+        final tags = (p['tags'] as List?)?.map((e) => e.toString()).toList() ?? [];
+        final updatedAt = p['updated_at'] != null ? DateTime.parse(p['updated_at']) : DateTime.now();
+        int? durationMins;
+        for (var tag in tags) {
+          if (tag.startsWith('duration:')) {
+            durationMins = int.tryParse(tag.split(':')[1]);
+          }
+        }
+        
+        bool isExpired = false;
+        if (durationMins != null) {
+          if (DateTime.now().isAfter(updatedAt.add(Duration(minutes: durationMins)))) {
+            isExpired = true;
+          }
+        }
+
         return {
           ...p,
           'total_votes': a + b,
           'v_a': a,
           'v_b': b,
+          'is_expired_calc': isExpired,
         };
       }).toList();
 
-      if (sortBy == 'total_votes') {
-        enrichedPosts.sort((a, b) {
-          int valA = a['total_votes'];
-          int valB = b['total_votes'];
-          return isAscending ? valA.compareTo(valB) : valB.compareTo(valA);
-        });
-      }
+      _applyFilters();
 
-      // 4. 페이지네이션
-      final from = currentPage * pageSize;
-      final to = (from + pageSize < enrichedPosts.length) ? from + pageSize : enrichedPosts.length;
-      final pagedPosts = (enrichedPosts.length > from) ? enrichedPosts.sublist(from, to) : [];
-
-      if (mounted) {
-        setState(() {
-          posts = pagedPosts;
-          _isLoading = false;
-        });
-      }
     } catch (e) {
       debugPrint('Post manage fetch error: $e');
       if (mounted) {
@@ -117,6 +93,42 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  void _applyFilters() {
+    List<dynamic> results = List.from(allFetchedPosts);
+
+    // 1. 검색어 필터
+    if (searchQuery.isNotEmpty) {
+      results = results.where((p) {
+        final title = (p['title'] ?? '').toString().toLowerCase();
+        final uploader = (p['uploader_id'] ?? '').toString().toLowerCase();
+        return title.contains(searchQuery.toLowerCase()) || uploader.contains(searchQuery.toLowerCase());
+      }).toList();
+    }
+
+    // 2. 상태 필터
+    if (statusFilter == 'active') {
+      results = results.where((p) => p['is_expired_calc'] == false).toList();
+    } else if (statusFilter == 'expired') {
+      results = results.where((p) => p['is_expired_calc'] == true).toList();
+    }
+
+    // 3. 정렬 (투표순 등 클라이언트 정렬)
+    if (sortBy == 'total_votes') {
+      results.sort((a, b) {
+        int valA = a['total_votes'];
+        int valB = b['total_votes'];
+        return isAscending ? valA.compareTo(valB) : valB.compareTo(valA);
+      });
+    }
+
+    if (mounted) {
+      setState(() {
+        filteredPosts = results;
+        _isLoading = false;
+      });
     }
   }
 
@@ -132,8 +144,13 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
 
   @override
   Widget build(BuildContext context) {
-    int totalPages = (totalPostCount / pageSize).ceil();
+    int totalCount = filteredPosts.length;
+    int totalPages = (totalCount / pageSize).ceil();
     if (totalPages == 0) totalPages = 1;
+
+    final from = currentPage * pageSize;
+    final to = (from + pageSize < totalCount) ? from + pageSize : totalCount;
+    final pagedItems = (totalCount > from) ? filteredPosts.sublist(from, to) : [];
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -157,11 +174,11 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
                 ? const Center(child: CircularProgressIndicator(color: Colors.cyanAccent))
                 : _errorMessage.isNotEmpty
                   ? Center(child: Text('에러: $_errorMessage', style: const TextStyle(color: Colors.redAccent, fontSize: 12)))
-                  : posts.isEmpty
+                  : filteredPosts.isEmpty
                     ? const Center(child: Text('포스트가 없습니다.', style: TextStyle(color: Colors.white38)))
                     : ListView.builder(
-                        itemCount: posts.length,
-                        itemBuilder: (context, index) => _buildPostRow(posts[index]),
+                        itemCount: pagedItems.length,
+                        itemBuilder: (context, index) => _buildPostRow(pagedItems[index]),
                       ),
             ),
             _buildPagination(totalPages),
@@ -182,10 +199,10 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
             child: TextField(
               controller: _searchController,
               style: const TextStyle(color: Colors.white, fontSize: 14),
-              onSubmitted: (val) {
+              onChanged: (val) {
                 searchQuery = val.trim();
                 currentPage = 0;
-                _fetchPosts();
+                _applyFilters();
               },
               decoration: InputDecoration(
                 hintText: '제목 또는 작성자 검색',
@@ -195,7 +212,7 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
                   ? IconButton(icon: const Icon(Icons.cancel, color: Colors.white38, size: 18), onPressed: () {
                       _searchController.clear();
                       searchQuery = '';
-                      _fetchPosts();
+                      _applyFilters();
                     }) : null,
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -210,7 +227,7 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
                 _filterChip('전체', 'all', isStatus: true),
                 _filterChip('투표중', 'active', isStatus: true),
                 _filterChip('종료됨', 'expired', isStatus: true),
-                const SizedBox(width: 10, child: VerticalDivider(color: Colors.white12)),
+                const SizedBox(width: 10, child: VerticalDivider(color: Colors.white12, thickness: 1)),
                 _filterChip('최신순', 'updated_at', isSort: true, defaultAsc: false),
                 _filterChip('투표순', 'total_votes', isSort: true, defaultAsc: false),
               ],
@@ -237,7 +254,11 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
           }
           currentPage = 0;
         });
-        _fetchPosts();
+        if (isSort && value == 'updated_at') {
+          _fetchPosts(); // DB 정렬 다시 부름
+        } else {
+          _applyFilters(); // 앱 내 필터/정렬 적용
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(right: 8),
@@ -281,12 +302,12 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
     final int total = post['total_votes'] ?? 0;
     final int a = post['v_a'] ?? 0;
     final int b = post['v_b'] ?? 0;
-    final bool expired = post['is_expired'] ?? false;
+    final bool isExpired = post['is_expired_calc'] ?? false;
     
     String status = '투표중';
     Color statusColor = Colors.orangeAccent;
     
-    if (expired) {
+    if (isExpired) {
       if (a > b) {
         status = 'A 승';
         statusColor = Colors.cyanAccent;
@@ -299,38 +320,33 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
       }
     }
 
-    return InkWell(
-      onTap: () {
-        // 상세 확인 가능하게 처리 가능
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white10, width: 0.5))),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 4,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  Text('@${post['uploader_id']}', style: const TextStyle(color: Colors.white24, fontSize: 10)),
-                ],
-              ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white10, width: 0.5))),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text('@${post['uploader_id']}', style: const TextStyle(color: Colors.white24, fontSize: 10)),
+              ],
             ),
-            Expanded(flex: 2, child: Text(formatCount(total), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-            Expanded(flex: 1, child: Text(formatCount(a), style: const TextStyle(color: Colors.cyanAccent, fontSize: 11), textAlign: TextAlign.center)),
-            Expanded(flex: 1, child: Text(formatCount(b), style: const TextStyle(color: Colors.pinkAccent, fontSize: 11), textAlign: TextAlign.center)),
-            Expanded(
-              flex: 2,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                child: Text(status, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-              ),
+          ),
+          Expanded(flex: 2, child: Text(formatCount(total), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+          Expanded(flex: 1, child: Text(formatCount(a), style: const TextStyle(color: Colors.cyanAccent, fontSize: 11), textAlign: TextAlign.center)),
+          Expanded(flex: 1, child: Text(formatCount(b), style: const TextStyle(color: Colors.pinkAccent, fontSize: 11), textAlign: TextAlign.center)),
+          Expanded(
+            flex: 2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+              child: Text(status, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -348,7 +364,6 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
             return GestureDetector(
               onTap: () {
                 setState(() => currentPage = index);
-                _fetchPosts();
               },
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 5),
