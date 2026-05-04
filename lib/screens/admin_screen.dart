@@ -13,6 +13,7 @@ class _AdminScreenState extends State<AdminScreen> {
   int totalUsers = 0;
   int totalPosts = 0;
   int totalVotes = 0;
+  int totalPoints = 0;
   bool _isLoading = true;
 
   @override
@@ -23,16 +24,22 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Future<void> _fetchStats() async {
     try {
-      // 📊 전체 데이터 카운트 조회 (컴파일 에러 해결 버전)
-      final usersData = await SupabaseService.client.from('user_profiles').select('id');
+      // 📊 전체 데이터 카운트 조회
+      final usersData = await SupabaseService.client.from('user_profiles').select('id, points');
       final postsData = await SupabaseService.client.from('posts').select('id');
       final votesData = await SupabaseService.client.from('votes').select('id');
+
+      int sumPoints = 0;
+      for (var user in usersData) {
+        sumPoints += (user['points'] as int? ?? 0);
+      }
 
       if (mounted) {
         setState(() {
           totalUsers = usersData.length;
           totalPosts = postsData.length;
           totalVotes = votesData.length;
+          totalPoints = sumPoints;
           _isLoading = false;
         });
       }
@@ -87,7 +94,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       _statCard('전체 유저', totalUsers.toString(), Icons.people_outline),
                       _statCard('전체 포스트', totalPosts.toString(), Icons.article_outlined),
                       _statCard('전체 투표', totalVotes.toString(), Icons.how_to_vote_outlined),
-                      _statCard('매칭 성공', 'TBD', Icons.star_outline),
+                      _statCard('전체 포인트', totalPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"), Icons.stars_outlined),
                     ],
                   ),
                   const SizedBox(height: 40),
