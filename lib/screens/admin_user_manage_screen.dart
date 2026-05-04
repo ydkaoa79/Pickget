@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
+import '../models/post_data.dart';
+import 'channel_screen.dart';
+import '../main.dart'; // To access global state if needed
 
 class AdminUserManageScreen extends StatefulWidget {
   const AdminUserManageScreen({super.key});
@@ -14,11 +17,10 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
   int currentPage = 0;
   int totalUserCount = 0;
   String searchQuery = '';
-  String sortBy = 'updated_at'; // 'updated_at', 'points'
+  String sortBy = 'updated_at'; // 'updated_at', 'points', 'votes', 'posts'
+  String _errorMessage = '';
   
   final int pageSize = 10;
-
-  String _errorMessage = '';
 
   @override
   void initState() {
@@ -26,39 +28,77 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
     _fetchUsers();
   }
 
+  // 🏛️ [핵심] 유저의 포스트 수와 받은 투표 수를 실시간으로 계산해서 병합하는 함수
   Future<void> _fetchUsers() async {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
     try {
-      // 1. 전체 유저 수 가져오기 (가장 단순한 쿼리)
+      // 1. 전체 유저 수 가져오기
       final allRes = await SupabaseService.client.from('user_profiles').select('id');
-      final allList = allRes as List;
-      totalUserCount = allList.length;
+      totalUserCount = (allRes as List).length;
 
-      // 2. 검색 필터 적용
-      List<dynamic> filteredList = allList;
+      // 2. 기본 유저 정보 가져오기
+      dynamic query = SupabaseService.client
+          .from('user_profiles')
+          .select('id, user_id, nickname, profile_image, points, updated_at');
+
       if (searchQuery.isNotEmpty) {
-        // 클라이언트 사이드 필터링으로 일단 시도 (보안 정책 회피용)
-        final searchRes = await SupabaseService.client
-            .from('user_profiles')
-            .select('id, user_id, nickname, profile_image, points, created_at')
-            .or('nickname.ilike.%$searchQuery%,user_id.ilike.%$searchQuery%');
-        filteredList = searchRes as List;
-      } else {
-        // 전체 목록 (페이지네이션 적용)
-        final queryRes = await SupabaseService.client
-            .from('user_profiles')
-            .select('id, user_id, nickname, profile_image, points, updated_at')
-            .order(sortBy == 'points' ? 'points' : 'updated_at', ascending: false)
-            .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1);
-        filteredList = queryRes as List;
+        query = query.or('nickname.ilike.%$searchQuery%,user_id.ilike.%$searchQuery%');
       }
+
+      // 포인트순 정렬은 DB에서 직접 가능
+      if (sortBy == 'points') {
+        query = query.order('points', ascending: false);
+      } else if (sortBy == 'updated_at') {
+        query = query.order('updated_at', ascending: false);
+      }
+
+      final List<dynamic> baseUsers = await query;
+
+      // 3. 🚀 [데이터 보강] 각 유저별 게시글 수 및 투표 수 계산
+      List<Map<String, dynamic>> enrichedUsers = [];
+      
+      for (var user in baseUsers) {
+        final String internalId = user['id'];
+        
+        // 해당 유저의 모든 게시물 가져오기
+        final postsRes = await SupabaseService.client
+            .from('posts')
+            .select('vote_count_a, vote_count_b')
+            .eq('uploader_internal_id', internalId);
+        
+        final List<dynamic> posts = postsRes as List;
+        int postCount = posts.length;
+        int totalVotes = 0;
+        
+        for (var p in posts) {
+          totalVotes += _parseCount(p['vote_count_a']) + _parseCount(p['vote_count_b']);
+        }
+        
+        enrichedUsers.add({
+          ...user,
+          'post_count': postCount,
+          'total_votes': totalVotes,
+        });
+      }
+
+      // 4. 📊 [클라이언트 정렬] 받은 투표순 / 게시글순 정렬 처리
+      if (sortBy == 'votes') {
+        enrichedUsers.sort((a, b) => b['total_votes'].compareTo(a['total_votes']));
+      } else if (sortBy == 'posts') {
+        enrichedUsers.sort((a, b) => b['post_count'].compareTo(a['post_count']));
+      }
+
+      // 5. 페이지네이션 적용 (데이터가 보강된 후 자름)
+      final from = currentPage * pageSize;
+      final to = (from + pageSize < enrichedUsers.length) ? from + pageSize : enrichedUsers.length;
+      final pagedUsers = enrichedUsers.sublist(from, to);
 
       if (mounted) {
         setState(() {
-          users = filteredList;
+          users = pagedUsers;
           _isLoading = false;
         });
       }
@@ -71,6 +111,16 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
         });
       }
     }
+  }
+
+  int _parseCount(dynamic val) {
+    if (val == null) return 0;
+    if (val is int) return val;
+    String s = val.toString().toLowerCase().replaceAll(',', '').trim();
+    if (s.endsWith('k')) {
+      return ((double.tryParse(s.substring(0, s.length - 1)) ?? 0) * 1000).toInt();
+    }
+    return int.tryParse(s) ?? 0;
   }
 
   @override
@@ -124,7 +174,7 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
         children: [
           _summaryItem('전체 유저', '$totalUserCount명'),
           const SizedBox(width: 20),
-          _summaryItem('현재 접속', '${(totalUserCount * 0.05).toInt()}명'), // 가상의 접속자 수
+          _summaryItem('현재 접속', '${(totalUserCount * 0.05).toInt()}명'),
         ],
       ),
     );
@@ -175,8 +225,8 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
               children: [
                 _sortChip('가입순', 'updated_at'),
                 _sortChip('포인트순', 'points'),
-                _sortChip('투표순(TBD)', 'received_votes'),
-                _sortChip('게시글순(TBD)', 'post_count'),
+                _sortChip('투표순', 'votes'),
+                _sortChip('게시글순', 'posts'),
               ],
             ),
           ),
@@ -219,46 +269,98 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
     final String userId = user['user_id'] ?? '-';
     final int points = user['points'] ?? 0;
     final String profileImg = user['profile_image'] ?? '';
+    final int posts = user['post_count'] ?? 0;
+    final int votes = user['total_votes'] ?? 0;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.white10, width: 0.5)),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: Colors.white12,
-            backgroundImage: (profileImg.isNotEmpty && profileImg.startsWith('http'))
-              ? NetworkImage(profileImg)
-              : null,
-            child: (profileImg.isEmpty || !profileImg.startsWith('http')) 
-              ? const Icon(Icons.person, color: Colors.white24, size: 20) 
-              : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(nickname, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                Text('@$userId', style: const TextStyle(color: Colors.white38, fontSize: 11)),
-              ],
+    return GestureDetector(
+      onTap: () {
+        // 🏛️ [순간이동] 해당 유저의 채널 페이지로 이동!
+        // 최소한의 PostData 객체를 생성하여 전달합니다.
+        final mockPost = PostData(
+          id: 'temp',
+          uploaderId: userId,
+          uploaderName: nickname,
+          uploaderImage: profileImg,
+          uploaderInternalId: user['id'], // 🆔 주민번호 필수!
+          title: '',
+          description: '',
+          mediaUrl: '',
+          isImage: true,
+          voteTitleA: '',
+          voteTitleB: '',
+          tags: [],
+        );
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChannelScreen(
+              uploaderId: userId,
+              allPosts: gAllPosts, // 전역 포스트 리스트 전달
+              initialPost: mockPost,
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text('${points.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},")}P', 
-                style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.w900, fontSize: 14)),
-              const Text('포인트', style: TextStyle(color: Colors.white24, fontSize: 10)),
-            ],
-          ),
-          const SizedBox(width: 10),
-          const Icon(Icons.arrow_forward_ios, color: Colors.white12, size: 14),
-        ],
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Colors.white10, width: 0.5)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.white12,
+              backgroundImage: (profileImg.isNotEmpty && profileImg.startsWith('http'))
+                ? NetworkImage(profileImg)
+                : null,
+              child: (profileImg.isEmpty || !profileImg.startsWith('http')) 
+                ? const Icon(Icons.person, color: Colors.white24, size: 20) 
+                : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(nickname, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text('@$userId', style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      _miniStat('게시글 $posts'),
+                      const SizedBox(width: 8),
+                      _miniStat('투표 $votes'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('${points.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},")}P', 
+                  style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.w900, fontSize: 14)),
+                const Text('포인트', style: TextStyle(color: Colors.white24, fontSize: 10)),
+              ],
+            ),
+            const SizedBox(width: 10),
+            const Icon(Icons.arrow_forward_ios, color: Colors.white12, size: 14),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _miniStat(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(text, style: const TextStyle(color: Colors.white38, fontSize: 10)),
     );
   }
 
