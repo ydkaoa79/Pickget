@@ -3,6 +3,7 @@ import '../services/supabase_service.dart';
 import '../models/post_data.dart';
 import 'channel_screen.dart';
 import '../main.dart'; // To access global state if needed
+import '../core/app_state.dart'; 
 
 class AdminUserManageScreen extends StatefulWidget {
   const AdminUserManageScreen({super.key});
@@ -278,16 +279,22 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
         // 최소한의 PostData 객체를 생성하여 전달합니다.
         final mockPost = PostData(
           id: 'temp',
+          title: '',
           uploaderId: userId,
+          uploaderInternalId: user['id'],
           uploaderName: nickname,
           uploaderImage: profileImg,
-          uploaderInternalId: user['id'], // 🆔 주민번호 필수!
-          title: '',
-          description: '',
-          mediaUrl: '',
-          isImage: true,
-          voteTitleA: '',
-          voteTitleB: '',
+          timeLocation: '',
+          imageA: '',
+          imageB: '',
+          descriptionA: '',
+          descriptionB: '',
+          likesCount: 0,
+          commentsCount: 0,
+          voteCountA: '0',
+          voteCountB: '0',
+          percentA: '50%',
+          percentB: '50%',
           tags: [],
         );
 

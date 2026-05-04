@@ -20,6 +20,7 @@ Set<String> gLikedPostIds = {};
 Set<String> gBookmarkedPostIds = {};
 Set<String> gFollowedUserIds = {};
 bool gHasNewNotifs = false;
+List<PostData> gAllPosts = [];
 
 bool canViewPostDiscussionResults(PostData post) {
   final bool isOwnPost = post.uploaderInternalId != null &&
