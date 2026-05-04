@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../core/app_state.dart';
 import 'admin_user_manage_screen.dart';
+import 'admin_post_manage_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -100,7 +101,13 @@ class _AdminScreenState extends State<AdminScreen> {
                           ),
                           child: _statCard('전체 유저', totalUsers.toString(), Icons.people_outline),
                         ),
-                        _statCard('전체 포스트', totalPosts.toString(), Icons.article_outlined),
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const AdminPostManageScreen()),
+                          ),
+                          child: _statCard('전체 포스트', totalPosts.toString(), Icons.article_outlined),
+                        ),
                         _statCard('전체 투표', totalVotes.toString(), Icons.how_to_vote_outlined),
                         _statCard('전체 포인트', totalPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"), Icons.stars_outlined),
                       ],

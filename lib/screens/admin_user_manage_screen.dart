@@ -22,11 +22,18 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
   String _errorMessage = '';
   
   final int pageSize = 10;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _fetchUsers();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   // 🏛️ [핵심] 유저의 포스트 수와 받은 투표 수를 실시간으로 계산해서 병합하는 함수
@@ -204,19 +211,45 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: TextField(
+              controller: _searchController,
               style: const TextStyle(color: Colors.white, fontSize: 14),
               onSubmitted: (val) {
                 searchQuery = val.trim();
                 currentPage = 0;
                 _fetchUsers();
               },
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: '이름 또는 아이디 검색',
-                hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
-                prefixIcon: Icon(Icons.search, color: Colors.white24, size: 20),
+                hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
+                prefixIcon: const Icon(Icons.search, color: Colors.white24, size: 20),
+                suffixIcon: _searchController.text.isNotEmpty 
+                  ? IconButton(
+                      icon: const Icon(Icons.cancel, color: Colors.white38, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          searchQuery = '';
+                          currentPage = 0;
+                        });
+                        _fetchUsers();
+                      },
+                    )
+                  : null,
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
               ),
+              onChanged: (val) {
+                // 글자를 지우는 중이라면 X 버튼 상태를 위해 setState 호출
+                if (val.isEmpty && searchQuery.isNotEmpty) {
+                  setState(() {
+                    searchQuery = '';
+                    currentPage = 0;
+                  });
+                  _fetchUsers();
+                } else {
+                  setState(() {}); // X 버튼 보이기/숨기기용
+                }
+              },
             ),
           ),
           const SizedBox(height: 12),
