@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -23,16 +23,16 @@ import 'services/post_service.dart';
 import 'core/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// ?? CDN 二쇱냼 蹂???좏떥由ы떚
+// 🚀 CDN 주소 변환 유틸리티
 String toCdnUrl(String url) {
   if (url.isEmpty) return url;
   if (url.startsWith('http')) {
-    // ?대? http濡??쒖옉?섎㈃ 洹몃?濡?諛섑솚?섎릺, ?뱀젙 ?꾨찓??蹂?섏씠 ?꾩슂?섎㈃ ?ш린??泥섎━ 媛??
+    // 이미 http로 시작하면 그대로 반환하되, 특정 도메인 변환이 필요하면 여기서 처리 가능
     return url;
   }
   if (url.startsWith('assets/')) return url;
   
-  // Supabase Storage 二쇱냼瑜?CDN 二쇱냼濡?蹂??(?덉떆)
+  // Supabase Storage 주소를 CDN 주소로 변환 (예시)
   if (url.contains('supabase.co/storage/v1/object/public/')) {
     return url.replaceFirst(
       RegExp(r'https://.*\.supabase\.co/storage/v1/object/public/'),
@@ -45,12 +45,12 @@ String toCdnUrl(String url) {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ??移댁뭅??SDK 珥덇린??(?ㅼ씠?곕툕 ?????곸슜)
+  // ✅ 카카오 SDK 초기화 (네이티브 앱 키 적용)
   KakaoSdk.init(nativeAppKey: 'c4f30c6f5fd4c09548c843ebe0e10074');
 
   print('DEBUG: App starting with latest comment system code! (Ver. 2.3)');
 
-  // ?몃줈紐⑤뱶 怨좎젙
+  // 세로모드 고정
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -99,12 +99,12 @@ class PickGetApp extends StatelessWidget {
         
         return LayoutBuilder(
           builder: (context, constraints) {
-            // ?붾㈃ ?볦씠媛 600px ?댄븯(紐⑤컮???쒕툝由??몃줈)?쇰㈃ ?꾩껜 ?붾㈃ ?ъ슜
+            // 화면 넓이가 600px 이하(모바일/태블릿 세로)라면 전체 화면 사용
             if (constraints.maxWidth <= 600) return child!;
             
-            // 洹몃낫???볦? ?섍꼍(PC/?쒕툝由?媛濡??먯꽌留??볦씠 怨좎젙 諛?以묒븰 ?뺣젹
+            // 그보다 넓은 환경(PC/태블릿 가로)에서만 넓이 고정 및 중앙 정렬
             return Container(
-              color: const Color(0xFF0A0A0A), // PC 諛곌꼍??
+              color: const Color(0xFF0A0A0A), // PC 배경색
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 500),
@@ -132,43 +132,43 @@ class _MainScreenState extends State<MainScreen> {
   List<PostData> _recommendedPosts = [];
   final Set<String> _forcedVisibleIds =
       {}; // To show expired posts clicked from ranking
-  bool _isLoadingMore = false; // ?봽 異붽? 濡쒕뵫 ?곹깭
-  bool _hasMore = true; // ?봽 ??媛?몄삱 ?곗씠?곌? ?덈뒗吏 ?щ?
+  bool _isLoadingMore = false; // 🔄 추가 로딩 상태
+  bool _hasMore = true; // 🔄 더 가져올 데이터가 있는지 여부
   late PageController _pageController;
   int _userPoints = 0;
   int _selectedTopTabIndex = 0;
   bool _hasNewNotifications = false;
   List<Map<String, dynamic>> _notifications = [];
   
-  // ?? [Web ?꾩슜] ???ㅼ튂 ?좊룄 ?앹뾽 愿???곹깭
+  // 🚀 [Web 전용] 앱 설치 유도 팝업 관련 상태
   bool _showAppDownloadBanner = false;
   Timer? _appDownloadTimer;
 
   StreamSubscription<AuthState>? _authSubscription;
   bool _isLoginPopupOpen = false;
-  bool _isProfileSetupOpen = false; // ??異붽? ?뺣낫 ?낅젰 ?앹뾽 以묐났 諛⑹???
-  BuildContext? _loginDialogContext; // 異붽?
-  bool _isInitialLoading = false; // ?썳截?以묐났 濡쒕뵫 諛⑹뼱留?異붽?!
-  bool _isDataLoading = true; // ?봽 ?곗씠??濡쒕뵫 以묒씤吏 (濡쒕뵫 ?붾㈃ ?쒖떆??
+  bool _isProfileSetupOpen = false; // ✅ 추가 정보 입력 팝업 중복 방지용
+  BuildContext? _loginDialogContext; // 추가
+  bool _isInitialLoading = false; // 🛡️ 중복 로딩 방어막 추가!
+  bool _isDataLoading = true; // 🔄 데이터 로딩 중인지 (로딩 화면 표시용)
 
   @override
   void initState() {
     super.initState();
     _posts = [];
-    // fetchPosts(); // ?? [理쒖쟻?? ?ш린??遺瑜댁? ?딄퀬 ?꾨옒 由ъ뒪??肄쒕갚?먯꽌 ??踰덈쭔 遺由낅땲??
+    // fetchPosts(); // 🚀 [최적화] 여기서 부르지 않고 아래 리스너/콜백에서 한 번만 부릅니다!
 
     gShowLoginPopup = _showLoginPopup;
     gOnLogout = () async {
       print('DEBUG [LOGOUT]: Logout triggered, clearing points and notifications...');
 
       try {
-        // ?? [?듭떖] ?섑뙆踰좎씠???몄뀡 濡쒓렇?꾩썐 (湲곌린 ??μ냼 鍮꾩슦湲?
+        // 🚀 [핵심] 수파베이스 세션 로그아웃 (기기 저장소 비우기)
         await Supabase.instance.client.auth.signOut(); 
         
-        // ?? 移댁뭅??SDK 濡쒓렇?꾩썐 (?대? ?섏뼱?덈떎硫??섏뼱媛?꾨줉 try-catch)
+        // 🚀 카카오 SDK 로그아웃 (이미 되어있다면 넘어가도록 try-catch)
         await UserApi.instance.logout();
       } catch (e) {
-        print('濡쒓렇?꾩썐 怨쇱젙 以??뚮┝: $e');
+        print('로그아웃 과정 중 알림: $e');
       }
 
       if (mounted) {
@@ -176,16 +176,16 @@ class _MainScreenState extends State<MainScreen> {
           gUserPoints = 0;
           gIsLoggedIn = false;
           gUserInternalId = null; 
-          gIdText = '?뚯뒪?몄슜';
-          gNameText = '?뚯뒪?몄슜';
+          gIdText = '테스트용';
+          gNameText = '테스트용';
           gProfileImage = '';
 
-          gUserVotes.clear(); // ?뿳截??ы몴 ?댁뿭 珥덇린??(濡쒓렇?꾩썐 ??VS 留덊겕 蹂듦뎄??)
-          gLikedPostIds.clear(); // ?ㅿ툘 醫뗭븘???댁뿭 珥덇린??
-          gBookmarkedPostIds.clear(); // ?뵔 利먭꺼李얘린 ?댁뿭 珥덇린??
-          gFollowedUserIds.clear(); // ?뫀 ?붾줈???댁뿭 珥덇린??
+          gUserVotes.clear(); // 🗳️ 투표 내역 초기화 (로그아웃 시 VS 마크 복구용!)
+          gLikedPostIds.clear(); // ❤️ 좋아요 내역 초기화
+          gBookmarkedPostIds.clear(); // 🔖 즐겨찾기 내역 초기화
+          gFollowedUserIds.clear(); // 👤 팔로우 내역 초기화
           gHasNewNotifs = false;
-          gBioText = '?덈뀞?섏꽭?? ???PickGet ?좎??낅땲??';
+          gBioText = '안녕하세요! 저는 PickGet 유저입니다.';
           
           _hasNewNotifications = false;
           _notifications = [];
@@ -199,18 +199,18 @@ class _MainScreenState extends State<MainScreen> {
     _pageController = PageController();
     _pageController.addListener(_onScroll);
 
-    // [蹂닿컯] ?쒖뒪???덈꺼 ?λ쭅???먯?湲?(?뱀뿉?쒕뒗 釉뚮씪?곗?媛 吏곸젒 泥섎━?섎?濡??쒖쇅)
+    // [보강] 시스템 레벨 딥링크 탐지기 (웹에서는 브라우저가 직접 처리하므로 제외)
     if (!kIsWeb) {
       final appLinks = AppLinks();
       appLinks.uriLinkStream.listen((uri) {
         print('DEBUG [SYSTEM_LINK]: Received link: $uri');
         
-        // 留뚯빟 ?뱀젙 ?ъ뒪??ID媛 ?ы븿?섏뼱 ?덈떎硫?泥섎━ (紐⑤컮???λ쭅?ъ슜)
+        // 만약 특정 포스트 ID가 포함되어 있다면 처리 (모바일 딥링크용)
         if (uri.queryParameters.containsKey('id')) {
           _handleSharedPost(uri.queryParameters['id']!);
         }
 
-        // ?λ쭅?ш? ?ㅼ뼱?ㅻ㈃ ?섑뙆踰좎씠?ㅺ? ?몄뀡???뚯떛???쒓컙??二쇨퀬 泥댄겕
+        // 딥링크가 들어오면 수파베이스가 세션을 파싱할 시간을 주고 체크
         Future.delayed(const Duration(seconds: 1), () async {
           final session = SupabaseService.client.auth.currentSession;
           if (session != null) {
@@ -220,7 +220,7 @@ class _MainScreenState extends State<MainScreen> {
         });
       });
     } else {
-      // ?? [???꾩슜] ?묒냽 二쇱냼???ъ뒪??ID媛 ?ы븿?섏뼱 ?덈뒗吏 ?뺤씤 (怨듭쑀?섍린 ???
+      // 🚀 [웹 전용] 접속 주소에 포스트 ID가 포함되어 있는지 확인 (공유하기 대응)
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final uri = Uri.base;
         if (uri.queryParameters.containsKey('id')) {
@@ -231,7 +231,7 @@ class _MainScreenState extends State<MainScreen> {
           }
         }
 
-        // ?? [Web ?꾩슜] 30珥덈쭏?????ㅼ튂 ?좊룄 ?앹뾽 ??대㉧ (二쇨린??
+        // 🚀 [Web 전용] 30초마다 앱 설치 유도 팝업 타이머 (주기적)
         _appDownloadTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
           if (mounted) {
             setState(() => _showAppDownloadBanner = true);
@@ -240,7 +240,7 @@ class _MainScreenState extends State<MainScreen> {
       });
     }
 
-    // ?깆씠 耳쒖졇 ?덉쓣 ??resume ?곹깭?먯꽌??泥댄겕?섎룄濡?異붽?
+    // 앱이 켜져 있을 때 resume 상태에서도 체크하도록 추가
     SystemChannels.lifecycle.setMessageHandler((msg) async {
       if (msg == AppLifecycleState.resumed.toString()) {
         print('DEBUG [LIFECYCLE]: App resumed, checking session...');
@@ -252,27 +252,27 @@ class _MainScreenState extends State<MainScreen> {
       return null;
     });
 
-    // ?몄쬆 ?곹깭 媛먯떆???ㅼ튂
+    // 인증 상태 감시자 설치
     print('DEBUG [INIT]: Setting up AuthStateChange listener...');
     _authSubscription = SupabaseService.client.auth.onAuthStateChange.listen((data) {
       final AuthChangeEvent event = data.event;
       final Session? session = data.session;
 
-      // 1. 濡쒓렇瑜?李띿뼱??吏湲?臾댁뒯 ?쇱씠 ?쇱뼱?섎뒗吏 ?뺤씤 (?붾쾭源낆슜)
-      print('DEBUG [AUTH]: ?대깽??諛쒖깮 -> $event, ?몄뀡 議댁옱?щ? -> ${session != null}');
+      // 1. 로그를 찍어서 지금 무슨 일이 일어나는지 확인 (디버깅용)
+      print('DEBUG [AUTH]: 이벤트 발생 -> $event, 세션 존재여부 -> ${session != null}');
 
-      // 2. ?듭떖 濡쒖쭅: 吏꾩쭨濡?'?몄뀡'???ㅼ뼱?붿쓣 ?뚮쭔 ?깃났 泥섎━瑜??댁빞 ?⑸땲??
+      // 2. 핵심 로직: 진짜로 '세션'이 들어왔을 때만 성공 처리를 해야 합니다.
       if ((event == AuthChangeEvent.signedIn || event == AuthChangeEvent.initialSession) && session != null) {
-        // 留뚯빟 ?대? 濡쒓렇??泥섎━(gIsLoggedIn)媛 ?앸궗?ㅻ㈃ ???ㅽ뻾?섏? ?딄쾶 留됱븘????
+        // 만약 이미 로그인 처리(gIsLoggedIn)가 끝났다면 또 실행하지 않게 막아야 함
         if (!gIsLoggedIn) {
-          print('DEBUG [AUTH]: 吏꾩쭨 濡쒓렇???깃났! ?댁젣 ?앹뾽 ?リ퀬 ?곗씠???명똿??');
-          _loginTimer?.cancel(); // ??濡쒓렇???뺤씤?섎뒗 利됱떆 ??대㉧ 醫낅즺!
+          print('DEBUG [AUTH]: 진짜 로그인 성공! 이제 팝업 닫고 데이터 세팅함.');
+          _loginTimer?.cancel(); // ✅ 로그인 확인되는 즉시 타이머 종료!
           _handleLoginSuccess(session); 
         }
       } 
-      // 留뚯빟 濡쒓렇?꾩썐 ?대깽?멸? ?ㅻ㈃ ?곹깭 珥덇린??
+      // 만약 로그아웃 이벤트가 오면 상태 초기화
       else if (event == AuthChangeEvent.signedOut) {
-        print('DEBUG [AUTH]: 濡쒓렇?꾩썐 ??);
+        print('DEBUG [AUTH]: 로그아웃 됨');
         if (mounted) {
           setState(() {
             gIsLoggedIn = false;
@@ -282,11 +282,11 @@ class _MainScreenState extends State<MainScreen> {
       }
     });
 
-    // 珥덇린 ?몄뀡 利됱떆 泥댄겕
+    // 초기 세션 즉시 체크
     print('DEBUG [INIT]: Preparing initial session check...');
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       print('DEBUG [INIT]: Inside postFrameCallback');
-      // ?깆씠 ?λ쭅?щ줈 ?대졇???뚯쓽 珥덇린 二쇱냼 ?뺤씤 (???쒖쇅)
+      // 앱이 딥링크로 열렸을 때의 초기 주소 확인 (웹 제외)
       if (!kIsWeb) {
         try {
           final appLinks = AppLinks();
@@ -320,27 +320,27 @@ class _MainScreenState extends State<MainScreen> {
 
     print('DEBUG [AUTH]: Handling login success for ${user.id}');
 
-    // 1. ?깆쓽 ?꾩뿭 ?곹깭瑜?'濡쒓렇?????쇰줈留?蹂寃?(?꾨줈?꾩? DB?먯꽌 媛?몄삱 ?뚭퉴吏 湲곕낯媛??좎?!)
+    // 1. 앱의 전역 상태를 '로그인 됨'으로만 변경 (프로필은 DB에서 가져올 때까지 기본값 유지!)
     setState(() {
       gIsLoggedIn = true;
-      gUserInternalId = user.id; // ?섑뙆踰좎씠?ㅼ쓽 ?좊땲??ID ???
+      gUserInternalId = user.id; // 수파베이스의 유니크 ID 저장
       
-      // ?대쫫/?꾩씠?붾뒗 ?꾩쭅 ?놁쓣 ?뚮쭔 ?꾩떆媛??명똿 (DB媛믪씠 ?곗꽑)
-      if (gNameText.isEmpty || gNameText == '?뚯뒪?몄슜') {
+      // 이름/아이디는 아직 없을 때만 임시값 세팅 (DB값이 우선)
+      if (gNameText.isEmpty || gNameText == '테스트용') {
         gNameText = user.userMetadata?['full_name'] ??
-                    user.userMetadata?['name'] ?? '?쎄쿊 ?좎?';
+                    user.userMetadata?['name'] ?? '픽겟 유저';
       }
-      if (gIdText.isEmpty || gIdText == '?뚯뒪?몄슜') {
+      if (gIdText.isEmpty || gIdText == '테스트용') {
         gIdText = user.email?.split('@').first ?? user.id.substring(0, 8);
       }
-      // ?좑툘 ?꾨줈???대?吏: 移댁뭅??avatar_url 諛붾줈 ?곗? ?딄퀬 鍮?臾몄옄???좎?
-      // ??fetchPosts()媛 DB?먯꽌 而ㅼ뒪? ?꾨줈??媛?몄?????뼱? (源쒕묀??諛⑹?!)
+      // ⚠️ 프로필 이미지: 카카오 avatar_url 바로 쓰지 않고 빈 문자열 유지
+      // → fetchPosts()가 DB에서 커스텀 프로필 가져와서 덮어씀 (깜빡임 방지!)
       gProfileImage = '';
     });
 
-    print('??[STATE UPDATE]: ?꾩뿭 蹂???낅뜲?댄듃 ?꾨즺! (ID: ${user.id})');
+    print('✅ [STATE UPDATE]: 전역 변수 업데이트 완료! (ID: ${user.id})');
 
-    // 2. ?꾩썙???덈뒗 濡쒓렇???앹뾽 ?リ린
+    // 2. 띄워져 있는 로그인 팝업 닫기
     if (_isLoginPopupOpen) {
       if (mounted) {
         try {
@@ -357,10 +357,10 @@ class _MainScreenState extends State<MainScreen> {
       _loginDialogContext = null;
     }
 
-    // 3. 濡쒓렇?몃맂 ?좎????ы몴 ?댁뿭?대굹 ?ъ씤???깆쓣 ?덈줈怨좎묠
+    // 3. 로그인된 유저의 투표 내역이나 포인트 등을 새로고침
     await fetchPosts(); 
 
-    // 4. ?꾨줈???뺣낫媛 鍮꾩뼱?덉쑝硫??좉퇋 ?좎?) 異붽? ?뺣낫 ?낅젰 ?앹뾽 ?꾩슦湲?
+    // 4. 프로필 정보가 비어있으면(신규 유저) 추가 정보 입력 팝업 띄우기
     if (gIsLoggedIn && gUserInternalId != null) {
       final profile = await SupabaseService.client
           .from('user_profiles')
@@ -392,9 +392,9 @@ class _MainScreenState extends State<MainScreen> {
                   })
                   .eq('id', gUserInternalId!);
 
-              // ??[?섏젙] 媛??異뺥븯 ?ъ씤??吏湲?濡쒖쭅 ?쒓굅 (?댁젣 0P遺???쒖옉)
+              // ✅ [수정] 가입 축하 포인트 지급 로직 제거 (이제 0P부터 시작)
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('?뚯썝媛?낆씠 ?꾨즺?섏뿀?듬땲?? ?쒖옉??蹂댁꽭?? ?럦')),
+                const SnackBar(content: Text('회원가입이 완료되었습니다! 시작해 보세요. 🎉')),
               );
             } catch (e) {
               print('DEBUG [AUTH]: Profile update error: $e');
@@ -419,7 +419,7 @@ class _MainScreenState extends State<MainScreen> {
   void _onScroll() {
     if (_pageController.hasClients) {
       final page = _pageController.page ?? 0;
-      // ?꾩옱 ?섏씠吏媛 ?꾩껜 寃뚯떆臾?由ъ뒪?몄쓽 ?앹뿉??3踰덉㎏ ?댄븯濡??⑥븯?????ㅼ쓬 ?섏씠吏 濡쒕뱶
+      // 현재 페이지가 전체 게시물 리스트의 끝에서 3번째 이하로 남았을 때 다음 페이지 로드
       if (page >= _posts.length - 3 && !_isLoadingMore && _hasMore) {
         _fetchMorePosts();
       }
@@ -433,7 +433,7 @@ class _MainScreenState extends State<MainScreen> {
     setState(() => _isLoadingMore = false);
   }
 
-  // ?뵕 [?좉퇋] 怨듭쑀諛쏆? ?뱀젙 ?ъ뒪?몃? 理쒖긽?⑥뿉 濡쒕뱶?섎뒗 ?⑥닔
+  // 🔗 [신규] 공유받은 특정 포스트를 최상단에 로드하는 함수
   Future<void> _handleSharedPost(String postId) async {
     try {
       final response = await SupabaseService.client
@@ -443,7 +443,7 @@ class _MainScreenState extends State<MainScreen> {
           .maybeSingle();
 
       if (response != null) {
-        // ?뵞 ?깆씤??寃뚯떆臾쇱씤??鍮꾨줈洹몄씤 ?곹깭硫?嫄곕?
+        // 🔞 성인용 게시물인데 비로그인 상태면 거부
         if (response['is_adult'] == true && !gIsLoggedIn) {
           print('DEBUG [SHARE]: Adult content blocked for guest user');
           return;
@@ -452,7 +452,7 @@ class _MainScreenState extends State<MainScreen> {
         final profile = response['profiles'];
         final String nickname = (profile != null && profile['nickname'] != null)
             ? profile['nickname'].toString()
-            : (response['uploader_name'] ?? response['uploader_id'] ?? '?듬챸');
+            : (response['uploader_name'] ?? response['uploader_id'] ?? '익명');
             
         final String profileImg = toCdnUrl((profile != null && profile['profile_image'] != null)
             ? profile['profile_image'].toString()
@@ -463,11 +463,11 @@ class _MainScreenState extends State<MainScreen> {
         final sharedPost = PostData(
           id: response['id'].toString(),
           title: response['title'] ?? '',
-          uploaderId: response['uploader_id']?.toString() ?? '?듬챸',
+          uploaderId: response['uploader_id']?.toString() ?? '익명',
           uploaderInternalId: response['uploader_internal_id']?.toString(),
           uploaderName: nickname,
           uploaderImage: profileImg,
-          timeLocation: '怨듭쑀??,
+          timeLocation: '공유됨',
           imageA: toCdnUrl(response['image_a'] ?? ''),
           imageB: toCdnUrl(response['image_b'] ?? ''),
           thumbA: toCdnUrl(response['thumb_a'] ?? ''),
@@ -512,14 +512,14 @@ class _MainScreenState extends State<MainScreen> {
 
         if (mounted) {
           setState(() {
-            // ?대? 紐⑸줉???덈떎硫??쒓굅?섍퀬 留??욎쑝濡?
+            // 이미 목록에 있다면 제거하고 맨 앞으로
             _posts.removeWhere((p) => p.id == sharedPost.id);
             _posts.insert(0, sharedPost);
             
-            // 異붿쿇 紐⑸줉??媛깆떊
+            // 추천 목록도 갱신
             _recommendedPosts = _posts.where((p) => !p.isHidden).toList();
             
-            // 0踰??섏씠吏濡??대룞 (怨듭쑀??寃뚯떆臾쇱씠 蹂댁씠寃???
+            // 0번 페이지로 이동 (공유된 게시물이 보이게 함)
             if (_pageController.hasClients) {
               _pageController.jumpToPage(0);
             }
@@ -531,7 +531,7 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  // ?봽 寃뚯떆臾?諛??뚮┝ 媛?몄삤湲?(isRefresh: true硫?泥섏쓬遺?? false硫??댁뼱??
+  // 🔄 게시물 및 알림 가져오기 (isRefresh: true면 처음부터, false면 이어서)
   Future<void> fetchPosts({bool isRefresh = true}) async {
     List<Map<String, dynamic>> loadedNotifications = [];
     try {
@@ -540,10 +540,10 @@ class _MainScreenState extends State<MainScreen> {
         _hasMore = true;
       }
 
-      // 1. 媛쒖씤 ?곗씠??(?붾줈???뺣낫???꾩뿭 愿由ш? ?꾩슂?섎?濡?蹂꾨룄 ?좎?)
+      // 1. 개인 데이터 (팔로우 정보는 전역 관리가 필요하므로 별도 유지)
       if (gIsLoggedIn && gUserInternalId != null) {
         try {
-          // ?꾨줈???뺣낫 ?뺤젙 (?ъ씤????媛깆떊)
+          // 프로필 정보 확정 (포인트 등 갱신)
           final profileData = await SupabaseService.client
               .from('user_profiles')
               .select('id, points, user_id, nickname, profile_image, bio')
@@ -559,29 +559,29 @@ class _MainScreenState extends State<MainScreen> {
           }
 
           final results = await Future.wait([
-            // [0] ?붾줈???뺣낫
+            // [0] 팔로우 정보
             SupabaseService.client
                 .from('follows')
                 .select('following_internal_id')
                 .eq('follower_internal_id', gUserInternalId!),
-            // [1] ?뚮┝
+            // [1] 알림
             SupabaseService.client
                 .from('notifications')
                 .select()
                 .eq('user_id', gUserInternalId!)
                 .order('created_at', ascending: false)
                 .limit(20),
-            // [2] 醫뗭븘??(?꾩떆 蹂듦뎄: ?덉젙???뺣낫瑜??꾪빐 ?ㅼ떆 ?꾩껜 由ъ뒪???ъ슜)
+            // [2] 좋아요 (임시 복구: 안정성 확보를 위해 다시 전체 리스트 사용)
             SupabaseService.client
                 .from('likes')
                 .select('post_id')
                 .eq('user_id', gUserInternalId!),
-            // [3] 遺곷쭏??
+            // [3] 북마크
             SupabaseService.client
                 .from('bookmarks')
                 .select('post_id')
                 .eq('user_id', gUserInternalId!),
-            // [4] ?ы몴
+            // [4] 투표
             SupabaseService.client
                 .from('votes')
                 .select('post_id, side')
@@ -603,29 +603,29 @@ class _MainScreenState extends State<MainScreen> {
           loadedNotifications = List<Map<String, dynamic>>.from(notifs);
           gHasNewNotifs = loadedNotifications.any((n) => n['is_read'] == false);
         } catch (e) {
-          print('媛쒖씤 ?곗씠??媛?몄삤湲??ㅽ뙣: $e');
+          print('개인 데이터 가져오기 실패: $e');
         }
       }
 
-      // 2. ?? [?뚭퀬由ъ쬁 蹂듦뎄] ??뿉 ?곕Ⅸ 留욎땄???쒕쾭 荑쇰━
+      // 2. 🚀 [알고리즘 복구] 탭에 따른 맞춤형 서버 쿼리
       var query = SupabaseService.client
           .from('posts')
           .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image, points, updated_at)');
 
-      // ??퀎 ?꾪꽣留??뚭퀬由ъ쬁 ?곸슜
-      if (_selectedTopTabIndex == 1) { // ?붾줈????
+      // 탭별 필터링 알고리즘 적용
+      if (_selectedTopTabIndex == 1) { // 팔로우 탭
         if (gFollowedUserIds.isEmpty) {
           if (mounted) setState(() { _posts = []; _isDataLoading = false; });
           return;
         }
         query = query.inFilter('uploader_internal_id', gFollowedUserIds.toList());
-      } else if (_selectedTopTabIndex == 2) { // 遺곷쭏????
+      } else if (_selectedTopTabIndex == 2) { // 북마크 탭
         if (gBookmarkedPostIds.isEmpty) {
           if (mounted) setState(() { _posts = []; _isDataLoading = false; });
           return;
         }
         query = query.inFilter('id', gBookmarkedPostIds.toList());
-      } else if (_selectedTopTabIndex == 3) { // Pick (?닿? 李몄뿬??寃?
+      } else if (_selectedTopTabIndex == 3) { // Pick (내가 참여한 것)
         final voteResponse = await SupabaseService.client
             .from('votes')
             .select('post_id')
@@ -638,7 +638,7 @@ class _MainScreenState extends State<MainScreen> {
         query = query.inFilter('id', votedPostIds);
       }
 
-      // ?뱶 ?섏씠吏?ㅼ씠?? refresh媛 ?꾨땲硫?留덉?留?寃뚯떆臾??쒓컙蹂대떎 ?댁쟾 ?곗씠??濡쒕뱶
+      // 📜 페이지네이션: refresh가 아니면 마지막 게시물 시간보다 이전 데이터 로드
       if (!isRefresh && _posts.isNotEmpty) {
         final lastCreatedAt = _posts.last.createdAt;
         if (lastCreatedAt != null) {
@@ -664,7 +664,7 @@ class _MainScreenState extends State<MainScreen> {
             : handle;
         final String nickname = (profile != null && profile['nickname'] != null)
             ? profile['nickname'].toString()
-            : (json['uploader_name'] ?? json['uploader_id'] ?? '?듬챸');
+            : (json['uploader_name'] ?? json['uploader_id'] ?? '익명');
         final String profileImg = toCdnUrl(
             (profile != null && profile['profile_image'] != null)
             ? profile['profile_image'].toString()
@@ -684,9 +684,9 @@ class _MainScreenState extends State<MainScreen> {
           timeLocation: () {
             final ca = json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now();
             final diff = DateTime.now().difference(ca);
-            if (diff.inMinutes < 60) return '${diff.inMinutes}遺???;
-            if (diff.inHours < 24) return '${diff.inHours}?쒓컙 ??;
-            return '${ca.month}??${ca.day}??;
+            if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
+            if (diff.inHours < 24) return '${diff.inHours}시간 전';
+            return '${ca.month}월 ${ca.day}일';
           }(),
           imageA: toCdnUrl(json['image_a'] ?? ''),
           imageB: toCdnUrl(json['image_b'] ?? ''),
@@ -772,7 +772,8 @@ class _MainScreenState extends State<MainScreen> {
         if (isRefresh) {
           _notifications = loadedNotifications;
           _hasNewNotifications = gHasNewNotifs;
-          _isDataLoading = false; gAllPosts = _posts;
+          _isDataLoading = false;
+          gAllPosts = _posts; // 🌍 전역 변수 동기화!
           _refreshRecommended();
         }
       });
@@ -788,7 +789,7 @@ class _MainScreenState extends State<MainScreen> {
   void _startLoginTimer() {
     _loginTimer?.cancel();
     _loginTimer = Timer(const Duration(seconds: 4), () async {
-      // ??대㉧媛 ?앸궗?????몄뀡????踰???吏곸젒 ?뺤씤 (媛???뺤떎??諛⑸쾿)
+      // 타이머가 끝났을 때 세션을 한 번 더 직접 확인 (가장 확실한 방법)
       final session = SupabaseService.client.auth.currentSession;
       if (mounted && !gIsLoggedIn && session == null && !_isLoginPopupOpen) {
         _showLoginPopup();
@@ -805,7 +806,7 @@ class _MainScreenState extends State<MainScreen> {
       return;
     }
 
-    // 1. ??湲 遺꾨━ (?곗꽑 ?몄텧??
+    // 1. 내 글 분리 (우선 노출용)
     List<PostData> myPosts = nonExpired
         .where((p) => p.uploaderInternalId == gUserInternalId)
         .toList();
@@ -813,7 +814,7 @@ class _MainScreenState extends State<MainScreen> {
         .where((p) => p.uploaderInternalId != gUserInternalId)
         .toList();
 
-    // 2. ?⑥쓽 湲? ?멸린湲/?쇰컲湲濡??욊린
+    // 2. 남의 글은 인기글/일반글로 섞기
     List<PostData> popular = otherPosts
         .where((p) => (p.likesCount + p.commentsCount) >= 1000)
         .toList();
@@ -826,44 +827,44 @@ class _MainScreenState extends State<MainScreen> {
 
     List<PostData> mixedOthers = [...popular, ...others];
 
-    // ?렞 ?뺤꽍 濡쒖쭅: [??湲] + [?욎씤 ?⑥쓽 湲] ?쒖꽌濡?諛곗튂
+    // 🎯 정석 로직: [내 글] + [섞인 남의 글] 순서로 배치
     setState(() {
       _recommendedPosts = [...myPosts, ...mixedOthers];
     });
   }
 
   List<PostData> get _filteredPosts {
-    // ?뵞 ?깆씤 肄섑뀗痢??꾪꽣留?(鍮꾨줈洹몄씤 ?곹깭) + 湲곕낯 ?④? 泥섎━
+    // 🔞 성인 콘텐츠 필터링 (비로그인 상태) + 기본 숨김 처리
     List<PostData> visiblePosts = _posts.where((p) {
       if (p.isAdult && !gIsLoggedIn) return false;
       return !p.isHidden;
     }).toList();
 
     switch (_selectedTopTabIndex) {
-      case 0: // 異붿쿇
+      case 0: // 추천
         return _recommendedPosts
             .where((p) => !p.isExpired || _forcedVisibleIds.contains(p.id))
             .toList();
-      case 1: // ?붾줈??
+      case 1: // 팔로우
         return visiblePosts
             .where((p) => p.isFollowing && !p.isExpired)
             .toList();
-      case 2: // 利먭꺼李얘린
+      case 2: // 즐겨찾기
         return visiblePosts
             .where((p) => p.isBookmarked && !p.isExpired)
             .toList();
-      case 3: // Pick: ?닿? ?좏깮??寃뚯떆臾?(?뺣젹: 吏꾪뻾以?吏㏃??쒓컙??-> 留덇컧??
+      case 3: // Pick: 내가 선택한 게시물 (정렬: 진행중 짧은시간순 -> 마감됨)
         List<PostData> picked = visiblePosts
             .where((p) => p.userVotedSide != 0)
             .toList();
 
-        // ?뺣젹 濡쒖쭅
+        // 정렬 로직
         List<PostData> ongoing = picked.where((p) => !p.isExpired).toList();
         List<PostData> expired = picked.where((p) => p.isExpired).toList();
 
-        // 吏꾪뻾 以묒씤 嫄??쒓컙??吏㏐쾶 ?⑥? ??(remainingSeconds 湲곗?? ?꾨땲吏留? prototype?⑹쑝濡?durationMinutes ???쒖슜 媛??
-        // ?ш린?쒕뒗 durationMinutes???앹꽦 ?쒓컙 ?깆쓣 怨좊젮?섏뿬 ?뺣젹?????덉뒿?덈떎.
-        // PostData??援ъ껜?곸씤 留덇컧 ?쒓컖 ?꾨뱶媛 ?덈떎硫????뺥솗?⑸땲??
+        // 진행 중인 건 시간이 짧게 남은 순 (remainingSeconds 기준은 아니지만, prototype용으로 durationMinutes 등 활용 가능)
+        // 여기서는 durationMinutes나 생성 시간 등을 고려하여 정렬할 수 있습니다.
+        // PostData에 구체적인 마감 시각 필드가 있다면 더 정확합니다.
         ongoing.sort(
           (a, b) => (a.durationMinutes ?? 0).compareTo(b.durationMinutes ?? 0),
         );
@@ -878,7 +879,7 @@ class _MainScreenState extends State<MainScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '$platform 濡쒓렇???꾨즺!',
+          '$platform 로그인 완료!',
           style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -898,10 +899,10 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       barrierDismissible: true,
       barrierLabel: '',
-      barrierColor: Colors.black.withValues(alpha: 0.8), // ?룻솕硫??대몼寃?
+      barrierColor: Colors.black.withValues(alpha: 0.8), // 뒷화면 어둡게
       transitionDuration: const Duration(milliseconds: 400),
       pageBuilder: (dialogContext, anim1, anim2) {
-        _loginDialogContext = dialogContext; // ???
+        _loginDialogContext = dialogContext; // 저장!
         return PopScope(
           onPopInvokedWithResult: (didPop, result) {
             if (didPop) {
@@ -942,7 +943,7 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                     const SizedBox(height: 24),
                     const Text(
-                      'PickGet ?쒖옉?섍린',
+                      'PickGet 시작하기',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 24,
@@ -953,14 +954,14 @@ class _MainScreenState extends State<MainScreen> {
                     const SizedBox(height: 40),
                     SocialLoginButton(
                       svgAsset: 'assets/kakao_logo.svg',
-                      label: '移댁뭅??濡쒓렇??,
+                      label: '카카오 로그인',
                       backgroundColor: const Color(0xFFFEE500),
                       textColor: const Color(
                         0xFF191919,
                       ).withValues(alpha: 0.85),
                       iconSize: 28,
                       onTap: () async {
-                        // ?뮕 ?덉쟾?섍쾶 ?앹뾽 ?リ린 (以묐났 pop 諛⑹?)
+                        // 💡 안전하게 팝업 닫기 (중복 pop 방지)
                         if (_isLoginPopupOpen && _loginDialogContext != null) {
                           final targetCtx = _loginDialogContext;
                           _isLoginPopupOpen = false;
@@ -973,8 +974,8 @@ class _MainScreenState extends State<MainScreen> {
                         }
 
                         try {
-                          // ?? [?뺤꽍] ?꾩옱 釉뚮씪?곗???二쇱냼李?二쇱냼瑜?洹몃?濡?媛?몄샃?덈떎.
-                          // ?대젃寃??섎㈃ pickget.net?대뱺 ?뚯뒪??二쇱냼???먮룞?쇰줈 留욎떠吏묐땲??
+                          // 🚀 [정석] 현재 브라우저의 주소창 주소를 그대로 가져옵니다.
+                          // 이렇게 하면 pickget.net이든 테스트 주소든 자동으로 맞춰집니다.
                           final String redirectUrl = kIsWeb 
                               ? Uri.base.origin 
                               : 'pickget://login-callback';
@@ -987,12 +988,12 @@ class _MainScreenState extends State<MainScreen> {
                             authScreenLaunchMode: LaunchMode.inAppBrowserView,
                           );
                         } catch (e) {
-                          // ?뮕 李멸퀬: 濡쒓렇?몄씠 ?꾨즺?섎㈃ ?λ쭅?щ? ?듯빐 ?깆쑝濡??뚯븘?ㅺ퀬,
-                          // supabase_flutter ?⑦궎吏媛 ?먮룞?쇰줈 ?몄뀡???몄떇?⑸땲??
+                          // 💡 참고: 로그인이 완료되면 딥링크를 통해 앱으로 돌아오고,
+                          // supabase_flutter 패키지가 자동으로 세션을 인식합니다.
                         } catch (e) {
-                          print('移댁뭅??濡쒓렇???먮윭: $e');
+                          print('카카오 로그인 에러: $e');
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('濡쒓렇??以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎: $e')),
+                            SnackBar(content: Text('로그인 중 오류가 발생했습니다: $e')),
                           );
                         }
                       },
@@ -1000,7 +1001,7 @@ class _MainScreenState extends State<MainScreen> {
                     const SizedBox(height: 12),
                     SocialLoginButton(
                       svgAsset: 'assets/naver_logo.svg',
-                      label: '?ㅼ씠踰?濡쒓렇??,
+                      label: '네이버 로그인',
                       backgroundColor: const Color(0xFF03C75A),
                       textColor: Colors.white,
                       iconSize: 18.7,
@@ -1034,9 +1035,9 @@ class _MainScreenState extends State<MainScreen> {
                                 })
                                 .eq('id', gUserInternalId!);
 
-                            _showLoginSuccessSnackBar('?ㅼ씠踰?);
+                            _showLoginSuccessSnackBar('네이버');
 
-                            _showLoginSuccessSnackBar('?ㅼ씠踰?);
+                            _showLoginSuccessSnackBar('네이버');
                           } catch (e) {
                             print(
                               'DEBUG [AUTH]: Naver profile update error: $e',
@@ -1048,7 +1049,7 @@ class _MainScreenState extends State<MainScreen> {
                     const SizedBox(height: 12),
                     SocialLoginButton(
                       svgAsset: 'assets/google_logo.svg',
-                      label: 'Google 濡쒓렇??,
+                      label: 'Google 로그인',
                       backgroundColor: Colors.white,
                       textColor: const Color(0xFF191919),
                       hasBorder: true,
@@ -1101,7 +1102,7 @@ class _MainScreenState extends State<MainScreen> {
                         Navigator.pop(context);
                       },
                       child: const Text(
-                        '?섏쨷???좉쾶??,
+                        '나중에 할게요',
                         style: TextStyle(
                           color: Colors.white38,
                           fontSize: 14,
@@ -1134,11 +1135,11 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final filteredList = _filteredPosts;
     
-    // ?뼢截?PC ???덉씠?꾩썐 理쒖쟻??(媛?대뜲 ?뺣젹 諛??덈퉬 ?쒗븳)
+    // 🖥️ PC 웹 레이아웃 최적화 (가운데 정렬 및 너비 제한)
     Widget mainContent = Scaffold(
       body: Stack(
         children: [
-          // ?봽 ?곗씠??濡쒕뵫 以묒씪 ??濡쒕뵫 ?붾㈃ ?쒖떆 (?꾨━吏?諛⑹?!)
+          // 🔄 데이터 로딩 중일 때 로딩 화면 표시 (프리징 방지!)
           if (_isDataLoading && _posts.isEmpty)
             _buildLoadingView()
           else if (!gIsLoggedIn && _selectedTopTabIndex != 0)
@@ -1149,9 +1150,9 @@ class _MainScreenState extends State<MainScreen> {
               scrollDirection: Axis.vertical,
               itemCount: filteredList.length,
               onPageChanged: (index) {
-                // ?봽 臾댄븳 ?ㅽ겕濡? 留덉?留됱뿉??5媛??꾩? ?붿쓣 ??誘몃━ ?ㅼ쓬 ?섏씠吏 濡쒕뱶!
+                // 🔄 무한 스크롤: 마지막에서 5개 전쯤 왔을 때 미리 다음 페이지 로드!
                 if (index >= filteredList.length - 5 && _hasMore && !_isDataLoading) {
-                  print('DEBUG [PAGING]: ?앹뿉 ?꾨떖 以?.. ?ㅼ쓬 ?섏씠吏 濡쒕뱶 ?쒖옉 (index: $index)');
+                  print('DEBUG [PAGING]: 끝에 도달 중... 다음 페이지 로드 시작 (index: $index)');
                   fetchPosts(isRefresh: false);
                 }
               },
@@ -1168,7 +1169,7 @@ class _MainScreenState extends State<MainScreen> {
                     });
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('愿?ъ뾾?뚯쑝濡??ㅼ젙?섏뼱 ???ъ뒪?멸? ?쒖쇅?섏뿀?듬땲??'),
+                        content: Text('관심없음으로 설정되어 이 포스트가 제외되었습니다.'),
                         duration: Duration(seconds: 1),
                       ),
                     );
@@ -1180,7 +1181,7 @@ class _MainScreenState extends State<MainScreen> {
                     });
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('$uploaderId 梨꾨꼸??異붿쿇??以묐떒?⑸땲??'),
+                        content: Text('$uploaderId 채널의 추천을 중단합니다.'),
                         duration: const Duration(seconds: 1),
                       ),
                     );
@@ -1219,7 +1220,7 @@ class _MainScreenState extends State<MainScreen> {
                     ).then((_) {
                       if (mounted) {
                         setState(() {
-                          // 梨꾨꼸 ?붾㈃?먯꽌 寃뚯떆臾쇱씠 ??젣?섏뿀?????덉쑝誘濡?異붿쿇 紐⑸줉 ?깆쓣 ?숆린??
+                          // 채널 화면에서 게시물이 삭제되었을 수 있으므로 추천 목록 등을 동기화
                           _refreshRecommended();
                         });
                       }
@@ -1231,8 +1232,8 @@ class _MainScreenState extends State<MainScreen> {
           _buildTopBar(),
           _buildBottomNav(),
 
-          // ?? [Web ?꾩슜] ???ㅼ튂 ?좊룄 ?앹뾽 (15珥????섎떒?먯꽌 ?깆옣)
-          // 濡쒓렇???щ?? ?곴??놁씠 ???좎??쇰㈃ 蹂댁뿬二쇰릺, 濡쒓렇???앹뾽???대젮?덉쓣 ?뚮쭔 ?④퉩?덈떎.
+          // 🚀 [Web 전용] 앱 설치 유도 팝업 (15초 뒤 하단에서 등장)
+          // 로그인 여부와 상관없이 웹 유저라면 보여주되, 로그인 팝업이 열려있을 때만 숨깁니다.
           if (kIsWeb)
             AnimatedPositioned(
               duration: const Duration(milliseconds: 600),
@@ -1275,9 +1276,9 @@ class _MainScreenState extends State<MainScreen> {
                                     const Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text('PickGet ???ㅼ튂?섍린', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                        Text('PickGet 앱 설치하기', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                                         SizedBox(height: 2),
-                                        Text('?깆뿉????鍮좊Ⅴ怨?遺?쒕읇寃?', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                                        Text('앱에서 더 빠르고 부드럽게!', style: TextStyle(color: Colors.white70, fontSize: 13)),
                                       ],
                                     ),
                                   ],
@@ -1300,12 +1301,12 @@ class _MainScreenState extends State<MainScreen> {
                                   elevation: 0,
                                 ),
                                 onPressed: () {
-                                  // ?? 異뷀썑 ?ㅼ젣 ?깆뒪?좎뼱/?뚮젅?댁뒪?좎뼱 二쇱냼濡??곌껐
+                                  // 🚀 추후 실제 앱스토어/플레이스토어 주소로 연결
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('怨??깆뒪?좎뼱?먯꽌 留뚮굹蹂댁떎 ???덉뒿?덈떎!')),
+                                    const SnackBar(content: Text('곧 앱스토어에서 만나보실 수 있습니다!')),
                                   );
                                 },
-                                child: const Text('臾대즺濡??ㅼ슫濡쒕뱶', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                child: const Text('무료로 다운로드', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                               ),
                             ),
                           ],
@@ -1322,7 +1323,7 @@ class _MainScreenState extends State<MainScreen> {
     return mainContent;
   }
 
-  // ?봽 ?곗씠??濡쒕뵫 以??쒖떆 ?붾㈃ (泥??ㅽ뻾 ?꾨━吏?諛⑹?!)
+  // 🔄 데이터 로딩 중 표시 화면 (첫 실행 프리징 방지!)
   Widget _buildLoadingView() {
     return Container(
       color: Colors.black,
@@ -1330,14 +1331,14 @@ class _MainScreenState extends State<MainScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // PickGet 濡쒓퀬
+            // PickGet 로고
             SvgPicture.asset(
               'assets/simbol.svg',
               width: 80,
               height: 80,
             ),
             const SizedBox(height: 32),
-            // 濡쒕뵫 ?몃뵒耳?댄꽣
+            // 로딩 인디케이터
             const SizedBox(
               width: 28,
               height: 28,
@@ -1348,7 +1349,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              '肄섑뀗痢좊? 遺덈윭?ㅻ뒗 以?..',
+              '콘텐츠를 불러오는 중...',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 14,
@@ -1364,9 +1365,9 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildLoginRequiredView() {
     String tabName = [
       '',
-      '?붾줈?고븳 梨꾨꼸',
-      '利먭꺼李얘린???쎄쿊',
-      '?좏깮???쎄쿊',
+      '팔로우한 채널',
+      '즐겨찾기한 픽겟',
+      '선택한 픽겟',
     ][_selectedTopTabIndex];
     return Center(
       child: Padding(
@@ -1388,7 +1389,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
             const SizedBox(height: 32),
             Text(
-              '濡쒓렇?몄씠 ?꾩슂??湲곕뒫?낅땲??,
+              '로그인이 필요한 기능입니다',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.9),
                 fontSize: 20,
@@ -1397,7 +1398,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              '$tabName ?뺤씤???꾪빐\n濡쒓렇?몄쓣 吏꾪뻾?댁＜?몄슂.',
+              '$tabName 확인을 위해\n로그인을 진행해주세요.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.5),
@@ -1420,7 +1421,7 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                 ),
                 child: const Text(
-                  '濡쒓렇?명븯怨??쒖옉?섍린',
+                  '로그인하고 시작하기',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -1540,11 +1541,11 @@ class _MainScreenState extends State<MainScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _topTab('異붿쿇', 0),
+                  _topTab('추천', 0),
                   const SizedBox(width: 25),
-                  _topTab('?붾줈??, 1),
+                  _topTab('팔로우', 1),
                   const SizedBox(width: 25),
-                  _topTab('利먭꺼李얘린', 2),
+                  _topTab('즐겨찾기', 2),
                   const SizedBox(width: 25),
                   _topTab('Pick', 3),
                 ],
@@ -1565,17 +1566,17 @@ class _MainScreenState extends State<MainScreen> {
         setState(() {
           _selectedTopTabIndex = index;
         });
-        // ?? [?뚭퀬由ъ쬁 媛?? ??씠 諛붾뚯뿀?쇰땲 ?대떦 ??뿉 留욌뒗 ?곗씠?곕? ?쒕쾭?먯꽌 ?덈줈 媛?몄샃?덈떎!
+        // 🚀 [알고리즘 가동] 탭이 바뀌었으니 해당 탭에 맞는 데이터를 서버에서 새로 가져옵니다!
         fetchPosts(isRefresh: true);
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 湲???먭퍡 蹂?붿뿉 ?곕Ⅸ ?붾뱾由?諛⑹?瑜??꾪빐 Stack ?쒖슜
+          // 글자 두께 변화에 따른 흔들림 방지를 위해 Stack 활용
           Stack(
             alignment: Alignment.center,
             children: [
-              // 蹂댁씠吏 ?딅뒗 媛???먭볼??湲?먮? 諛곌꼍??源붿븘 ?덈퉬 ?뺣낫
+              // 보이지 않는 가장 두꺼운 글자를 배경에 깔아 너비 확보
               Text(
                 label,
                 style: const TextStyle(
@@ -1584,7 +1585,7 @@ class _MainScreenState extends State<MainScreen> {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              // ?ㅼ젣 蹂댁씠??湲??
+              // 실제 보이는 글자
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 200),
                 style: TextStyle(
@@ -1598,7 +1599,7 @@ class _MainScreenState extends State<MainScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          // ?꾨옒 ?ъ씤??諛붾룄 ?붾뱾由??녿룄濡??щ챸?꾨쭔 議곗젅
+          // 아래 포인트 바도 흔들림 없도록 투명도만 조절
           AnimatedOpacity(
             duration: const Duration(milliseconds: 200),
             opacity: isSelected ? 1.0 : 0.0,
@@ -1686,10 +1687,10 @@ class _MainScreenState extends State<MainScreen> {
                   context,
                   MaterialPageRoute(builder: (context) => const UploadScreen()),
                 ).then((_) async {
-                  // 1. ?쒕쾭?먯꽌 理쒖떊 ?곗씠??媛?몄삤湲?
+                  // 1. 서버에서 최신 데이터 가져오기
                   await fetchPosts();
 
-                  // 2. ?먮룞?쇰줈 泥?踰덉㎏ ?섏씠吏(??湲)濡??대룞!
+                  // 2. 자동으로 첫 번째 페이지(새 글)로 이동!
                   if (_pageController.hasClients) {
                     _pageController.animateToPage(
                       0,
@@ -1722,7 +1723,7 @@ class _MainScreenState extends State<MainScreen> {
                 HapticFeedback.mediumImpact();
                 setState(() {
                   _hasNewNotifications = false;
-                }); // ?뚮┝ ?뺤씤 ?????쒓굅
+                }); // 알림 확인 시 점 제거
                 _showNotificationSheet(context);
               },
               child: Stack(
@@ -1755,7 +1756,7 @@ class _MainScreenState extends State<MainScreen> {
                   _showLoginPopup();
                   return;
                 }
-                // 寃뚯떆臾쇱씠 ?놁쓣 寃쎌슦瑜??鍮꾪븳 ?덉쟾???대룞 濡쒖쭅
+                // 게시물이 없을 경우를 대비한 안전한 이동 로직
                 PostData? firstPost = _posts.isNotEmpty ? _posts.first : null;
 
                 Navigator.push(
@@ -1772,8 +1773,8 @@ class _MainScreenState extends State<MainScreen> {
                             uploaderInternalId: gUserInternalId,
                             uploaderName: gNameText,
                             uploaderImage: gProfileImage,
-                            title: '泥??ъ뒪?몃? ?щ젮蹂댁꽭??',
-                            timeLocation: '諛⑷툑 ??,
+                            title: '첫 포스트를 올려보세요!',
+                            timeLocation: '방금 전',
                             imageA: 'assets/images/placeholder.png',
                             imageB: 'assets/images/placeholder.png',
                             descriptionA: '',
@@ -1799,7 +1800,7 @@ class _MainScreenState extends State<MainScreen> {
               },
               behavior: HitTestBehavior.opaque,
               child: Container(
-                padding: const EdgeInsets.all(10), // ?곗튂 留덉뒪???곸뿭 ?됰꼮?섍쾶 ?뺤옣
+                padding: const EdgeInsets.all(10), // 터치 마스크 영역 넉넉하게 확장
                 child: gIsLoggedIn
                     ? (gProfileImage.isEmpty
                     ? CircleAvatar(
@@ -1852,7 +1853,7 @@ class _MainScreenState extends State<MainScreen> {
               ),
               const SizedBox(height: 20),
               const Text(
-                '?뚮┝',
+                '알림',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -1864,7 +1865,7 @@ class _MainScreenState extends State<MainScreen> {
                 child: _notifications.isEmpty
                     ? const Center(
                         child: Text(
-                          '?덈줈???뚮┝???놁뒿?덈떎.',
+                          '새로운 알림이 없습니다.',
                           style: TextStyle(color: Colors.white38),
                         ),
                       )
@@ -1901,7 +1902,7 @@ class _MainScreenState extends State<MainScreen> {
                             icon,
                             color,
                             n['message'] ?? n['title'] ?? '',
-                            '諛⑷툑 ??, // In real app, format n['created_at']
+                            '방금 전', // In real app, format n['created_at']
                           );
                         },
                       ),
@@ -1960,7 +1961,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _showRankingSheet(BuildContext context) async {
-    // 1. 濡쒕뵫 李?癒쇱? ?쒖떆
+    // 1. 로딩 창 먼저 표시
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1993,7 +1994,7 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                       const SizedBox(height: 20),
                       const Text(
-                        '?ㅼ떆媛??멸린 Pick (TOP 10)',
+                        '실시간 인기 Pick (TOP 10)',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -2002,7 +2003,7 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        '吏湲?媛???④굅???ㅼ떆媛???궧',
+                        '지금 가장 뜨거운 실시간 랭킹',
                         style: TextStyle(color: Colors.cyanAccent, fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                       const Divider(color: Colors.white10, height: 30),
@@ -2025,7 +2026,7 @@ class _MainScreenState extends State<MainScreen> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) => ChannelFeedScreen(
-                                          initialIndex: 0, // ??궧?먯꽌 ?꾨Ⅴ硫??대떦 ?ъ뒪?멸? 泥ル쾲吏?
+                                          initialIndex: 0, // 랭킹에서 누르면 해당 포스트가 첫번째
                                           channelPosts: [post],
                                           allPosts: _posts,
                                         ),
@@ -2048,12 +2049,12 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<List<PostData>> _fetchTopRankings() async {
     try {
-      // ?쒕쾭?먯꽌 吏곸젒 理쒖떊 ?ы몴 ?곗씠?곌? ?ы븿??寃뚯떆臾?議고쉶
+      // 서버에서 직접 최신 투표 데이터가 포함된 게시물 조회
       var query = SupabaseService.client
           .from('posts')
           .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image, points, updated_at)');
 
-      // ?뵞 鍮꾨줈洹몄씤 ???깆씤 寃뚯떆臾??쒖쇅
+      // 🔞 비로그인 시 성인 게시물 제외
       if (!gIsLoggedIn) {
         query = query.eq('is_adult', false);
       }
@@ -2063,11 +2064,11 @@ class _MainScreenState extends State<MainScreen> {
           .limit(50);
 
       List<PostData> loadedPosts = data.map<PostData>((json) {
-        // [?섏젙] 理쒖떊 ?꾨줈???뺣낫 諛섏쁺 (議곗씤???곗씠???ъ슜)
+        // [수정] 최신 프로필 정보 반영 (조인된 데이터 사용)
         final profile = json['profiles'];
         final String nickname = (profile != null && profile['nickname'] != null)
             ? profile['nickname'].toString()
-            : (json['uploader_name'] ?? json['uploader_id'] ?? '?듬챸');
+            : (json['uploader_name'] ?? json['uploader_id'] ?? '익명');
             
         final String uploaderImage = toCdnUrl((profile != null && profile['profile_image'] != null)
             ? profile['profile_image'].toString()
@@ -2081,12 +2082,12 @@ class _MainScreenState extends State<MainScreen> {
 
         return PostData(
           id: json['id'].toString(),
-          title: json['title'] ?? '?쒕ぉ ?놁쓬',
-          uploaderId: json['uploader_id']?.toString() ?? '?듬챸',
+          title: json['title'] ?? '제목 없음',
+          uploaderId: json['uploader_id']?.toString() ?? '익명',
           uploaderInternalId: internalId,
           uploaderName: nickname,
           uploaderImage: uploaderImage,
-          timeLocation: '?ㅼ떆媛?,
+          timeLocation: '실시간',
           imageA: toCdnUrl(json['image_a'] ?? ''),
           imageB: toCdnUrl(json['image_b'] ?? ''),
           thumbA: toCdnUrl(json['thumb_a'] ?? ''),
@@ -2153,12 +2154,12 @@ class _MainScreenState extends State<MainScreen> {
         );
       }).toList();
 
-      // ?ы몴 ?⑷퀎 ?쒖쑝濡??뺣? ?뺣젹
+      // 투표 합계 순으로 정밀 정렬
       loadedPosts = loadedPosts.where(canViewPostDiscussionResults).toList();
       loadedPosts.sort((a, b) => b.totalVotes.compareTo(a.totalVotes));
       return loadedPosts.take(10).toList();
     } catch (e) {
-      print('??궧 ?곗씠??濡쒕뱶 ?ㅽ뙣: $e');
+      print('랭킹 데이터 로드 실패: $e');
       return [];
     }
   }
@@ -2190,7 +2191,7 @@ class _MainScreenState extends State<MainScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    (post.isExpired ? '[醫낅즺] ' : '') + post.title,
+                    (post.isExpired ? '[종료] ' : '') + post.title,
                     style: TextStyle(
                       color: post.isExpired ? Colors.white38 : Colors.white,
                       fontSize: 14,
@@ -2207,7 +2208,7 @@ class _MainScreenState extends State<MainScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  formatCount(post.totalVotes), // 吏꾩쭨 ?ы몴??A+B) ?쒖떆!
+                  formatCount(post.totalVotes), // 진짜 투표수(A+B) 표시!
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -2215,7 +2216,7 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                 ),
                 const Text(
-                  '??,
+                  '픽',
                   style: TextStyle(
                     color: Colors.white38,
                     fontSize: 10,
