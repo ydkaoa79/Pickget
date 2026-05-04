@@ -156,7 +156,7 @@ class _SearchScreenState extends State<SearchScreen> {
       // 제목, 작성자 이름, 태그 등에 해당 키워드가 포함된 게시물을 가져옵니다.
       final response = await SupabaseService.client
           .from('posts')
-          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image)')
+          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image, points, updated_at)')
           .or('title.ilike.%$query%,uploader_id.ilike.%$query%,description_a.ilike.%$query%,description_b.ilike.%$query%')
           .order('created_at', ascending: false)
           .limit(50); 

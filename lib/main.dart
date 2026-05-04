@@ -438,7 +438,7 @@ class _MainScreenState extends State<MainScreen> {
     try {
       final response = await SupabaseService.client
           .from('posts')
-          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image)')
+          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image, points, updated_at)')
           .eq('id', postId)
           .maybeSingle();
 
@@ -610,7 +610,7 @@ class _MainScreenState extends State<MainScreen> {
       // 2. 🚀 [알고리즘 복구] 탭에 따른 맞춤형 서버 쿼리
       var query = SupabaseService.client
           .from('posts')
-          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image)');
+          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image, points, updated_at)');
 
       // 탭별 필터링 알고리즘 적용
       if (_selectedTopTabIndex == 1) { // 팔로우 탭
@@ -2051,7 +2051,7 @@ class _MainScreenState extends State<MainScreen> {
       // 서버에서 직접 최신 투표 데이터가 포함된 게시물 조회
       var query = SupabaseService.client
           .from('posts')
-          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image)');
+          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image, points, updated_at)');
 
       // 🔞 비로그인 시 성인 게시물 제외
       if (!gIsLoggedIn) {
