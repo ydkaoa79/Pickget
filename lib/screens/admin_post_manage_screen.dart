@@ -10,14 +10,14 @@ class AdminPostManageScreen extends StatefulWidget {
 }
 
 class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
-  List<dynamic> allFetchedPosts = []; // 전체 원본 데이터
-  List<dynamic> filteredPosts = []; // 필터/검색 적용 데이터
+  List<dynamic> allFetchedPosts = []; 
+  List<dynamic> filteredPosts = []; 
   bool _isLoading = true;
   int currentPage = 0;
   String searchQuery = '';
   String sortBy = 'updated_at'; 
   bool isAscending = false;
-  String statusFilter = 'all'; // 'all', 'active', 'expired'
+  String statusFilter = 'all'; 
   String _errorMessage = '';
   
   final int pageSize = 15;
@@ -41,10 +41,10 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
       _errorMessage = '';
     });
     try {
-      // 1. 실제 데이터 가져오기 (is_expired 제외, tags/updated_at 포함)
-      dynamic query = SupabaseService.client
+      // 🚀 [핵심] DB에는 is_expired 필터링을 절대 요청하지 않습니다 (에러 원인)
+      var query = SupabaseService.client
           .from('posts')
-          .select('id, title, uploader_id, vote_count_a, vote_count_b, updated_at, tags'); 
+          .select('id, title, uploader_id, vote_count_a, vote_count_b, updated_at, tags');
 
       if (sortBy == 'updated_at') {
         query = query.order('updated_at', ascending: isAscending);
@@ -52,12 +52,11 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
 
       final List<dynamic> fetchedData = await query;
 
-      // 2. 📊 데이터 가공 (앱 내에서 만료 여부 계산)
+      // 📊 앱 내에서 데이터 가공 및 상태 계산
       allFetchedPosts = fetchedData.map((p) {
         int a = _parseCount(p['vote_count_a']);
         int b = _parseCount(p['vote_count_b']);
         
-        // 유효기간 계산 로직
         final tags = (p['tags'] as List?)?.map((e) => e.toString()).toList() ?? [];
         final updatedAt = p['updated_at'] != null ? DateTime.parse(p['updated_at']) : DateTime.now();
         int? durationMins;
@@ -99,7 +98,6 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
   void _applyFilters() {
     List<dynamic> results = List.from(allFetchedPosts);
 
-    // 1. 검색어 필터
     if (searchQuery.isNotEmpty) {
       results = results.where((p) {
         final title = (p['title'] ?? '').toString().toLowerCase();
@@ -108,14 +106,12 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
       }).toList();
     }
 
-    // 2. 상태 필터
     if (statusFilter == 'active') {
       results = results.where((p) => p['is_expired_calc'] == false).toList();
     } else if (statusFilter == 'expired') {
       results = results.where((p) => p['is_expired_calc'] == true).toList();
     }
 
-    // 3. 정렬 (투표순 등 클라이언트 정렬)
     if (sortBy == 'total_votes') {
       results.sort((a, b) {
         int valA = a['total_votes'];
@@ -175,7 +171,7 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
                 : _errorMessage.isNotEmpty
                   ? Center(child: Text('에러: $_errorMessage', style: const TextStyle(color: Colors.redAccent, fontSize: 12)))
                   : filteredPosts.isEmpty
-                    ? const Center(child: Text('포스트가 없습니다.', style: TextStyle(color: Colors.white38)))
+                    ? const Center(child: Text('결과가 없습니다.', style: TextStyle(color: Colors.white38)))
                     : ListView.builder(
                         itemCount: pagedItems.length,
                         itemBuilder: (context, index) => _buildPostRow(pagedItems[index]),
@@ -255,9 +251,9 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
           currentPage = 0;
         });
         if (isSort && value == 'updated_at') {
-          _fetchPosts(); // DB 정렬 다시 부름
+          _fetchPosts(); 
         } else {
-          _applyFilters(); // 앱 내 필터/정렬 적용
+          _applyFilters(); 
         }
       },
       child: Container(
