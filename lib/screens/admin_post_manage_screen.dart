@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../core/app_state.dart';
+import '../services/post_service.dart';
+import '../models/post_data.dart';
+import 'channel_feed_screen.dart';
+import '../main.dart'; 
 
 class AdminPostManageScreen extends StatefulWidget {
   const AdminPostManageScreen({super.key});
@@ -15,7 +19,7 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
   int currentPage = 0;
   int totalPostCount = 0; 
   String searchQuery = '';
-  String sortBy = 'created_at'; // posts 테이블은 created_at 사용
+  String sortBy = 'created_at'; 
   bool isAscending = false;
   String statusFilter = 'all'; 
   String _errorMessage = '';
@@ -41,49 +45,41 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
       _errorMessage = '';
     });
     try {
-      // 1. 전체 개수 조회 (컴파일 에러 해결을 위해 단순화)
-      var countQuery = SupabaseService.client.from('posts').select('id');
+      dynamic countQuery = SupabaseService.client.from('posts').select('id');
       
       if (searchQuery.isNotEmpty) {
         countQuery = countQuery.or('title.ilike.%$searchQuery%,uploader_id.ilike.%$searchQuery%');
       }
       
-      if (statusFilter == 'active') {
-        countQuery = countQuery.eq('is_expired', false);
-      } else if (statusFilter == 'expired') {
-        countQuery = countQuery.eq('is_expired', true);
+      if (statusFilter != 'all') {
+        countQuery = countQuery.eq('is_expired', statusFilter == 'expired');
       }
       
       final countRes = await countQuery;
       totalPostCount = (countRes as List).length;
 
-      // 2. 데이터 가져오기 (Range 적용)
-      final from = currentPage * pageSize;
-      final to = from + pageSize - 1;
-
       dynamic query = SupabaseService.client
           .from('posts')
-          .select('id, title, uploader_id, vote_count_a, vote_count_b, created_at, tags, is_expired')
-          .range(from, to);
+          .select('id, title, uploader_id, vote_count_a, vote_count_b, created_at, tags, is_expired');
 
       if (searchQuery.isNotEmpty) {
         query = query.or('title.ilike.%$searchQuery%,uploader_id.ilike.%$searchQuery%');
       }
 
-      if (statusFilter == 'active') {
-        query = query.eq('is_expired', false);
-      } else if (statusFilter == 'expired') {
-        query = query.eq('is_expired', true);
+      if (statusFilter != 'all') {
+        query = query.eq('is_expired', statusFilter == 'expired');
       }
 
-      // 정렬 (created_at 사용)
       if (sortBy == 'created_at') {
         query = query.order('created_at', ascending: isAscending);
       }
 
-      final List<dynamic> fetchedData = await query;
+      final from = currentPage * pageSize;
+      final to = from + pageSize - 1;
+      final response = await query.range(from, to);
 
-      // 3. 데이터 가공
+      final List<dynamic> fetchedData = response;
+
       List<dynamic> enrichedPosts = fetchedData.map((p) {
         int a = _parseCount(p['vote_count_a']);
         int b = _parseCount(p['vote_count_b']);
@@ -106,10 +102,44 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
       debugPrint('Post manage fetch error: $e');
       if (mounted) {
         setState(() {
-          _errorMessage = '에러: $e\n(SQL을 먼저 실행하셨는지 확인해주세요)';
+          if (e.toString().contains('42703')) {
+            _errorMessage = '⚠️ DB 세팅이 필요합니다.\n제가 드린 SQL들을 먼저 실행해주세요!';
+          } else {
+            _errorMessage = '에러 발생: $e';
+          }
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _navigateToPost(String postId) async {
+    setState(() => _isLoading = true);
+    try {
+      final json = await SupabaseService.client
+          .from('posts')
+          .select('*, profiles:user_profiles!uploader_internal_id(*)')
+          .eq('id', postId)
+          .maybeSingle();
+
+      if (json != null && mounted) {
+        final post = PostService.mapToPostData(json);
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChannelFeedScreen(
+              initialIndex: 0,
+              channelPosts: [post],
+              allPosts: [post],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Navigation error: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -150,8 +180,21 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
                 ? const Center(child: CircularProgressIndicator(color: Colors.cyanAccent))
                 : _errorMessage.isNotEmpty
                   ? Center(child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Text(_errorMessage, style: const TextStyle(color: Colors.redAccent, fontSize: 13), textAlign: TextAlign.center),
+                      padding: const EdgeInsets.all(30),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 50),
+                          const SizedBox(height: 16),
+                          Text(_errorMessage, style: const TextStyle(color: Colors.white70, fontSize: 14), textAlign: TextAlign.center),
+                          const SizedBox(height: 20),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent),
+                            onPressed: _fetchPosts, 
+                            child: const Text('다시 시도', style: TextStyle(color: Colors.black))
+                          )
+                        ],
+                      ),
                     ))
                   : posts.isEmpty
                     ? const Center(child: Text('결과가 없습니다.', style: TextStyle(color: Colors.white38)))
@@ -279,8 +322,8 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
     final int b = post['v_b'] ?? 0;
     final bool isExpired = post['is_expired'] ?? false; 
     
-    String status = '투표중';
     Color statusColor = Colors.orangeAccent;
+    String status = '투표중';
     
     if (isExpired) {
       if (a > b) {
@@ -295,33 +338,36 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
       }
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white10, width: 0.5))),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text('@${post['uploader_id']}', style: const TextStyle(color: Colors.white24, fontSize: 10)),
-              ],
+    return InkWell(
+      onTap: () => _navigateToPost(post['id']),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white10, width: 0.5))),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 4,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500, decoration: TextDecoration.underline), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text('@${post['uploader_id']}', style: const TextStyle(color: Colors.white24, fontSize: 10)),
+                ],
+              ),
             ),
-          ),
-          Expanded(flex: 2, child: Text(formatCount(total), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
-          Expanded(flex: 1, child: Text(formatCount(a), style: const TextStyle(color: Colors.cyanAccent, fontSize: 11), textAlign: TextAlign.center)),
-          Expanded(flex: 1, child: Text(formatCount(b), style: const TextStyle(color: Colors.pinkAccent, fontSize: 11), textAlign: TextAlign.center)),
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-              child: Text(status, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+            Expanded(flex: 2, child: Text(formatCount(total), style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+            Expanded(flex: 1, child: Text(formatCount(a), style: const TextStyle(color: Colors.cyanAccent, fontSize: 11), textAlign: TextAlign.center)),
+            Expanded(flex: 1, child: Text(formatCount(b), style: const TextStyle(color: Colors.pinkAccent, fontSize: 11), textAlign: TextAlign.center)),
+            Expanded(
+              flex: 2,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                child: Text(status, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

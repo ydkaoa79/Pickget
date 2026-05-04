@@ -4,21 +4,10 @@ import '../models/post_data.dart';
 import 'channel_screen.dart';
 import 'channel_feed_screen.dart';
 import '../services/supabase_service.dart';
+import '../services/post_service.dart';
 import '../core/app_state.dart';
 
-// 🚀 CDN 주소 변환 유틸리티
-String toCdnUrl(String url) {
-  if (url.isEmpty) return url;
-  if (url.startsWith('http')) return url;
-  if (url.startsWith('assets/')) return url;
-  if (url.contains('supabase.co/storage/v1/object/public/')) {
-    return url.replaceFirst(
-      RegExp(r'https://.*\.supabase\.co/storage/v1/object/public/'),
-      'https://cdn.pickget.net/',
-    );
-  }
-  return url;
-}
+// PostService already contains the standardized toCdnUrl logic.
 
 class SearchScreen extends StatefulWidget {
   final List<PostData> allPosts;
@@ -162,67 +151,7 @@ class _SearchScreenState extends State<SearchScreen> {
           .limit(50); 
 
       final List<PostData> fetchedResults = (response as List).map((json) {
-        final profile = json['profiles'];
-        final String handle = json['uploader_id']?.toString() ?? '';
-        final String? internalId = json['uploader_internal_id']?.toString() ?? profile?['id']?.toString();
-        
-        final String nickname = (profile != null && profile['nickname'] != null)
-            ? profile['nickname'].toString()
-            : (json['uploader_name'] ?? json['uploader_id'] ?? '익명');
-            
-        final bool isPostLiked = gLikedPostIds.contains(json['id'].toString());
-        int initialLikesCount = json['likes_count'] ?? 0;
-        if (isPostLiked && initialLikesCount < 1) initialLikesCount = 1;
-
-        final tags = (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        final createdAt = json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now();
-        int? durationMins;
-        for (var tag in tags) {
-          if (tag.startsWith('duration:')) {
-            durationMins = int.tryParse(tag.split(':')[1]);
-          }
-        }
-
-        final bool isExpired = () {
-          bool exp = json['is_expired'] ?? false;
-          if (exp) return true;
-          if (durationMins != null && DateTime.now().isAfter(createdAt.add(Duration(minutes: durationMins)))) {
-            return true;
-          }
-          return false;
-        }();
-
-        return PostData(
-          id: json['id'].toString(),
-          title: json['title'] ?? '',
-          uploaderId: (profile != null && profile['user_id'] != null) ? profile['user_id'].toString() : handle,
-          uploaderInternalId: internalId,
-          uploaderName: nickname,
-          uploaderImage: toCdnUrl((profile != null && profile['profile_image'] != null)
-              ? profile['profile_image'].toString()
-              : (json['user_image'] ?? 'assets/profiles/profile_11.jpg')),
-          timeLocation: "${json['created_at'].toString().split('T')[0]}",
-          imageA: toCdnUrl(json['image_a'] ?? ''),
-          imageB: toCdnUrl(json['image_b'] ?? ''),
-          thumbA: toCdnUrl(json['thumb_a'] ?? ''),
-          thumbB: toCdnUrl(json['thumb_b'] ?? ''),
-          descriptionA: json['description_a'] ?? '',
-          descriptionB: json['description_b'] ?? '',
-          likesCount: initialLikesCount,
-          commentsCount: json['comments_count'] ?? 0,
-          voteCountA: json['vote_count_a']?.toString() ?? '0',
-          voteCountB: json['vote_count_b']?.toString() ?? '0',
-          percentA: json['percent_a']?.toString() ?? '50%',
-          percentB: json['percent_b']?.toString() ?? '50%',
-          isLiked: isPostLiked,
-          isBookmarked: gBookmarkedPostIds.contains(json['id'].toString()),
-          isFollowing: gFollowedUserIds.contains(internalId),
-          userVotedSide: gUserVotes[json['id'].toString()] ?? 0,
-          tags: tags,
-          createdAt: createdAt,
-          durationMinutes: durationMins,
-          isExpired: isExpired,
-        );
+        return PostService.mapToPostData(json);
       }).toList();
 
       if (mounted) {

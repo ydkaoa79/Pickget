@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
+import '../services/post_service.dart';
 import '../models/post_data.dart';
 import 'channel_screen.dart';
 import '../main.dart'; // To access global state if needed
 import '../core/app_state.dart'; 
+import '../core/supabase_config.dart'; // 🚀 추가
 
 class AdminUserManageScreen extends StatefulWidget {
   const AdminUserManageScreen({super.key});
@@ -298,6 +300,13 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
     );
   }
 
+  // 🚀 CDN 이미지 처리 헬퍼
+  String _getProfileUrl(String? path) {
+    if (path == null || path.isEmpty) return '';
+    if (path.startsWith('http')) return path;
+    return '${CloudflareConfig.cdnUrl}profile_images/$path';
+  }
+
   Widget _buildUserTile(dynamic user) {
     final String nickname = user['nickname'] ?? '익명';
     final String userId = user['user_id'] ?? '-';
@@ -306,29 +315,22 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
     final int posts = user['post_count'] ?? 0;
     final int votes = user['total_votes'] ?? 0;
 
+    final String profileUrl = _getProfileUrl(profileImg);
+
     return GestureDetector(
       onTap: () {
-        // 🏛️ [순간이동] 해당 유저의 채널 페이지로 이동!
-        // 최소한의 PostData 객체를 생성하여 전달합니다.
-        final mockPost = PostData(
-          id: 'temp',
-          title: '',
+        // 🏛️ [데이터 지능화] 전역 포스트 목록(gAllPosts)에서 이 유저의 진짜 포스트가 있는지 먼저 탐색
+        PostData? realPost;
+        try {
+          realPost = gAllPosts.firstWhere((p) => p.uploaderId == userId);
+        } catch (_) {}
+
+        // 🚀 진짜 포스트가 있으면 그걸 사용하고, 없으면 정교한 표준 mockPost 생성
+        final mockPost = realPost ?? PostService.createMockPost(
           uploaderId: userId,
           uploaderInternalId: user['id'],
           uploaderName: nickname,
-          uploaderImage: profileImg,
-          timeLocation: '',
-          imageA: '',
-          imageB: '',
-          descriptionA: '',
-          descriptionB: '',
-          likesCount: 0,
-          commentsCount: 0,
-          voteCountA: '0',
-          voteCountB: '0',
-          percentA: '50%',
-          percentB: '50%',
-          tags: [],
+          uploaderImage: profileUrl.isNotEmpty ? profileUrl : '',
         );
 
         Navigator.push(
@@ -336,7 +338,7 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
           MaterialPageRoute(
             builder: (context) => ChannelScreen(
               uploaderId: userId,
-              allPosts: gAllPosts, // 전역 포스트 리스트 전달
+              allPosts: gAllPosts,
               initialPost: mockPost,
             ),
           ),
@@ -352,12 +354,8 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
             CircleAvatar(
               radius: 20,
               backgroundColor: Colors.white12,
-              backgroundImage: (profileImg.isNotEmpty && profileImg.startsWith('http'))
-                ? NetworkImage(profileImg)
-                : null,
-              child: (profileImg.isEmpty || !profileImg.startsWith('http')) 
-                ? const Icon(Icons.person, color: Colors.white24, size: 20) 
-                : null,
+              backgroundImage: profileUrl.isNotEmpty ? NetworkImage(profileUrl) : null,
+              child: profileUrl.isEmpty ? const Icon(Icons.person, color: Colors.white24, size: 20) : null,
             ),
             const SizedBox(width: 12),
             Expanded(

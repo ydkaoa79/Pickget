@@ -9,6 +9,7 @@ import 'edit_profile_screen.dart';
 import 'channel_feed_screen.dart';
 import 'admin_screen.dart';
 import '../services/supabase_service.dart';
+import '../services/post_service.dart';
 
 class ChannelScreen extends StatefulWidget {
   final String uploaderId;
@@ -27,7 +28,7 @@ class ChannelScreen extends StatefulWidget {
 }
 
 class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProviderStateMixin {
-  String _dName = ''; String _dImg = 'assets/profiles/profile_11.jpg'; String _dBio = '';
+  String _dName = ''; String _dImg = ''; String _dBio = '';
   bool _isFollowing = false;
   late TabController _tabController;
   late List<PostData> _channelPosts;
@@ -72,6 +73,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
     _loadPosts();
     _calculateRealEmpathy(); // [신규] 진짜 공감도 계산 시작
     _fetchFollowerCount(); // [신규] 실제 팔로워 수 조회
+    _checkFollowStatus(); // 🚀 [추가] 실시간 팔로우 상태 체크
 
     // 🏛️ 정석 강제 새로고침: 혹시 모를 인식 지연을 방지하기 위해 0.1초 뒤 다시 확인!
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -190,23 +192,69 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
     }
   }
 
-  void _loadPosts() {
-    String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
-    String currentChannelId = normalized(widget.uploaderId);
+  // 🚀 [추가] 실시간 팔로우 상태 체크 함수
+  Future<void> _checkFollowStatus() async {
+    try {
+      if (isMe) return;
+      if (gUserInternalId == null || widget.initialPost.uploaderInternalId == null) return;
 
-    setState(() {
-      _channelPosts = widget.allPosts.where((p) {
-        // 🆔 주민번호(UUID) 기반 정석 필터링!
-        if (isMe) {
-          // 내 채널일 때: 내 주민번호와 일치하는 것만!
-          return p.uploaderInternalId == gUserInternalId;
-        } else {
-          // 타인 페이지일 경우: 그 사람의 주민번호와 일치하는 것만!
-          bool isSameOwner = (p.uploaderInternalId != null && p.uploaderInternalId == widget.initialPost.uploaderInternalId);
-          return isSameOwner && !p.isHidden;
-        }
-      }).toList();
-    });
+      final response = await SupabaseService.client
+          .from('follows')
+          .select('id')
+          .eq('follower_internal_id', gUserInternalId!)
+          .eq('following_internal_id', widget.initialPost.uploaderInternalId!)
+          .maybeSingle();
+      
+      if (mounted) {
+        setState(() {
+          _isFollowing = response != null;
+        });
+      }
+    } catch (e) {
+      debugPrint('팔로우 상태 체크 에러: $e');
+    }
+  }
+
+  void _loadPosts() {
+    // 🏛️ [1단계] 먼저 전달받은 로컬 목록에서 필터링 (즉각적인 반응성)
+    String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
+    
+    _channelPosts = widget.allPosts.where((p) {
+      if (isMe) {
+        return p.uploaderInternalId == gUserInternalId;
+      } else {
+        bool isSameOwner = (p.uploaderInternalId != null && p.uploaderInternalId == widget.initialPost.uploaderInternalId);
+        return isSameOwner && !p.isHidden;
+      }
+    }).toList();
+
+    // 🚀 [2단계] 실시간 DB 동기화 (최신 데이터 확보)
+    _syncWithSupabase();
+  }
+
+  Future<void> _syncWithSupabase() async {
+    try {
+      final String? targetInternalId = isMe ? gUserInternalId : widget.initialPost.uploaderInternalId;
+      if (targetInternalId == null) return;
+
+      // DB에서 이 유저의 모든 포스트를 실시간으로 긁어옵니다. (프로필 Join 포함)
+      final List<dynamic> response = await SupabaseService.client
+          .from('posts')
+          .select('*, profiles:user_profiles!uploader_internal_id(id, user_id, nickname, profile_image, points, updated_at)')
+          .eq('uploader_internal_id', targetInternalId)
+          .order('created_at', ascending: false);
+      
+      final fetched = response.map((m) => PostService.mapToPostData(m)).toList();
+
+      if (mounted) {
+        setState(() {
+          // 중복 제거 및 최신 데이터로 교체
+          _channelPosts = fetched;
+        });
+      }
+    } catch (e) {
+      debugPrint('채널 실시간 동기화 에러: $e');
+    }
   }
 
   void _handleTabSelection() {

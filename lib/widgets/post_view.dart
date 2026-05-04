@@ -99,7 +99,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       if (syncedCount is int) return syncedCount;
       if (syncedCount is num) return syncedCount.toInt();
     } catch (_) {
-      // Older databases may not have this RPC signature yet.
     }
 
     final List<dynamic> comments = await SupabaseService.client
@@ -120,30 +119,22 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   @override
   void didUpdateWidget(PostView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // If the post data reference changed or follows were updated, we need to refresh
     if (oldWidget.post.isFollowing != widget.post.isFollowing || oldWidget.post.id != widget.post.id) {
       setState(() {});
     }
   }
 
-  double _dragDistance = 0; // 📏 미세 드래그 방지용 변수 추가
-  Timer? _initTimer; // ⏱️ 영상 초기화 딜레이용 타이머
+  double _dragDistance = 0; 
+  Timer? _initTimer; 
   
   @override
   void initState() {
     super.initState();
-    print('DEBUG: PostView State initialized for post_id: ${widget.post.id} (Ver. 1.0)');
-    
-    // 이전 투표 내역 불러오기
     _votedSide = gUserVotes[widget.post.id] ?? 0;
-    
     _updateRemainingTime();
     _startTimer();
-
-    // 🎬 영상 초기화는 화면에 보일 때(VisibilityDetector)에서 자동 처리!
   }
 
-  // 🎬 모든 영상 리소스 해제
   void _releaseAllVideos() {
     _controllerA?.dispose();
     _controllerA = null;
@@ -160,7 +151,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     _videoBFinished = false;
   }
 
-  // 🎬 영상 초기화 (네트워크 URL 직접 사용, 6초 영상이라 빠름)
   Future<void> _initVideo(String url, int side) async {
     if (!_isVideo(url)) return;
     if (side == 1 && (_isInitializedA || _isInitializingA)) return;
@@ -170,33 +160,24 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     else _isInitializingB = true;
 
     try {
-      print('DEBUG [VIDEO v2]: Side $side 초기화 시작 - $url');
-      
-      // 🚀 주소가 http로 시작하면 웹/모바일 상관없이 네트워크 재생 방식을 사용 (웹 에러 방지)
-      // 🚀 영상 캐싱 적용 (모바일 전용)
       VideoPlayerController controller;
       if (!kIsWeb && url.startsWith('http')) {
-        print('DEBUG [VIDEO v2]: 캐시 매니저 가동 - $url');
         try {
           final file = await DefaultCacheManager().getSingleFile(url);
           controller = VideoPlayerController.file(file);
         } catch (e) {
-          print('DEBUG [VIDEO v2]: 캐싱 실패, 스트리밍으로 전환 - $e');
           controller = VideoPlayerController.networkUrl(Uri.parse(url));
         }
       } else if (url.startsWith('http')) {
-        print('DEBUG [VIDEO v2]: 네트워크 URL 직접 재생 (Web/Streaming) - $url');
         controller = VideoPlayerController.networkUrl(Uri.parse(url));
       } else {
-        print('DEBUG [VIDEO v2]: 로컬 파일 직접 재생');
         controller = VideoPlayerController.file(File(url));
       }
 
       await controller.initialize();
-      await controller.setLooping(false); // 🎬 루핑은 수동 리스너(_onVideoFinished)에서 관리 (A->B 전환 등 지능적 루프를 위해)
-      await controller.setVolume(0); // 🔇 음소거 (소리는 업로드 시 이미 삭제됨)
+      await controller.setLooping(false); 
+      await controller.setVolume(0); 
       
-      // 🎬 영상 끝 감지 리스너
       void listener() {
         if (!mounted) return;
         if (side == 1 && _controllerA != controller) return;
@@ -228,20 +209,15 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
         }
       });
 
-      // 🎬 A가 준비되면 자동 재생 시작!
       if (side == 1 && _playingSide == 0) {
         _switchToSide(1);
       }
-      
-      print('DEBUG [VIDEO v2]: Side $side 초기화 완료!');
     } catch (e) {
       if (side == 1) _isInitializingA = false;
       else _isInitializingB = false;
-      print('DEBUG [VIDEO v2]: Side $side 초기화 실패 - $e');
     }
   }
 
-  // 🎬 영상 재생 완료 시 처리 (무한 루프 로직)
   void _onVideoFinished(int side) {
     if (!mounted) return;
     if (side == 1 && _videoAFinished) return;
@@ -249,69 +225,50 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     if (side == 1) _videoAFinished = true;
     if (side == 2) _videoBFinished = true;
     
-    // 🎬 현재 어떤 사이드가 확장되어 있는지 체크
     double ratioA = (_widthA ?? (MediaQuery.of(context).size.width * 0.5)) / MediaQuery.of(context).size.width;
 
     if (side == 1) {
-      print('DEBUG [VIDEO v2]: A 영상 종료');
       _controllerA?.pause();
       _controllerA?.seekTo(Duration.zero);
-      
       if (ratioA >= 0.55) {
-        // A가 확장된 상태라면 A 무한 반복
         _switchToSide(1);
       } else if (ratioA <= 0.45) {
-        // B가 확장된 상태인데 A가 끝난 건 무시 (이미 B 재생 중일 것)
       } else {
-        // 중앙 상태라면 B로 전환 (순차 루프)
         _switchToSide(2);
       }
     } else if (side == 2) {
-      print('DEBUG [VIDEO v2]: B 영상 종료');
       _controllerB?.pause();
       _controllerB?.seekTo(Duration.zero);
-
       if (ratioA <= 0.45) {
-        // B가 확장된 상태라면 B 무한 반복
         _switchToSide(2);
       } else if (ratioA >= 0.55) {
-        // A가 확장된 상태인데 B가 끝난 건 무시
       } else {
-        // 중앙 상태라면 다시 A로 전환 (순차 루프 A->B->A...)
         _switchToSide(1);
       }
     }
   }
 
-  // 🎬 특정 사이드로 즉시 전환 (터치/슬라이드 시 호출)
   void _switchToSide(int side) {
     if (!mounted) return;
     
     if (side == 1 && _isInitializedA && _controllerA != null) {
-      _controllerB?.pause(); // B는 보던 위치에서 일시정지
-      // 🚀 보던 위치에서 Resume! (완전히 끝났을 때만 위에서 0초로 감)
+      _controllerB?.pause();
       _videoAFinished = false;
       _controllerA!.play();
       setState(() => _playingSide = 1);
     } else if (side == 2 && _isInitializedB && _controllerB != null) {
-      _controllerA?.pause(); // A는 보던 위치에서 일시정지
-      // 🚀 보던 위치에서 Resume!
+      _controllerA?.pause();
       _videoBFinished = false;
       _controllerB!.play();
       setState(() => _playingSide = 2);
     }
   }
 
-  // 🎬 화면 진입 시 영상 시작 (스마트 시차 로딩 적용)
   void _onBecomeVisible() {
-    _viewStartTime = DateTime.now(); // ⏱️ 화면에 보이기 시작한 시간 기록!
-    
-    // 1️⃣ 우선순위: 메인 영상(A) 즉시 로딩 시작
+    _viewStartTime = DateTime.now(); 
     if (_isVideo(widget.post.imageA)) {
       _initVideo(widget.post.imageA, 1);
     }
-
-    // 2️⃣ 시차 로딩: 반대편 영상(B)은 0.15초 뒤에 로딩 시작 (CPU 부하 분산)
     Future.delayed(const Duration(milliseconds: 150), () {
       if (!mounted || !_isVisible) return;
       if (_isVideo(widget.post.imageB)) {
@@ -335,7 +292,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     if (widget.post.isExpired) {
       _remainingSeconds = 0;
     } else {
-      // Calculate remaining seconds based on absolute end time
       _remainingSeconds = widget.post.endTime.difference(DateTime.now()).inSeconds;
       if (_remainingSeconds < 0) _remainingSeconds = 0;
     }
@@ -356,18 +312,16 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   @override
   void dispose() {
     _countdownTimer?.cancel();
-    _controllerA?.dispose(); // 🎬 영상 리소스 해제 필수!
+    _controllerA?.dispose(); 
     _controllerB?.dispose();
     super.dispose();
   }
 
   bool get isMe {
-    // 🆔 오직 주민번호(UUID) 하나로만 판단 (진짜 정석!)
     String nId(String? s) => (s ?? '').trim().toLowerCase();
     if (widget.post.uploaderInternalId != null && gUserInternalId != null) {
       if (nId(widget.post.uploaderInternalId) == nId(gUserInternalId)) return true;
     }
-    // 예외/안전장치 (아이디 기반)
     String normalized(String id) => id.replaceAll(RegExp(r'[@\s_]'), '').trim();
     return normalized(widget.post.uploaderId) == normalized(gIdText) || 
            widget.post.uploaderId == 'me';
@@ -393,25 +347,19 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
     if (confirm == true) {
       try {
-        final String postId = widget.post.id; // UUID 문자열 그대로 사용
-
-        // 🔥 [핵심] 외래 키 제약 때문에 연관 데이터 먼저 삭제 후 게시물 삭제!
+        final String postId = widget.post.id; 
         await Future.wait([
           SupabaseService.client.from('votes').delete().eq('post_id', postId),
           SupabaseService.client.from('comments').delete().eq('post_id', postId),
           SupabaseService.client.from('likes').delete().eq('post_id', postId),
           SupabaseService.client.from('bookmarks').delete().eq('post_id', postId),
         ]);
-
-        // 연관 데이터 삭제 완료 후 게시물 삭제
         await SupabaseService.client.from('posts').delete().eq('id', postId);
-
         widget.onDelete?.call(postId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('게시물이 삭제되었습니다.')));
         }
       } catch (e) {
-        debugPrint('Delete error: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('삭제 중 오류가 발생했습니다.')));
         }
@@ -429,7 +377,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   void _showAlreadySelectedMessage() {
     if (_showAlreadySelectedToast) return;
     setState(() => _showAlreadySelectedToast = true);
-    Future.delayed(const Duration(milliseconds: 1000), () { // ⏱️ 시간 1초로 단축!
+    Future.delayed(const Duration(milliseconds: 1000), () { 
       if (mounted) setState(() => _showAlreadySelectedToast = false);
     });
   }
@@ -437,23 +385,21 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   void _showIsMeMessage() {
     if (_showIsMeToast) return;
     setState(() => _showIsMeToast = true);
-    Future.delayed(const Duration(milliseconds: 1000), () { // ⏱️ 1초만 잔류!
+    Future.delayed(const Duration(milliseconds: 1000), () { 
       if (mounted) setState(() => _showIsMeToast = false);
     });
   }
 
-  // 🛡️ 진짜 유효한 설명글인지 확인하는 판별기
   bool _isValidDescription(String? text) {
     if (text == null) return false;
     final clean = text.trim();
     if (clean.isEmpty) return false;
-    // 의미 없는 기본값들이나 공백만 있는 경우 차단!
     final blackList = [
       "내용을 입력하세요", "내용 없음", "내용이 없습니다", "설명을 입력하세요",
       "선택지A", "선택지B", "선택지 A", "선택지 B"
     ];
     if (blackList.contains(clean)) return false;
-    return clean.length > 1; // 최소 2글자는 되어야 함
+    return clean.length > 1; 
   }
 
   void _onVote(int side) async {
@@ -463,35 +409,28 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     }
     if (_votedSide != 0) return;
     
-    // 🆔 오직 주민번호(UUID) 하나로만 판단 (진짜 정석!)
     String normalized(String? s) => (s ?? '').trim().toLowerCase();
     bool isMe = (widget.post.uploaderInternalId != null && gUserInternalId != null && 
                  normalized(widget.post.uploaderInternalId) == normalized(gUserInternalId));
     
-    print('DEBUG [VOTE]: gUserInternalId=$gUserInternalId, postUploaderInternalId=${widget.post.uploaderInternalId}, isMe=$isMe');
-
     if (isMe) {
-      _showIsMeMessage(); // 🚀 SnackBar 대신 전용 토스트 호출!
-      HapticFeedback.vibrate(); // 진동으로 피드백!
+      _showIsMeMessage(); 
+      HapticFeedback.vibrate(); 
       return;
     }
 
-    // 💾 진짜 투표 및 포인트 적립 로직 (새로운 정책!)
     try {
-      // 1. 투표 기록 저장 (언제든지 가능!)
       await SupabaseService.client.from('votes').insert({
         'post_id': widget.post.id,
         'user_internal_id': gUserInternalId,
         'side': side,
       });
 
-      // ⏱️ [신규 규칙] 6초 이상 정독했을 때만 포인트 혜택 적용!
       final elapsed = _viewStartTime != null 
           ? DateTime.now().difference(_viewStartTime!).inSeconds 
           : 0;
 
       if (elapsed >= 6) {
-        // 🎁 [규칙 1] 게시글 작성자에게 1포인트 지급!
         if (widget.post.uploaderInternalId != null) {
           await SupabaseService.client.from('points_history').insert({
             'user_internal_id': widget.post.uploaderInternalId,
@@ -506,7 +445,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
           } catch(e) {}
         }
 
-        // 🏆 [규칙 2] 내가 투표 10번 할 때마다 1포인트 지급!
         final voteCountRes = await SupabaseService.client
             .from('votes')
             .select('id')
@@ -528,20 +466,16 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
           if (mounted) {
             setState(() => gUserPoints += 1);
-            _triggerPointToast(); // 6초 정독 시에만 포인트 알림!
+            _triggerPointToast(); 
           }
         }
-        print('DEBUG [VOTE]: 6s+ read. Points awarded. (Uploader +1, Voter 1/10)');
-      } else {
-        print('DEBUG [VOTE]: Under 6s. Vote recorded but NO points awarded.');
       }
     } catch (e) {
-      print('DEBUG [VOTE]: Error recording vote: $e');
     }
 
     setState(() {
       _votedSide = side;
-      gUserVotes[widget.post.id] = side; // 전역 상태에 즉시 반영
+      gUserVotes[widget.post.id] = side; 
       
       int parseV(String s) {
         s = s.toLowerCase().replaceAll(',', '').trim();
@@ -581,7 +515,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       _isDragging = true; 
       _widthA = ((_widthA ?? (sw * 0.5)) + details.delta.dx).clamp(sw * 0.2, sw * 0.8); 
       
-      // 🎬 실시간 영상 전환 체크 (55% 이상 열리면 즉시 재생)
       double ratioA = _widthA! / sw;
       final now = DateTime.now();
       if (_lastSwitchTime == null || now.difference(_lastSwitchTime!) > const Duration(milliseconds: 300)) {
@@ -597,11 +530,11 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   }
 
   void _onPanEnd(DragEndDetails details, double sw) {
-    if (!_isDragging) return; // 🚫 드래그가 실제로 일어나지 않았다면(단순 클릭) 무시!
+    if (!_isDragging) return; 
 
     setState(() {
       _isDragging = false;
-      _dragDistance = 0; // 리셋
+      _dragDistance = 0; 
       double currentWidthA = _widthA ?? (sw * 0.5);
       
       if (currentWidthA > sw * 0.65) {
@@ -632,28 +565,26 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   }
 
   void _onPanCancel(double sw) {
-    if (!_isDragging) return; // 🚫 드래그 중이 아니었다면 무시
+    if (!_isDragging) return; 
 
     setState(() {
       _isDragging = false;
-      _dragDistance = 0; // 리셋
+      _dragDistance = 0; 
       _widthA = sw * 0.5;
       _expandedSide = 0;
     });
   }
 
   void _handleTap(TapDownDetails details, double sw) {
-    _dragDistance = 0; // 클릭하는 순간 거리 리셋
+    _dragDistance = 0; 
     double tapX = details.localPosition.dx;
     double currentWidthA = _widthA ?? (sw * 0.5);
 
     setState(() {
       if (_expandedSide != 0) {
-        // 🔙 이미 한쪽이 확장되어 있다면, 어디를 누르든 다시 중앙(50:50)으로 복귀!
         _expandedSide = 0;
         _widthA = sw * 0.5;
       } else {
-        // 🔍 중앙 상태일 때만 클릭한 쪽을 확장
         if (tapX < currentWidthA) {
           _expandedSide = 1;
           _widthA = sw * 0.8;
@@ -666,7 +597,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     
     HapticFeedback.lightImpact();
     
-    // 🎬 터치 시에도 즉시 전환 체크
     double ratioA = (_widthA ?? (sw * 0.5)) / sw;
     if (ratioA >= 0.55) {
       _switchToSide(1);
@@ -677,8 +607,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     }
   }
 
-
-
   String _formatTimer(int seconds) {
     int h = seconds ~/ 3600;
     int m = (seconds % 3600) ~/ 60;
@@ -687,8 +615,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   }
 
   void _syncWithGlobalState() {
-    // 🌍 전역 상태(gLikedPostIds 등)와 개별 포스트 데이터 동기화
-    // 이 작업은 빌드 시점에 수행되어 여러 화면에 흩어진 동일 포스트들의 상태를 맞춥니다.
     final String postId = widget.post.id;
     final String? uploaderId = widget.post.uploaderInternalId;
 
@@ -698,7 +624,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       widget.post.isFollowing = gFollowedUserIds.contains(uploaderId);
     }
     
-    // 투표 상태는 로컬 변수 _votedSide와 전역 상태 gUserVotes를 우선함
     if (gUserVotes.containsKey(postId)) {
       _votedSide = gUserVotes[postId]!;
       widget.post.userVotedSide = _votedSide;
@@ -708,7 +633,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    _syncWithGlobalState(); // 🔄 빌드할 때마다 최신 전역 상태 주입!
+    _syncWithGlobalState(); 
     return VisibilityDetector(
       key: ValueKey('vd_${widget.key ?? widget.post.id}'),
       onVisibilityChanged: (info) {
@@ -731,7 +656,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
         final currentWidthA = _widthA ?? (sw > 0 ? sw * 0.5 : 0.0);
         const double descWidth = 175.0;
         bool isExpired = _remainingSeconds <= 0;
-        // UI update for remaining time
 
         return GestureDetector(
           onTapDown: (d) => _handleTap(d, sw),
@@ -742,17 +666,15 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
             children: [
               Row(
                 children: [
-                  // 왼쪽 A 구역 (창문 역할)
                   AnimatedContainer(
                     duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
                     curve: Curves.easeOutCubic, 
                     width: currentWidthA, 
                     height: sh,
-                    clipBehavior: Clip.hardEdge, // 창문 밖으로 나가는 건 자름
+                    clipBehavior: Clip.hardEdge, 
                     decoration: const BoxDecoration(color: Colors.black),
                     child: Stack(
                       children: [
-                        // 배경 블러 (창문 뒤에 꽉 참)
                         Positioned.fill(
                           child: ImageFiltered(
                             imageFilter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
@@ -760,10 +682,9 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           ),
                         ),
                         Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.3))),
-                        // 전경 이미지 (창문 너비에 상관없이 80% 크기로 고정되어 있음)
                         Center(
                           child: OverflowBox(
-                            maxWidth: sw, // 🚀 80%에서 100%로 키워서 여백 없앰!
+                            maxWidth: sw, 
                             minWidth: sw,
                             child: _buildMedia(1, widget.post.imageA, sw, thumbUrl: widget.post.thumbA),
                           ),
@@ -771,17 +692,15 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                       ],
                     ),
                   ),
-                  // 오른쪽 B 구역 (창문 역할)
                   AnimatedContainer(
                     duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
                     curve: Curves.easeOutCubic, 
                     width: (sw - currentWidthA).clamp(0.0, sw), 
                     height: sh,
-                    clipBehavior: Clip.hardEdge, // 창문 밖으로 나가는 건 자름
+                    clipBehavior: Clip.hardEdge, 
                     decoration: const BoxDecoration(color: Colors.black),
                     child: Stack(
                       children: [
-                        // 배경 블러
                         Positioned.fill(
                           child: ImageFiltered(
                             imageFilter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
@@ -789,10 +708,9 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           ),
                         ),
                         Positioned.fill(child: Container(color: Colors.black.withValues(alpha: 0.3))),
-                        // 전경 이미지 (80% 크기로 고정)
                         Center(
                           child: OverflowBox(
-                            maxWidth: sw, // 🚀 80%에서 100%로 키워서 여백 없앰!
+                            maxWidth: sw, 
                             minWidth: sw,
                             child: _buildMedia(2, widget.post.imageB, sw, thumbUrl: widget.post.thumbB),
                           ),
@@ -802,7 +720,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                   ),
                 ],
               ),
-              // 2. 중앙 VS 아이콘
               AnimatedPositioned(
                 duration: _isDragging ? Duration.zero : const Duration(milliseconds: 400), 
                 curve: Curves.easeOutCubic, 
@@ -837,11 +754,11 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                 child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(left: 20, right: 0), // 우측 여백을 0으로 하고 버튼 내부에서 처리
+                      padding: const EdgeInsets.only(left: 20, right: 0), 
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center, 
                         children: [
-                          const SizedBox(width: 20), // 좌측 여백 (대칭용)
+                          const SizedBox(width: 20), 
                           Expanded(
                             child: Center(
                               child: FittedBox(
@@ -860,7 +777,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                               )
                             )
                           ), 
-                          const SizedBox(width: 20), // 우측 여백 (대칭용)
+                          const SizedBox(width: 20), 
                         ]
                       )
                     ),
@@ -899,7 +816,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                 left: (currentWidthA / 2) - (descWidth / 2), 
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 300),
-                  // 🚀 판별기를 통과한 '진짜 내용'이 있을 때만 드래그/클릭 시 노출!
                   opacity: ((_expandedSide == 1 || (_isDragging && currentWidthA > sw * 0.55)) && _isValidDescription(widget.post.descriptionA)) ? 1.0 : 0.0,
                   child: IgnorePointer(
                     ignoring: _expandedSide != 1,
@@ -914,7 +830,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                 left: currentWidthA + ((sw - currentWidthA) / 2) - (descWidth / 2), 
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 300),
-                  // 🚀 판별기를 통과한 '진짜 내용'이 있을 때만 드래그/클릭 시 노출!
                   opacity: ((_expandedSide == 2 || (_isDragging && currentWidthA < sw * 0.45)) && _isValidDescription(widget.post.descriptionB)) ? 1.0 : 0.0,
                   child: IgnorePointer(
                     ignoring: _expandedSide != 2,
@@ -1017,7 +932,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                               ? formatCount(widget.post.commentsCount)
                               : 'Pick',
                           onTap: () {
-                            print('DEBUG: Comment icon tapped for post_id: ${widget.post.id}');
                             if (!gIsLoggedIn) {
                               gShowLoginPopup?.call();
                               return;
@@ -1046,14 +960,10 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         const SizedBox(width: 20),
                         _statIcon(Icons.share, '', onTap: () {
                           final String shareUrl = 'https://pickget.net/?id=${widget.post.id}';
-                          
-                          // 🚀 통합 공유하기 (Native Share Sheet) 호출
                           Share.share(
                             '지금 PickGet에서 이 게시물을 확인해보세요!\n$shareUrl',
                             subject: 'PickGet 게시물 공유',
                           );
-
-                          // 클립보드 복사도 동시에 진행 (편의용)
                           Clipboard.setData(ClipboardData(text: shareUrl));
                         }),
                       ],
@@ -1062,10 +972,9 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                 ),
               ),
               _buildChart(widget.post),
-              // 🚀 [신규 위치] 점 세 개 메뉴 버튼을 그래프 옆 벽면으로 이동
               Positioned(
                 bottom: 125 + MediaQuery.of(context).padding.bottom, 
-                right: 8, // 벽에 더 바짝 붙임
+                right: 8, 
                 child: PopupMenuButton<String>(
                   padding: EdgeInsets.zero,
                   child: Container(
@@ -1097,7 +1006,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                     }
                   },
                   itemBuilder: (BuildContext context) {
-                    // 🔒 [추가] 비로그인 상태면 '설명'만 노출
                     if (!gIsLoggedIn) {
                       return <PopupMenuEntry<String>>[
                         const PopupMenuItem<String>(value: '설명', child: Row(children: [Icon(Icons.info_outline, color: Colors.white70, size: 20), SizedBox(width: 12), Text('설명', style: TextStyle(color: Colors.white, fontSize: 14))])),
@@ -1147,7 +1055,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                     },
                   ),
                 ),
-
 
               if (_showAlreadySelectedToast && !isExpired)
                 Positioned(
@@ -1220,16 +1127,15 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.85, // 🚀 100%에서 85%로 줄여서 상단 여백 확보!
+        height: MediaQuery.of(context).size.height * 0.85, 
         decoration: const BoxDecoration(
-          color: Color(0xFF121212), // 조금 더 깊이감 있는 블랙
+          color: Color(0xFF121212), 
           borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
           boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 5)],
         ),
         child: Column(
           children: [
             const SizedBox(height: 12),
-            // 🎩 상단 핸들 바 (드래그 유도 및 디자인 포인트)
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 8),
             Padding(
@@ -1301,18 +1207,13 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       return;
     }
 
-    // 1. Fetch ALL comments for this post
     try {
-      print('DEBUG: Fetching comments for post_id: ${widget.post.id}');
       final List<dynamic> data = await SupabaseService.client
           .from('comments')
           .select()
           .eq('post_id', widget.post.id)
           .order('created_at', ascending: true);
       
-      print('DEBUG: Fetched ${data.length} comments from server.');
-      
-      // 1-b. Fetch user profiles for commenters to enable real-time sync
       final List<dynamic> commentersProfiles = await SupabaseService.client
           .from('user_profiles')
           .select('id, user_id, nickname, profile_image');
@@ -1324,12 +1225,9 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
         for (var p in commentersProfiles) p['user_id'].toString(): p
       };
 
-      // First, create all CommentData objects with merged profile info
       final allComments = data.map((json) {
         final String? internalId = json['user_internal_id']?.toString();
         final String handle = json['user_id'] ?? '';
-        
-        // Propagation Magic: Match by Internal ID (String/UUID), fallback to handle snapshot
         final profile = (internalId != null) ? profileById[internalId] : profileByHandle[handle];
         
         return CommentData(
@@ -1337,16 +1235,15 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
           parentId: json['parent_id'],
           user: (profile != null) ? (profile['nickname'] ?? '익명') : (json['user_name'] ?? '익명'),
           userId: json['user_id'] ?? '',
-          userInternalId: json['user_internal_id']?.toString(), // 🆔 주민번호 불러오기
+          userInternalId: json['user_internal_id']?.toString(), 
           text: json['text'] ?? '',
           side: json['side'] ?? 0,
-          image: (profile != null) ? (profile['profile_image'] ?? 'assets/profiles/profile_11.jpg') : (json['user_image'] ?? 'assets/profiles/profile_11.jpg'),
+          image: (profile != null) ? (profile['profile_image'] ?? '') : (json['user_image'] ?? ''),
           isPinned: json['is_pinned'] ?? false,
           isHidden: json['is_hidden'] ?? false,
         );
       }).toList();
 
-      // Second, rebuild the tree
       final List<CommentData> rootComments = [];
       final Map<String, CommentData> commentMap = {for (var c in allComments) c.id!: c};
 
@@ -1358,7 +1255,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
           if (parent != null) {
             parent.replies.add(c);
           } else {
-            // Parent not found (maybe deleted?), treat as root
             rootComments.add(c);
           }
         }
@@ -1366,7 +1262,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
       widget.post.comments = rootComments;
       
-      // Third, recursive count for the icon
       int countAll(List<CommentData> list) {
         int total = list.length;
         for (var c in list) {
@@ -1377,30 +1272,24 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       
       int totalCount = countAll(rootComments);
       widget.post.commentsCount = totalCount;
-      print('DEBUG: Total recursive comment count: $totalCount');
 
       try {
         widget.post.commentsCount = await _syncCommentsCount();
       } catch (e) {
-        print('DEBUG: Sync FAILED! Error: $e');
       }
 
       if (mounted) {
         setState(() {});
       }
     } catch (e) {
-      print('DEBUG: Fetch comments FAILED! Error: $e');
       _isSheetOpening = false;
       return;
     }
 
-    // 🆔 주민번호 기반 주인 확인 (진짜 정석!)
     bool isMe = (widget.post.uploaderInternalId != null && gUserInternalId != null && 
                  widget.post.uploaderInternalId!.trim().toLowerCase() == gUserInternalId!.trim().toLowerCase());
     
-    print('DEBUG [COMMENT]: gUserInternalId=$gUserInternalId, postUploaderInternalId=${widget.post.uploaderInternalId}, isMe=$isMe, _votedSide=$_votedSide, isExpired=$isExpired');
     if (_votedSide == 0 && !isExpired && !isMe) {
-      print('DEBUG [COMMENT]: BLOCKED! Showing AlertDialog.');
       await showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -1442,7 +1331,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const SizedBox(width: 48), // 좌측 균형용
+                        const SizedBox(width: 48), 
                         const Text('댓글', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
                         IconButton(
                           icon: const Icon(Icons.close, color: Colors.white70, size: 28),
@@ -1536,10 +1425,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           return;
                         }
                         
-                        // 🆔 진짜 주인 확인 (정석!)
                         bool isMe = (widget.post.uploaderInternalId != null && widget.post.uploaderInternalId == gUserInternalId);
-                        
-                        // 일반 유저는 투표 필수! 단, 주인님이거나 투표 종료된 글은 프리패스!
                         if (_votedSide == 0 && !isMe && !isExpired) {
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('투표를 먼저 해주세요!')));
                           return;
@@ -1548,7 +1434,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         final newComment = CommentData(
                           user: gNameText, 
                           userId: gIdText,
-                          userInternalId: gUserInternalId, // 🆔 주민번호 장착!
+                          userInternalId: gUserInternalId, 
                           text: text, 
                           side: _votedSide, 
                           image: gProfileImage,
@@ -1578,12 +1464,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                             'user_image': gProfileImage,
                             'side': _votedSide,
                           });
-
-                          // ★ [제미나이 프로 X 정석 로봇] 게시물 테이블의 댓글 숫자도 실시간 업데이트!
                           widget.post.commentsCount = await _syncCommentsCount();
-
                         } catch (e) {
-                          print('댓글 저장 및 숫자 업데이트 실패: $e');
                         }
                       }
                       FocusManager.instance.primaryFocus?.unfocus();
@@ -1609,24 +1491,20 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                       gShowLoginPopup?.call();
                       return;
                     }
-
                     bool isMe = (widget.post.uploaderInternalId != null && widget.post.uploaderInternalId == gUserInternalId);
-                    
                     if (_votedSide == 0 && !isMe && !isExpired) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('투표를 먼저 해주세요!')));
                       return;
                     }
-
                     final newComment = CommentData(
                       user: gNameText, 
                       userId: gIdText,
-                      userInternalId: gUserInternalId, // 🆔 주민번호 장착!
+                      userInternalId: gUserInternalId, 
                       text: text, 
                       side: _votedSide, 
                       image: gProfileImage,
                       parentId: replyingTo?.id,
                     );
-
                     setSheetState(() {
                       if (replyingTo != null) {
                         replyingTo.replies.add(newComment);
@@ -1638,7 +1516,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                       controller.clear();
                     });
                     if (mounted) setState(() {}); 
-
                     try {
                       await SupabaseService.client.from('comments').insert({
                         'post_id': widget.post.id,
@@ -1650,12 +1527,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         'user_image': gProfileImage,
                         'side': _votedSide,
                       });
-
-                      // ★ [제미나이 프로 X 정석 로봇] 게시물 테이블의 댓글 숫자도 실시간 업데이트!
                       widget.post.commentsCount = await _syncCommentsCount();
-
                     } catch (e) {
-                      print('댓글 저장 및 숫자 업데이트 실패: $e');
                     }
                   }
                   FocusManager.instance.primaryFocus?.unfocus();
@@ -1693,7 +1566,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   }
 
   Widget _bgLabel(String text, Color color, {bool isWinner = false}) { 
-    return IgnorePointer( // 배경 글자가 터치 이벤트를 가로막지 않도록 설정 (중요!)
+    return IgnorePointer(
       child: Stack(
         clipBehavior: Clip.none, alignment: Alignment.topCenter,
         children: [
@@ -1718,21 +1591,16 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       final controller = (side == 1) ? _controllerA : _controllerB;
       final isInitialized = (side == 1) ? _isInitializedA : _isInitializedB;
       final isPlaying = (_playingSide == side);
-
       Widget content;
-      // 🎬 초기화가 완료되었을 때의 처리
       if (!forceThumb && isInitialized && controller != null) {
         if (kIsWeb) {
-          // 🌐 [Web 전용] 모든 지저분한 로직을 걷어낸 '클린 슬레이트' 버전
           content = isPlaying
               ? ValueListenableBuilder(
                   valueListenable: controller,
                   builder: (context, VideoPlayerValue value, child) {
-                    // 🎬 웹 전용: 영상이 0.5초 이상 확실히 재생되고 + 실제로 플레이 중일 때만 전환 (깜빡임 완벽 차단)
                     final bool videoReady = value.position > const Duration(milliseconds: 500) && 
                                             value.size.width > 0 && 
                                             value.isPlaying;
-
                     if (!videoReady) {
                       return (thumbUrl != null && thumbUrl.isNotEmpty)
                           ? CachedNetworkImage(
@@ -1743,8 +1611,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                             )
                           : const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2));
                     }
-
-                    // 준비 완료 시 앱과 동일한 가장 표준적인 비디오 구조 사용
                     return FittedBox(
                       fit: BoxFit.cover,
                       clipBehavior: Clip.hardEdge,
@@ -1765,7 +1631,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                     )
                   : const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2));
         } else {
-          // 📱 [App 전용] 사용자 요청대로 절대 건드리지 않는 순수 오리지널 구조 유지
           content = FittedBox(
             fit: BoxFit.cover,
             clipBehavior: Clip.hardEdge,
@@ -1790,14 +1655,11 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
           content = const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2));
         }
       }
-
       return content;
     } else {
       if (url.trim().isEmpty) {
         return const Center(child: CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 2));
       }
-      // 🖼️ 이미지일 때 (기존 로직 그대로 캐싱 적용!)
-      // 블러 배경용(forceThumb)이라면 썸네일을 우선 사용해서 성능 최적화!
       final String effectiveUrl = (forceThumb && thumbUrl != null && thumbUrl.isNotEmpty) 
           ? thumbUrl.trim() 
           : url.trim();
@@ -1863,7 +1725,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   }
 
   Widget _buildChart(PostData post) {
-    bool isExpired = _remainingSeconds <= 0 || post.isExpired;
     bool hasVoted = _canViewDiscussionResults;
     return Positioned(
       bottom: 67 + MediaQuery.of(context).padding.bottom, right: 35,
@@ -1871,7 +1732,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
         width: 120, height: 110,
         child: Stack(
           alignment: Alignment.topCenter,
-          clipBehavior: Clip.none, // 에러 방지용! 박스를 벗어나도 보이게 설정
+          clipBehavior: Clip.none, 
           children: [
             SizedBox(
               width: 58, height: 58,
@@ -1888,7 +1749,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      // 왼쪽 A 통계 (시안색 - 우측 정렬)
                       SizedBox(
                         width: 45,
                         child: Stack(
@@ -1910,7 +1770,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         ),
                       ),
                       const SizedBox(width: 15),
-                      // 오른쪽 B 통계 (빨간색 - 좌측 정렬)
                       SizedBox(
                         width: 50,
                         child: Padding(
@@ -1939,10 +1798,10 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                 ],
               ),
             ) else Positioned(
-              top: 66, // ⚪ 조금 더 여유 있게 아래로 배치
-              left: 5, right: 5, // 🚀 양옆 여백을 줘서 중앙 정렬 유도
+              top: 66, 
+              left: 5, right: 5, 
               child: Center(
-                child: FittedBox( // 💥 [대응] 작은 폰에서도 글자가 안 깨지게 자동 축소!
+                child: FittedBox( 
                   fit: BoxFit.scaleDown,
                   child: _shadowText(
                     '투표 후 확인 가능', 
@@ -1982,7 +1841,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   Widget _myPickLabel() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-      margin: const EdgeInsets.only(bottom: 5), // 간격을 2에서 5로 대폭 확대
+      margin: const EdgeInsets.only(bottom: 5), 
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
       child: const Text('My Pick', style: TextStyle(color: Colors.black, fontSize: 7, fontWeight: FontWeight.w900)),
     );
@@ -1995,10 +1854,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   Widget _commentItem(CommentData c, int index, StateSetter setSheetState, Function(CommentData) onReplyTap, {double depth = 0}) {
     bool isPostAuthor = (widget.post.uploaderInternalId != null && widget.post.uploaderInternalId == gUserInternalId);
     bool isCommentAuthor = (c.userInternalId != null && c.userInternalId == gUserInternalId);
-    
-    if (c.isHidden && !isPostAuthor) {
-      return const SizedBox.shrink();
-    }
+    if (c.isHidden && !isPostAuthor) return const SizedBox.shrink();
 
     return Column(
       children: [
@@ -2040,14 +1896,11 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                       children: [
                         Builder(
                           builder: (context) {
-                            // 주민번호(internal_id)를 우선으로 작성자/본인 판별 (정석!)
                             bool isMe = (c.userInternalId != null && c.userInternalId == gUserInternalId);
                             bool isPostAuthorTag = (c.userInternalId != null && widget.post.uploaderInternalId != null && c.userInternalId == widget.post.uploaderInternalId);
-                            
                             if (isPostAuthorTag) {
                               String displayName = isMe ? gNameText : widget.post.uploaderName;
                               String badge = isMe ? '(본인)' : '(작성자)';
-                              
                               return Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
@@ -2086,51 +1939,37 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                                   widget.post.comments.insert(0, c);
                                 }
                               });
-                              // DB 고정 상태 업데이트
                               try {
                                 await SupabaseService.client
                                   .from('comments')
                                   .update({'is_pinned': newPinned})
                                   .eq('id', c.id!);
-                              } catch (e) {
-                                print('댓글 고정 에러: $e');
-                              }
+                              } catch (e) {}
                             } else if (value == '삭제') {
                               final String? commentId = c.id;
                               setSheetState(() {
                                 widget.post.comments.removeAt(index);
                                 widget.post.commentsCount--;
                               });
-                              if (mounted) {
-                                setState(() {});
-                              }
+                              if (mounted) setState(() {});
                               try {
-                                // 1. DB에서 실제 삭제
                                 if (commentId != null) {
                                   await SupabaseService.client
                                     .from('comments')
                                     .delete()
                                     .eq('id', commentId);
                                 }
-                                // 2. 게시물 댓글 수 업데이트
                                 widget.post.commentsCount = await _syncCommentsCount();
-                              } catch (e) {
-                                print('댓글삭제 에러: $e');
-                              }
+                              } catch (e) {}
                             } else if (value == '숨기기' || value == '숨김해제') {
                               final bool newHidden = !c.isHidden;
-                              setSheetState(() {
-                                c.isHidden = newHidden;
-                              });
-                              // DB 숨김 상태 업데이트
+                              setSheetState(() => c.isHidden = newHidden);
                               try {
                                 await SupabaseService.client
                                   .from('comments')
                                   .update({'is_hidden': newHidden})
                                   .eq('id', c.id!);
-                              } catch (e) {
-                                print('댓글숨김 에러: $e');
-                              }
+                              } catch (e) {}
                             } else if (value == '신고') {
                               _showReportSheet(context);
                             } else if (value == '수정') {
@@ -2139,41 +1978,21 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           },
                           itemBuilder: (context) {
                             List<PopupMenuEntry<String>> items = [];
-                            
-                            // 1. Pin/Unpin (Only for Post Owner)
                             if (isPostAuthor) {
-                              items.add(PopupMenuItem(
-                                value: c.isPinned ? '고정해제' : '고정',
-                                child: Text(c.isPinned ? '고정 해제' : '고정', style: const TextStyle(color: Colors.white, fontSize: 13)),
-                              ));
+                              items.add(PopupMenuItem(value: c.isPinned ? '고정해제' : '고정', child: Text(c.isPinned ? '고정 해제' : '고정', style: const TextStyle(color: Colors.white, fontSize: 13))));
                             }
-                            
-                            // 2. Edit (Only for Comment Author)
                             if (isCommentAuthor) {
                               items.add(const PopupMenuItem(value: '수정', child: Text('수정', style: TextStyle(color: Colors.white, fontSize: 13))));
                             }
-                            
-                            // 3. Delete (Author OR Post Owner)
                             if (isCommentAuthor || isPostAuthor) {
-                              items.add(PopupMenuItem(
-                                value: '삭제', 
-                                child: Text('삭제', style: TextStyle(color: isCommentAuthor ? Colors.redAccent : Colors.white, fontSize: 13))
-                              ));
+                              items.add(PopupMenuItem(value: '삭제', child: Text('삭제', style: TextStyle(color: isCommentAuthor ? Colors.redAccent : Colors.white, fontSize: 13))));
                             }
-                            
-                            // 4. Hide (Only for Post Owner on OTHERS' comments)
                             if (isPostAuthor && !isCommentAuthor) {
-                              items.add(PopupMenuItem(
-                                value: c.isHidden ? '숨김해제' : '숨기기', 
-                                child: Text(c.isHidden ? '숨김 해제' : '숨기기', style: const TextStyle(color: Colors.white, fontSize: 13))
-                              ));
+                              items.add(PopupMenuItem(value: c.isHidden ? '숨김해제' : '숨기기', child: Text(c.isHidden ? '숨김 해제' : '숨기기', style: const TextStyle(color: Colors.white, fontSize: 13))));
                             }
-                            
-                            // 5. Report (Everyone except on their OWN comment)
                             if (!isCommentAuthor) {
                               items.add(const PopupMenuItem(value: '신고', child: Text('신고', style: TextStyle(color: Colors.redAccent, fontSize: 13))));
                             }
-                            
                             return items;
                           },
                         ),
@@ -2203,7 +2022,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
             ],
           ),
         ),
-        // 대댓글(답글)들을 재귀적으로 렌더링
         if (c.replies.isNotEmpty)
           ...c.replies.asMap().entries.map((entry) {
             return _commentItem(entry.value, entry.key, setSheetState, onReplyTap, depth: depth + 1);
@@ -2230,19 +2048,14 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
             onPressed: () async {
               final newText = controller.text.trim();
               if (newText.isEmpty) return;
-              setSheetState(() {
-                c.text = newText;
-              });
+              setSheetState(() => c.text = newText);
               Navigator.pop(context);
-              // DB에 댓글 수정 내용 저장
               try {
                 await SupabaseService.client
                     .from('comments')
                     .update({'text': newText})
                     .eq('id', c.id!);
-              } catch (e) {
-                print('댓글 수정 DB 저장 오류: $e');
-              }
+              } catch (e) {}
             }, 
             child: const Text('수정', style: TextStyle(color: Colors.cyanAccent))
           ),
@@ -2267,7 +2080,6 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 🎩 상단 바 및 닫기 버튼
               Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 8),
               Row(
@@ -2284,15 +2096,12 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
               const SizedBox(height: 8),
               const Text('신고 사유를 선택해주세요. 검토 후 신속히 조치하겠습니다.', style: TextStyle(color: Colors.white38, fontSize: 12)),
               const SizedBox(height: 25),
-
-              // 📋 신고 항목 리스트 (아이콘 탑재!)
               _reportItem(context, Icons.copyright, '저작권 침해', Colors.amberAccent),
               _reportItem(context, Icons.explicit_outlined, '부적절한 콘텐츠', Colors.redAccent),
               _reportItem(context, Icons.campaign_outlined, '스팸 또는 홍보', Colors.blueAccent),
               _reportItem(context, Icons.psychology_alt_outlined, '허위 정보 유포', Colors.purpleAccent),
               _reportItem(context, Icons.sentiment_very_dissatisfied, '증오 표현 또는 괴롭힘', Colors.orangeAccent),
               _reportItem(context, Icons.more_horiz, '기타', Colors.white54),
-              
               const SizedBox(height: 20),
             ],
           ),
@@ -2312,16 +2121,39 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       trailing: const Icon(Icons.chevron_right, color: Colors.white10, size: 18),
       onTap: () {
         Navigator.pop(context);
-        if (widget.onReport != null) {
-          widget.onReport!(title);
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('"$title" 사유로 신고가 접수되었습니다.'),
-            backgroundColor: Colors.cyanAccent.withValues(alpha: 0.9),
-          ),
-        );
+        if (widget.onReport != null) widget.onReport!(title);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"$title" 사유로 신고가 접수되었습니다.'), backgroundColor: Colors.cyanAccent.withValues(alpha: 0.9)));
       },
     );
   }
+}
+
+class DonutPainter extends CustomPainter {
+  final double percentA;
+  final bool isPreVote;
+  DonutPainter({required this.percentA, this.isPreVote = false});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    final strokeWidth = radius * 0.25;
+
+    final bgPaint = Paint()..color = Colors.white.withValues(alpha: 0.08)..style = PaintingStyle.stroke..strokeWidth = strokeWidth;
+    canvas.drawCircle(center, radius - strokeWidth / 2, bgPaint);
+
+    if (isPreVote) return;
+
+    final paintA = Paint()..color = Colors.cyanAccent..style = PaintingStyle.stroke..strokeWidth = strokeWidth..strokeCap = StrokeCap.round;
+    final paintB = Paint()..color = Colors.redAccent..style = PaintingStyle.stroke..strokeWidth = strokeWidth..strokeCap = StrokeCap.round;
+
+    double sweepA = 2 * 3.141592 * percentA;
+    double sweepB = 2 * 3.141592 * (1.0 - percentA);
+
+    canvas.drawArc(Rect.fromCircle(center: center, radius: radius - strokeWidth / 2), -3.141592 / 2, sweepA, false, paintA);
+    canvas.drawArc(Rect.fromCircle(center: center, radius: radius - strokeWidth / 2), -3.141592 / 2 + sweepA, sweepB, false, paintB);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

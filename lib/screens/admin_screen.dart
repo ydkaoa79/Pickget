@@ -3,6 +3,8 @@ import '../services/supabase_service.dart';
 import '../core/app_state.dart';
 import 'admin_user_manage_screen.dart';
 import 'admin_post_manage_screen.dart';
+import 'admin_point_manage_screen.dart';
+import 'admin_report_manage_screen.dart'; // 👮‍♂️ 신고 관리 페이지 추가
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -14,7 +16,6 @@ class AdminScreen extends StatefulWidget {
 class _AdminScreenState extends State<AdminScreen> {
   int totalUsers = 0;
   int totalPosts = 0;
-  int totalVotes = 0;
   int totalPoints = 0;
   bool _isLoading = true;
 
@@ -26,10 +27,9 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Future<void> _fetchStats() async {
     try {
-      // 📊 전체 데이터 카운트 조회
+      // 📊 기본적인 서비스 현황 데이터만 조회
       final usersData = await SupabaseService.client.from('user_profiles').select('id, points');
       final postsData = await SupabaseService.client.from('posts').select('id');
-      final votesData = await SupabaseService.client.from('votes').select('id');
 
       int sumPoints = 0;
       for (var user in usersData) {
@@ -40,7 +40,6 @@ class _AdminScreenState extends State<AdminScreen> {
         setState(() {
           totalUsers = usersData.length;
           totalPosts = postsData.length;
-          totalVotes = votesData.length;
           totalPoints = sumPoints;
           _isLoading = false;
         });
@@ -108,8 +107,21 @@ class _AdminScreenState extends State<AdminScreen> {
                           ),
                           child: _statCard('전체 포스트', totalPosts.toString(), Icons.article_outlined),
                         ),
-                        _statCard('전체 투표', totalVotes.toString(), Icons.how_to_vote_outlined),
-                        _statCard('전체 포인트', totalPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"), Icons.stars_outlined),
+                        GestureDetector(
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('상품지급현황 상세 페이지는 준비 중입니다.'))
+                            );
+                          },
+                          child: _statCard('상품지급현황', '0', Icons.redeem),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const AdminPointManageScreen()),
+                          ), // 💰 포인트 카드 클릭 시 새 페이지로 이동
+                          child: _statCard('현재 총 지급 포인트', totalPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"), Icons.stars_outlined),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 40),
@@ -122,7 +134,10 @@ class _AdminScreenState extends State<AdminScreen> {
                       Icons.report_gmailerrorred, 
                       '신고 관리 센터', 
                       '유저들이 신고한 콘텐츠를 검토하고 조치합니다.', 
-                      () {}
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AdminReportManageScreen()),
+                      )
                     ),
                     _adminMenuTile(
                       Icons.person_off_outlined, 
@@ -151,68 +166,50 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
-  Widget _statCard(String label, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF151515),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Icon(icon, color: Colors.cyanAccent, size: 24),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  value, 
-                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)
-                ),
-              ),
-              Text(
-                label, 
-                style: const TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.w500)
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _adminMenuTile(IconData icon, String title, String subtitle, VoidCallback onTap) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF151515),
+        color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.white10),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         leading: Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.cyanAccent.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: Colors.cyanAccent, size: 22),
+          decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, color: Colors.redAccent, size: 24),
         ),
-        title: Text(
-          title, 
-          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)
-        ),
-        subtitle: Text(
-          subtitle, 
-          style: const TextStyle(color: Colors.white38, fontSize: 12)
-        ),
-        trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 14),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitle, style: const TextStyle(color: Colors.white38, fontSize: 12)),
+        trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
         onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _statCard(String label, String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Icon(icon, color: Colors.cyanAccent.withValues(alpha: 0.5), size: 24),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+              Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+            ],
+          ),
+        ],
       ),
     );
   }

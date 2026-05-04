@@ -96,4 +96,38 @@ class PostData {
     List<CommentData>? comments,
   }) : createdAt = createdAt ?? DateTime.now(),
        comments = comments ?? [];
+
+  // 🏛️ [신규] DB 데이터를 PostData 객체로 변환하는 정석 생성자
+  factory PostData.fromMap(Map<String, dynamic> map) {
+    return PostData(
+      id: map['id']?.toString() ?? '',
+      title: map['title']?.toString() ?? '',
+      uploaderId: map['uploader_id']?.toString() ?? 'anonymous',
+      uploaderInternalId: map['uploader_internal_id']?.toString(),
+      uploaderName: map['uploader_name']?.toString() ?? '익명',
+      uploaderImage: map['uploader_image']?.toString() ?? '',
+      timeLocation: '', // 필요 시 DB 컬럼 추가
+      imageA: map['image_a']?.toString() ?? '',
+      imageB: map['image_b']?.toString() ?? '',
+      thumbA: map['thumb_a']?.toString(),
+      thumbB: map['thumb_b']?.toString(),
+      descriptionA: map['description_a']?.toString() ?? '',
+      descriptionB: map['description_b']?.toString() ?? '',
+      likesCount: map['likes_count'] ?? 0,
+      commentsCount: map['comments_count'] ?? 0,
+      voteCountA: map['vote_count_a']?.toString() ?? '0',
+      voteCountB: map['vote_count_b']?.toString() ?? '0',
+      percentA: '50%', // 초기값
+      percentB: '50%', // 초기값
+      fullDescription: map['full_description']?.toString() ?? '',
+      tags: (map['tags'] as List?)?.map((e) => e.toString()).toList(),
+      durationMinutes: map['duration_minutes'],
+      targetPickCount: map['target_pick_count'],
+      createdAt: map['created_at'] != null ? DateTime.parse(map['created_at']) : null,
+      isAdult: map['is_adult'] ?? false,
+      isAi: map['is_ai'] ?? false,
+      isAd: map['is_ad'] ?? false,
+      isHidden: map['is_hidden'] ?? false,
+    );
+  }
 }

@@ -109,6 +109,17 @@ class _ChannelFeedScreenState extends State<ChannelFeedScreen> {
                     if (mounted) setState(() {});
                   });
                 },
+                onReport: (reason) async {
+                  if (!gIsLoggedIn) {
+                    gShowLoginPopup?.call();
+                    return;
+                  }
+                  await PostService.submitReport(
+                    postId: post.id,
+                    reportedInternalId: post.uploaderInternalId,
+                    reason: reason,
+                  );
+                },
               );
             },
           ),

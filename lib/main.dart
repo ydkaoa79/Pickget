@@ -23,24 +23,7 @@ import 'services/post_service.dart';
 import 'core/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// 🚀 CDN 주소 변환 유틸리티
-String toCdnUrl(String url) {
-  if (url.isEmpty) return url;
-  if (url.startsWith('http')) {
-    // 이미 http로 시작하면 그대로 반환하되, 특정 도메인 변환이 필요하면 여기서 처리 가능
-    return url;
-  }
-  if (url.startsWith('assets/')) return url;
-  
-  // Supabase Storage 주소를 CDN 주소로 변환 (예시)
-  if (url.contains('supabase.co/storage/v1/object/public/')) {
-    return url.replaceFirst(
-      RegExp(r'https://.*\.supabase\.co/storage/v1/object/public/'),
-      'https://cdn.pickget.net/',
-    );
-  }
-  return url;
-}
+// PostService already contains the standardized toCdnUrl logic.
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -454,9 +437,9 @@ class _MainScreenState extends State<MainScreen> {
             ? profile['nickname'].toString()
             : (response['uploader_name'] ?? response['uploader_id'] ?? '익명');
             
-        final String profileImg = toCdnUrl((profile != null && profile['profile_image'] != null)
+        final String profileImg = PostService.toCdnUrl((profile != null && profile['profile_image'] != null)
             ? profile['profile_image'].toString()
-            : (response['uploader_image'] ?? 'assets/profiles/profile_11.jpg'));
+            : (response['uploader_image'] ?? ''));
 
         final bool isPostLiked = gIsLoggedIn && gLikedPostIds.contains(response['id'].toString());
         
@@ -468,10 +451,10 @@ class _MainScreenState extends State<MainScreen> {
           uploaderName: nickname,
           uploaderImage: profileImg,
           timeLocation: '공유됨',
-          imageA: toCdnUrl(response['image_a'] ?? ''),
-          imageB: toCdnUrl(response['image_b'] ?? ''),
-          thumbA: toCdnUrl(response['thumb_a'] ?? ''),
-          thumbB: toCdnUrl(response['thumb_b'] ?? ''),
+          imageA: PostService.toCdnUrl(response['image_a'] ?? ''),
+          imageB: PostService.toCdnUrl(response['image_b'] ?? ''),
+          thumbA: PostService.toCdnUrl(response['thumb_a'] ?? ''),
+          thumbB: PostService.toCdnUrl(response['thumb_b'] ?? ''),
           descriptionA: response['description_a'] ?? '',
           descriptionB: response['description_b'] ?? '',
           likesCount: response['likes_count'] ?? 0,
@@ -655,104 +638,7 @@ class _MainScreenState extends State<MainScreen> {
       }
 
       final List<PostData> loadedPosts = postsData.map((json) {
-        final profile = json['profiles'];
-        final String handle = json['uploader_id']?.toString() ?? '';
-        final String? internalId = json['uploader_internal_id']?.toString() ?? profile?['user_id']?.toString();
-        
-        final String latestId = (profile != null && profile['user_id'] != null)
-            ? profile['user_id'].toString()
-            : handle;
-        final String nickname = (profile != null && profile['nickname'] != null)
-            ? profile['nickname'].toString()
-            : (json['uploader_name'] ?? json['uploader_id'] ?? '익명');
-        final String profileImg = toCdnUrl(
-            (profile != null && profile['profile_image'] != null)
-            ? profile['profile_image'].toString()
-            : (json['user_image'] ?? 'assets/profiles/profile_11.jpg'));
-
-        final bool isPostLiked = gIsLoggedIn && gLikedPostIds.contains(json['id'].toString());
-        int initialLikesCount = json['likes_count'] ?? 0;
-        if (isPostLiked && initialLikesCount < 1) initialLikesCount = 1;
-
-        final post = PostData(
-          id: json['id'].toString(),
-          title: json['title'] ?? '',
-          uploaderId: latestId,
-          uploaderInternalId: internalId,
-          uploaderName: nickname,
-          uploaderImage: profileImg,
-          timeLocation: () {
-            final ca = json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now();
-            final diff = DateTime.now().difference(ca);
-            if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
-            if (diff.inHours < 24) return '${diff.inHours}시간 전';
-            return '${ca.month}월 ${ca.day}일';
-          }(),
-          imageA: toCdnUrl(json['image_a'] ?? ''),
-          imageB: toCdnUrl(json['image_b'] ?? ''),
-          thumbA: toCdnUrl(json['thumb_a'] ?? ''),
-          thumbB: toCdnUrl(json['thumb_b'] ?? ''),
-          descriptionA: json['description_a'] ?? '',
-          descriptionB: json['description_b'] ?? '',
-          fullDescription: json['full_description'] ?? '',
-          likesCount: initialLikesCount,
-          commentsCount: json['comments_count'] ?? 0,
-          voteCountA: json['vote_count_a']?.toString() ?? '0',
-          voteCountB: json['vote_count_b']?.toString() ?? '0',
-          totalVotesCount: json['total_votes_count'] ?? 0,
-          percentA: json['percent_a']?.toString() ?? '50%',
-          percentB: json['percent_b']?.toString() ?? '50%',
-          isFollowing: gFollowedUserIds.contains(internalId),
-          isLiked: isPostLiked,
-          isBookmarked: gIsLoggedIn && gBookmarkedPostIds.contains(json['id'].toString()),
-          userVotedSide: gUserVotes[json['id'].toString()] ?? 0,
-          isExpired: () {
-            bool exp = json['is_expired'] ?? false;
-            if (exp) return true;
-            final tags = (json['tags'] as List?)?.map((e) => e.toString()).toList() ?? [];
-            final createdAtStr = json['created_at'];
-            if (createdAtStr != null) {
-              final createdAt = DateTime.tryParse(createdAtStr);
-              if (createdAt != null) {
-                for (var tag in tags) {
-                  if (tag.startsWith('duration:')) {
-                    final mins = int.tryParse(tag.split(':')[1]);
-                    if (mins != null && DateTime.now().isAfter(createdAt.add(Duration(minutes: mins)))) {
-                      return true;
-                    }
-                  }
-                }
-              }
-            }
-            return false;
-          }(),
-          durationMinutes: () {
-            int? dm = json['duration_minutes'];
-            if (dm != null) return dm;
-            final tags =
-                (json['tags'] as List?)?.map((e) => e.toString()).toList() ??
-                [];
-            for (var tag in tags) {
-              if (tag.startsWith('duration:'))
-                return int.tryParse(tag.split(':')[1]);
-            }
-            return null;
-          }(),
-          isAdult: json['is_adult'] ?? false,
-          isAi: json['is_ai'] ?? false,
-          isAd: json['is_ad'] ?? false,
-          createdAt: json['created_at'] != null
-              ? DateTime.parse(json['created_at'])
-              : DateTime.now(),
-          isHidden: (json['tags'] as List?)?.contains('#hidden#') ?? false,
-        );
-
-        if (post.id == '5ffdae62-7072-4ee9-9476-c18aa8afc733') {
-          print(
-            'DEBUG [MAIN]: Post 5ffdae62 comments_count: ${post.commentsCount}, isLiked: ${post.isLiked}',
-          );
-        }
-        return post;
+        return PostService.mapToPostData(json);
       }).toList();
 
       setState(() {
@@ -1225,6 +1111,17 @@ class _MainScreenState extends State<MainScreen> {
                         });
                       }
                     });
+                  },
+                  onReport: (reason) async {
+                    if (!gIsLoggedIn) {
+                      _showLoginPopup();
+                      return;
+                    }
+                    await PostService.submitReport(
+                      postId: post.id,
+                      reportedInternalId: post.uploaderInternalId,
+                      reason: reason,
+                    );
                   },
                 );
               },
@@ -2070,9 +1967,9 @@ class _MainScreenState extends State<MainScreen> {
             ? profile['nickname'].toString()
             : (json['uploader_name'] ?? json['uploader_id'] ?? '익명');
             
-        final String uploaderImage = toCdnUrl((profile != null && profile['profile_image'] != null)
+        final String uploaderImage = PostService.toCdnUrl((profile != null && profile['profile_image'] != null)
             ? profile['profile_image'].toString()
-            : (json['uploader_image'] ?? 'assets/profiles/profile_11.jpg'));
+            : (json['uploader_image'] ?? ''));
 
         String vA = (json['vote_count_a'] ?? '0').toString();
         String vB = (json['vote_count_b'] ?? '0').toString();
@@ -2088,10 +1985,10 @@ class _MainScreenState extends State<MainScreen> {
           uploaderName: nickname,
           uploaderImage: uploaderImage,
           timeLocation: '실시간',
-          imageA: toCdnUrl(json['image_a'] ?? ''),
-          imageB: toCdnUrl(json['image_b'] ?? ''),
-          thumbA: toCdnUrl(json['thumb_a'] ?? ''),
-          thumbB: toCdnUrl(json['thumb_b'] ?? ''),
+          imageA: PostService.toCdnUrl(json['image_a'] ?? ''),
+          imageB: PostService.toCdnUrl(json['image_b'] ?? ''),
+          thumbA: PostService.toCdnUrl(json['thumb_a'] ?? ''),
+          thumbB: PostService.toCdnUrl(json['thumb_b'] ?? ''),
           descriptionA: json['description_a'] ?? '',
           descriptionB: json['description_b'] ?? '',
           fullDescription: json['full_description'] ?? '',
