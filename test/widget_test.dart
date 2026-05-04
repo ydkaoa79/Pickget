@@ -1,10 +1,16 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pickget/main.dart';
 
 void main() {
-  testWidgets('앱 정상 실행 테스트', (WidgetTester tester) async {
-    await tester.pumpWidget(const PickGetApp());
-    expect(find.text('PickGet'), findsOneWidget);
+  testWidgets('PickGetApp builds with an injected test home', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const PickGetApp(home: SizedBox(key: Key('test-home'))),
+    );
+
+    expect(find.byKey(const Key('test-home')), findsOneWidget);
   });
 }

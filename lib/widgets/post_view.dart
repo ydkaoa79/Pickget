@@ -78,6 +78,45 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
   @override
   bool get wantKeepAlive => true;
 
+  bool get _isOwnPost {
+    return widget.post.uploaderInternalId != null &&
+        gUserInternalId != null &&
+        widget.post.uploaderInternalId!.trim().toLowerCase() ==
+            gUserInternalId!.trim().toLowerCase();
+  }
+
+  bool get _canViewDiscussionResults {
+    return _votedSide != 0 || _isOwnPost || (isExpired && gIsLoggedIn);
+  }
+
+  Future<int> _syncCommentsCount() async {
+    try {
+      final dynamic syncedCount = await SupabaseService.client.rpc(
+        'sync_comments_count',
+        params: {'target_post_id': widget.post.id},
+      );
+
+      if (syncedCount is int) return syncedCount;
+      if (syncedCount is num) return syncedCount.toInt();
+    } catch (_) {
+      // Older databases may not have this RPC signature yet.
+    }
+
+    final List<dynamic> comments = await SupabaseService.client
+        .from('comments')
+        .select('id')
+        .eq('post_id', widget.post.id);
+
+    final int serverCommentsCount = comments.length;
+
+    await SupabaseService.client
+        .from('posts')
+        .update({'comments_count': serverCommentsCount})
+        .eq('id', widget.post.id);
+
+    return serverCommentsCount;
+  }
+
   @override
   void didUpdateWidget(PostView oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -974,7 +1013,9 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                         const SizedBox(width: 20),
                         _statIcon(
                           Icons.chat_bubble, 
-                          formatCount(widget.post.commentsCount),
+                          _canViewDiscussionResults
+                              ? formatCount(widget.post.commentsCount)
+                              : 'Pick',
                           onTap: () {
                             print('DEBUG: Comment icon tapped for post_id: ${widget.post.id}');
                             if (!gIsLoggedIn) {
@@ -1226,6 +1267,40 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
     if (_isSheetOpening) return;
     _isSheetOpening = true;
 
+    if (!_canViewDiscussionResults) {
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'Pick 후 참여 가능',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          ),
+          content: const Text(
+            '댓글과 진행 상황은 먼저 Pick 한 뒤 확인할 수 있어요.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                '확인',
+                style: TextStyle(
+                  color: Colors.cyanAccent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      _isSheetOpening = false;
+      return;
+    }
+
     // 1. Fetch ALL comments for this post
     try {
       print('DEBUG: Fetching comments for post_id: ${widget.post.id}');
@@ -1304,14 +1379,8 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
       widget.post.commentsCount = totalCount;
       print('DEBUG: Total recursive comment count: $totalCount');
 
-      // Sync correctly calculated count back to posts table
       try {
-        print('DEBUG: Syncing comments_count ($totalCount) to Supabase posts table for post_id: ${widget.post.id}');
-        await SupabaseService.client
-          .from('posts')
-          .update({'comments_count': totalCount})
-          .eq('id', widget.post.id);
-        print('DEBUG: Sync SUCCESS!');
+        widget.post.commentsCount = await _syncCommentsCount();
       } catch (e) {
         print('DEBUG: Sync FAILED! Error: $e');
       }
@@ -1511,10 +1580,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                           });
 
                           // ★ [제미나이 프로 X 정석 로봇] 게시물 테이블의 댓글 숫자도 실시간 업데이트!
-                          await SupabaseService.client
-                            .from('posts')
-                            .update({'comments_count': widget.post.commentsCount})
-                            .eq('id', widget.post.id);
+                          widget.post.commentsCount = await _syncCommentsCount();
 
                         } catch (e) {
                           print('댓글 저장 및 숫자 업데이트 실패: $e');
@@ -1586,10 +1652,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                       });
 
                       // ★ [제미나이 프로 X 정석 로봇] 게시물 테이블의 댓글 숫자도 실시간 업데이트!
-                      await SupabaseService.client
-                        .from('posts')
-                        .update({'comments_count': widget.post.commentsCount})
-                        .eq('id', widget.post.id);
+                      widget.post.commentsCount = await _syncCommentsCount();
 
                     } catch (e) {
                       print('댓글 저장 및 숫자 업데이트 실패: $e');
@@ -1801,7 +1864,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
 
   Widget _buildChart(PostData post) {
     bool isExpired = _remainingSeconds <= 0 || post.isExpired;
-    bool hasVoted = _votedSide != 0 || isExpired || isMe;
+    bool hasVoted = _canViewDiscussionResults;
     return Positioned(
       bottom: 67 + MediaQuery.of(context).padding.bottom, right: 35,
       child: SizedBox(
@@ -2050,10 +2113,7 @@ class _PostViewState extends State<PostView> with AutomaticKeepAliveClientMixin 
                                     .eq('id', commentId);
                                 }
                                 // 2. 게시물 댓글 수 업데이트
-                                await SupabaseService.client
-                                  .from('posts')
-                                  .update({'comments_count': widget.post.commentsCount})
-                                  .eq('id', widget.post.id);
+                                widget.post.commentsCount = await _syncCommentsCount();
                               } catch (e) {
                                 print('댓글삭제 에러: $e');
                               }

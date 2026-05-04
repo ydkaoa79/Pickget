@@ -61,7 +61,9 @@ void main() async {
 }
 
 class PickGetApp extends StatelessWidget {
-  const PickGetApp({super.key});
+  const PickGetApp({super.key, this.home});
+
+  final Widget? home;
 
   @override
   Widget build(BuildContext context) {
@@ -91,7 +93,7 @@ class PickGetApp extends StatelessWidget {
           PointerDeviceKind.unknown,
         },
       ),
-      home: const MainScreen(),
+      home: home ?? const MainScreen(),
       builder: (context, child) {
         if (!kIsWeb) return child!;
         
@@ -2152,6 +2154,7 @@ class _MainScreenState extends State<MainScreen> {
       }).toList();
 
       // 투표 합계 순으로 정밀 정렬
+      loadedPosts = loadedPosts.where(canViewPostDiscussionResults).toList();
       loadedPosts.sort((a, b) => b.totalVotes.compareTo(a.totalVotes));
       return loadedPosts.take(10).toList();
     } catch (e) {

@@ -861,7 +861,9 @@ class _SearchScreenState extends State<SearchScreen> {
                                     Row(
                                       children: [
                                         Text(
-                                          '${post.totalVotes} picks',
+                                          canViewPostDiscussionResults(post)
+                                              ? '${post.totalVotes} picks'
+                                              : 'Pick to view',
                                           style: TextStyle(
                                             color: Colors.white.withValues(
                                               alpha: 0.4,

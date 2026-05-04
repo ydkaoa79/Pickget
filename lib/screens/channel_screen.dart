@@ -956,10 +956,18 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
       sortedPosts.sort((a, b) => (b.createdAt).compareTo(a.createdAt));
     } else if (tabIndex == 1) {
       // 픽순
-      sortedPosts.sort((a, b) => b.totalVotes.compareTo(a.totalVotes));
+      sortedPosts.sort((a, b) {
+        final int votesA = canViewPostDiscussionResults(a) ? a.totalVotes : 0;
+        final int votesB = canViewPostDiscussionResults(b) ? b.totalVotes : 0;
+        return votesB.compareTo(votesA);
+      });
     } else if (tabIndex == 2) {
       // 댓글순
-      sortedPosts.sort((a, b) => b.commentsCount.compareTo(a.commentsCount));
+      sortedPosts.sort((a, b) {
+        final int commentsA = canViewPostDiscussionResults(a) ? a.commentsCount : 0;
+        final int commentsB = canViewPostDiscussionResults(b) ? b.commentsCount : 0;
+        return commentsB.compareTo(commentsA);
+      });
     }
 
     return GridView.builder(
@@ -974,6 +982,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
       itemBuilder: (context, index) {
         final post = sortedPosts[index];
         final totalVotes = _parseTotalVotes(post);
+        final bool canViewResults = canViewPostDiscussionResults(post);
         bool isSelected = _selectedPostIds.contains(post.id);
 
         // Calculate expired status
@@ -1105,7 +1114,7 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _formatVotes(totalVotes),
+                      canViewResults ? _formatVotes(totalVotes) : 'Pick',
                       style: const TextStyle(
                         color: Colors.white60, 
                         fontSize: 10, 

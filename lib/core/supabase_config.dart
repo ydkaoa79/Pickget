@@ -1,7 +1,6 @@
 class SupabaseConfig {
   static const String url = 'https://otstiqndmoyzkurrjobb.supabase.co';
   static const String anonKey = 'sb_publishable_Gb0aPbRFQ6uVSM_Lt8uvDw_CF9xKrhm';
-  static const String password = 'oS8b0VyeSYc5RJll'; 
 }
 
 class CloudflareConfig {

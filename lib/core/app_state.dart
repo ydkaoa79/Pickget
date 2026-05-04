@@ -1,5 +1,6 @@
 import 'dart:ui';
-import '../services/supabase_service.dart';
+
+import '../models/post_data.dart';
 
 String gNameText = '테스트용';
 String gIdText = '테스트용';
@@ -19,6 +20,15 @@ Set<String> gLikedPostIds = {};
 Set<String> gBookmarkedPostIds = {};
 Set<String> gFollowedUserIds = {};
 bool gHasNewNotifs = false;
+
+bool canViewPostDiscussionResults(PostData post) {
+  final bool isOwnPost = post.uploaderInternalId != null &&
+      gUserInternalId != null &&
+      post.uploaderInternalId!.trim().toLowerCase() ==
+          gUserInternalId!.trim().toLowerCase();
+
+  return post.userVotedSide != 0 || isOwnPost || (post.isExpired && gIsLoggedIn);
+}
 
 String formatCount(dynamic countVal) {
   int count = 0;
