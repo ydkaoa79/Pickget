@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
 import '../core/app_state.dart';
+import 'admin_user_manage_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -66,72 +67,80 @@ class _AdminScreenState extends State<AdminScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: Colors.cyanAccent))
-        : RefreshIndicator(
-            onRefresh: _fetchStats,
-            color: Colors.cyanAccent,
-            backgroundColor: const Color(0xFF1A1A1A),
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '📊 서비스 현황', 
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)
-                  ),
-                  const SizedBox(height: 20),
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 1.4,
-                    children: [
-                      _statCard('전체 유저', totalUsers.toString(), Icons.people_outline),
-                      _statCard('전체 포스트', totalPosts.toString(), Icons.article_outlined),
-                      _statCard('전체 투표', totalVotes.toString(), Icons.how_to_vote_outlined),
-                      _statCard('전체 포인트', totalPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"), Icons.stars_outlined),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-                  const Text(
-                    '🚨 관리 도구', 
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)
-                  ),
-                  const SizedBox(height: 16),
-                  _adminMenuTile(
-                    Icons.report_gmailerrorred, 
-                    '신고 관리 센터', 
-                    '유저들이 신고한 콘텐츠를 검토하고 조치합니다.', 
-                    () {}
-                  ),
-                  _adminMenuTile(
-                    Icons.person_off_outlined, 
-                    '차단 유저 관리', 
-                    '커뮤니티 가이드 위반 유저를 관리합니다.', 
-                    () {}
-                  ),
-                  _adminMenuTile(
-                    Icons.campaign_outlined, 
-                    '전체 공지 발송', 
-                    '모든 유저에게 서비스 공지를 보냅니다.', 
-                    () {}
-                  ),
-                  const SizedBox(height: 50),
-                  Center(
-                    child: Text(
-                      'Admin ID: ${gUserInternalId?.substring(0, 8)}...',
-                      style: const TextStyle(color: Colors.white12, fontSize: 11),
+      body: SafeArea(
+        child: _isLoading 
+          ? const Center(child: CircularProgressIndicator(color: Colors.cyanAccent))
+          : RefreshIndicator(
+              onRefresh: _fetchStats,
+              color: Colors.cyanAccent,
+              backgroundColor: const Color(0xFF1A1A1A),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '📊 서비스 현황', 
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 20),
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1.4,
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const AdminUserManageScreen()),
+                          ),
+                          child: _statCard('전체 유저', totalUsers.toString(), Icons.people_outline),
+                        ),
+                        _statCard('전체 포스트', totalPosts.toString(), Icons.article_outlined),
+                        _statCard('전체 투표', totalVotes.toString(), Icons.how_to_vote_outlined),
+                        _statCard('전체 포인트', totalPoints.toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (Match m) => "${m[1]},"), Icons.stars_outlined),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
+                    const Text(
+                      '🚨 관리 도구', 
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)
+                    ),
+                    const SizedBox(height: 16),
+                    _adminMenuTile(
+                      Icons.report_gmailerrorred, 
+                      '신고 관리 센터', 
+                      '유저들이 신고한 콘텐츠를 검토하고 조치합니다.', 
+                      () {}
+                    ),
+                    _adminMenuTile(
+                      Icons.person_off_outlined, 
+                      '차단 유저 관리', 
+                      '커뮤니티 가이드 위반 유저를 관리합니다.', 
+                      () {}
+                    ),
+                    _adminMenuTile(
+                      Icons.campaign_outlined, 
+                      '전체 공지 발송', 
+                      '모든 유저에게 서비스 공지를 보냅니다.', 
+                      () {}
+                    ),
+                    const SizedBox(height: 50),
+                    Center(
+                      child: Text(
+                        'Admin ID: ${gUserInternalId?.substring(0, 8)}...',
+                        style: const TextStyle(color: Colors.white12, fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
+      ),
     );
   }
 
