@@ -14,9 +14,11 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
   int currentPage = 0;
   int totalUserCount = 0;
   String searchQuery = '';
-  String sortBy = 'created_at'; // 'created_at', 'points'
+  String sortBy = 'updated_at'; // 'updated_at', 'points'
   
   final int pageSize = 10;
+
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -25,49 +27,49 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
   }
 
   Future<void> _fetchUsers() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
     try {
-      // 1. 전체 유저 수 가져오기 (에러 방지를 위해 간단한 방식으로 수정)
-      dynamic countQuery = SupabaseService.client.from('user_profiles').select('id');
+      // 1. 전체 유저 수 가져오기 (가장 단순한 쿼리)
+      final allRes = await SupabaseService.client.from('user_profiles').select('id');
+      final allList = allRes as List;
+      totalUserCount = allList.length;
+
+      // 2. 검색 필터 적용
+      List<dynamic> filteredList = allList;
       if (searchQuery.isNotEmpty) {
-        countQuery = countQuery.or('nickname.ilike.%$searchQuery%,user_id.ilike.%$searchQuery%');
-      }
-      final countRes = await countQuery;
-      totalUserCount = (countRes as List).length;
-
-      // 2. 유저 목록 가져오기
-      dynamic query = SupabaseService.client
-          .from('user_profiles')
-          .select('id, user_id, nickname, profile_image, points, created_at');
-
-      // 검색어 필터
-      if (searchQuery.isNotEmpty) {
-        query = query.or('nickname.ilike.%$searchQuery%,user_id.ilike.%$searchQuery%');
-      }
-
-      // 정렬 처리
-      if (sortBy == 'created_at') {
-        query = query.order('created_at', ascending: false);
-      } else if (sortBy == 'points') {
-        query = query.order('points', ascending: false);
+        // 클라이언트 사이드 필터링으로 일단 시도 (보안 정책 회피용)
+        final searchRes = await SupabaseService.client
+            .from('user_profiles')
+            .select('id, user_id, nickname, profile_image, points, created_at')
+            .or('nickname.ilike.%$searchQuery%,user_id.ilike.%$searchQuery%');
+        filteredList = searchRes as List;
+      } else {
+        // 전체 목록 (페이지네이션 적용)
+        final queryRes = await SupabaseService.client
+            .from('user_profiles')
+            .select('id, user_id, nickname, profile_image, points, updated_at')
+            .order(sortBy == 'points' ? 'points' : 'updated_at', ascending: false)
+            .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1);
+        filteredList = queryRes as List;
       }
 
-      // 페이지네이션 적용
-      final from = currentPage * pageSize;
-      final to = from + pageSize - 1;
-      query = query.range(from, to);
-
-      final List<dynamic> data = await query;
-      
       if (mounted) {
         setState(() {
-          users = data;
+          users = filteredList;
           _isLoading = false;
         });
       }
     } catch (e) {
       debugPrint('User manage fetch error: $e');
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -96,12 +98,17 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
             Expanded(
               child: _isLoading 
                 ? const Center(child: CircularProgressIndicator(color: Colors.cyanAccent))
-                : users.isEmpty
-                  ? const Center(child: Text('검색 결과가 없습니다.', style: TextStyle(color: Colors.white38)))
-                  : ListView.builder(
-                      itemCount: users.length,
-                      itemBuilder: (context, index) => _buildUserTile(users[index]),
-                    ),
+                : _errorMessage.isNotEmpty
+                  ? Center(child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text('에러 발생: $_errorMessage', style: const TextStyle(color: Colors.redAccent, fontSize: 12), textAlign: TextAlign.center),
+                    ))
+                  : users.isEmpty
+                    ? const Center(child: Text('검색 결과가 없습니다.', style: TextStyle(color: Colors.white38)))
+                    : ListView.builder(
+                        itemCount: users.length,
+                        itemBuilder: (context, index) => _buildUserTile(users[index]),
+                      ),
             ),
             _buildPagination(totalPages),
           ],
@@ -166,7 +173,7 @@ class _AdminUserManageScreenState extends State<AdminUserManageScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _sortChip('가입순', 'created_at'),
+                _sortChip('가입순', 'updated_at'),
                 _sortChip('포인트순', 'points'),
                 _sortChip('투표순(TBD)', 'received_votes'),
                 _sortChip('게시글순(TBD)', 'post_count'),
