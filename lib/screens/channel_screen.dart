@@ -584,8 +584,14 @@ class _ChannelScreenState extends State<ChannelScreen> with SingleTickerProvider
               onPressed: () => Navigator.pop(context),
             ),
             actions: [
-              if (isMe)
+              if (isMe) ...[
+                if (gUserInternalId == 'f2a58f60-31c5-4883-9b56-072be4dde1df')
+                  IconButton(
+                    icon: const Icon(Icons.admin_panel_settings, color: Colors.cyanAccent, size: 28),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminScreen())),
+                  ),
                 IconButton(icon: const Icon(Icons.settings_outlined, color: Colors.white), onPressed: _showSettingsMenu),
+              ],
               if (!isMe)
                 IconButton(
                   icon: const Icon(Icons.more_vert, color: Colors.white), 
