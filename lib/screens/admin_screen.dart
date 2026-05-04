@@ -23,24 +23,16 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Future<void> _fetchStats() async {
     try {
-      // 📊 전체 데이터 카운트 조회
-      final usersResponse = await SupabaseService.client
-          .from('user_profiles')
-          .select('id', const FetchOptions(count: CountOption.exact));
-      
-      final postsResponse = await SupabaseService.client
-          .from('posts')
-          .select('id', const FetchOptions(count: CountOption.exact));
-      
-      final votesResponse = await SupabaseService.client
-          .from('votes')
-          .select('id', const FetchOptions(count: CountOption.exact));
+      // 📊 전체 데이터 카운트 조회 (컴파일 에러 해결 버전)
+      final usersData = await SupabaseService.client.from('user_profiles').select('id');
+      final postsData = await SupabaseService.client.from('posts').select('id');
+      final votesData = await SupabaseService.client.from('votes').select('id');
 
       if (mounted) {
         setState(() {
-          totalUsers = usersResponse.count;
-          totalPosts = postsResponse.count;
-          totalVotes = votesResponse.count;
+          totalUsers = usersData.length;
+          totalPosts = postsData.length;
+          totalVotes = votesData.length;
           _isLoading = false;
         });
       }
