@@ -10,12 +10,12 @@ class AdminPostManageScreen extends StatefulWidget {
 }
 
 class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
-  List<dynamic> allFetchedPosts = []; 
-  List<dynamic> filteredPosts = []; 
+  List<dynamic> posts = []; 
   bool _isLoading = true;
   int currentPage = 0;
+  int totalPostCount = 0; 
   String searchQuery = '';
-  String sortBy = 'updated_at'; 
+  String sortBy = 'created_at'; // posts 테이블은 created_at 사용
   bool isAscending = false;
   String statusFilter = 'all'; 
   String _errorMessage = '';
@@ -41,90 +41,75 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
       _errorMessage = '';
     });
     try {
-      // 🚀 [핵심] DB에는 is_expired 필터링을 절대 요청하지 않습니다 (에러 원인)
-      var query = SupabaseService.client
-          .from('posts')
-          .select('id, title, uploader_id, vote_count_a, vote_count_b, updated_at, tags');
+      // 1. 전체 개수 조회 (컴파일 에러 해결을 위해 단순화)
+      var countQuery = SupabaseService.client.from('posts').select('id');
+      
+      if (searchQuery.isNotEmpty) {
+        countQuery = countQuery.or('title.ilike.%$searchQuery%,uploader_id.ilike.%$searchQuery%');
+      }
+      
+      if (statusFilter == 'active') {
+        countQuery = countQuery.eq('is_expired', false);
+      } else if (statusFilter == 'expired') {
+        countQuery = countQuery.eq('is_expired', true);
+      }
+      
+      final countRes = await countQuery;
+      totalPostCount = (countRes as List).length;
 
-      if (sortBy == 'updated_at') {
-        query = query.order('updated_at', ascending: isAscending);
+      // 2. 데이터 가져오기 (Range 적용)
+      final from = currentPage * pageSize;
+      final to = from + pageSize - 1;
+
+      dynamic query = SupabaseService.client
+          .from('posts')
+          .select('id, title, uploader_id, vote_count_a, vote_count_b, created_at, tags, is_expired')
+          .range(from, to);
+
+      if (searchQuery.isNotEmpty) {
+        query = query.or('title.ilike.%$searchQuery%,uploader_id.ilike.%$searchQuery%');
+      }
+
+      if (statusFilter == 'active') {
+        query = query.eq('is_expired', false);
+      } else if (statusFilter == 'expired') {
+        query = query.eq('is_expired', true);
+      }
+
+      // 정렬 (created_at 사용)
+      if (sortBy == 'created_at') {
+        query = query.order('created_at', ascending: isAscending);
       }
 
       final List<dynamic> fetchedData = await query;
 
-      // 📊 앱 내에서 데이터 가공 및 상태 계산
-      allFetchedPosts = fetchedData.map((p) {
+      // 3. 데이터 가공
+      List<dynamic> enrichedPosts = fetchedData.map((p) {
         int a = _parseCount(p['vote_count_a']);
         int b = _parseCount(p['vote_count_b']);
-        
-        final tags = (p['tags'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        final updatedAt = p['updated_at'] != null ? DateTime.parse(p['updated_at']) : DateTime.now();
-        int? durationMins;
-        for (var tag in tags) {
-          if (tag.startsWith('duration:')) {
-            durationMins = int.tryParse(tag.split(':')[1]);
-          }
-        }
-        
-        bool isExpired = false;
-        if (durationMins != null) {
-          if (DateTime.now().isAfter(updatedAt.add(Duration(minutes: durationMins)))) {
-            isExpired = true;
-          }
-        }
-
         return {
           ...p,
           'total_votes': a + b,
           'v_a': a,
           'v_b': b,
-          'is_expired_calc': isExpired,
         };
       }).toList();
 
-      _applyFilters();
+      if (mounted) {
+        setState(() {
+          posts = enrichedPosts;
+          _isLoading = false;
+        });
+      }
 
     } catch (e) {
       debugPrint('Post manage fetch error: $e');
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = '에러: $e\n(SQL을 먼저 실행하셨는지 확인해주세요)';
           _isLoading = false;
         });
       }
-    }
-  }
-
-  void _applyFilters() {
-    List<dynamic> results = List.from(allFetchedPosts);
-
-    if (searchQuery.isNotEmpty) {
-      results = results.where((p) {
-        final title = (p['title'] ?? '').toString().toLowerCase();
-        final uploader = (p['uploader_id'] ?? '').toString().toLowerCase();
-        return title.contains(searchQuery.toLowerCase()) || uploader.contains(searchQuery.toLowerCase());
-      }).toList();
-    }
-
-    if (statusFilter == 'active') {
-      results = results.where((p) => p['is_expired_calc'] == false).toList();
-    } else if (statusFilter == 'expired') {
-      results = results.where((p) => p['is_expired_calc'] == true).toList();
-    }
-
-    if (sortBy == 'total_votes') {
-      results.sort((a, b) {
-        int valA = a['total_votes'];
-        int valB = b['total_votes'];
-        return isAscending ? valA.compareTo(valB) : valB.compareTo(valA);
-      });
-    }
-
-    if (mounted) {
-      setState(() {
-        filteredPosts = results;
-        _isLoading = false;
-      });
     }
   }
 
@@ -140,13 +125,8 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
 
   @override
   Widget build(BuildContext context) {
-    int totalCount = filteredPosts.length;
-    int totalPages = (totalCount / pageSize).ceil();
+    int totalPages = (totalPostCount / pageSize).ceil();
     if (totalPages == 0) totalPages = 1;
-
-    final from = currentPage * pageSize;
-    final to = (from + pageSize < totalCount) ? from + pageSize : totalCount;
-    final pagedItems = (totalCount > from) ? filteredPosts.sublist(from, to) : [];
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -169,12 +149,15 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
               child: _isLoading 
                 ? const Center(child: CircularProgressIndicator(color: Colors.cyanAccent))
                 : _errorMessage.isNotEmpty
-                  ? Center(child: Text('에러: $_errorMessage', style: const TextStyle(color: Colors.redAccent, fontSize: 12)))
-                  : filteredPosts.isEmpty
+                  ? Center(child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(_errorMessage, style: const TextStyle(color: Colors.redAccent, fontSize: 13), textAlign: TextAlign.center),
+                    ))
+                  : posts.isEmpty
                     ? const Center(child: Text('결과가 없습니다.', style: TextStyle(color: Colors.white38)))
                     : ListView.builder(
-                        itemCount: pagedItems.length,
-                        itemBuilder: (context, index) => _buildPostRow(pagedItems[index]),
+                        itemCount: posts.length,
+                        itemBuilder: (context, index) => _buildPostRow(posts[index]),
                       ),
             ),
             _buildPagination(totalPages),
@@ -195,10 +178,10 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
             child: TextField(
               controller: _searchController,
               style: const TextStyle(color: Colors.white, fontSize: 14),
-              onChanged: (val) {
+              onSubmitted: (val) {
                 searchQuery = val.trim();
                 currentPage = 0;
-                _applyFilters();
+                _fetchPosts();
               },
               decoration: InputDecoration(
                 hintText: '제목 또는 작성자 검색',
@@ -208,7 +191,7 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
                   ? IconButton(icon: const Icon(Icons.cancel, color: Colors.white38, size: 18), onPressed: () {
                       _searchController.clear();
                       searchQuery = '';
-                      _applyFilters();
+                      _fetchPosts();
                     }) : null,
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -224,7 +207,7 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
                 _filterChip('투표중', 'active', isStatus: true),
                 _filterChip('종료됨', 'expired', isStatus: true),
                 const SizedBox(width: 10, child: VerticalDivider(color: Colors.white12, thickness: 1)),
-                _filterChip('최신순', 'updated_at', isSort: true, defaultAsc: false),
+                _filterChip('최신순', 'created_at', isSort: true, defaultAsc: false),
                 _filterChip('투표순', 'total_votes', isSort: true, defaultAsc: false),
               ],
             ),
@@ -250,11 +233,7 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
           }
           currentPage = 0;
         });
-        if (isSort && value == 'updated_at') {
-          _fetchPosts(); 
-        } else {
-          _applyFilters(); 
-        }
+        _fetchPosts(); 
       },
       child: Container(
         margin: const EdgeInsets.only(right: 8),
@@ -298,7 +277,7 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
     final int total = post['total_votes'] ?? 0;
     final int a = post['v_a'] ?? 0;
     final int b = post['v_b'] ?? 0;
-    final bool isExpired = post['is_expired_calc'] ?? false;
+    final bool isExpired = post['is_expired'] ?? false; 
     
     String status = '투표중';
     Color statusColor = Colors.orangeAccent;
@@ -360,6 +339,7 @@ class _AdminPostManageScreenState extends State<AdminPostManageScreen> {
             return GestureDetector(
               onTap: () {
                 setState(() => currentPage = index);
+                _fetchPosts();
               },
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 5),
